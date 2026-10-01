@@ -8,6 +8,8 @@ The first criteria (sections "Delivery" to "Presentation") came from `Minecraft 
 - [x] Chromium: load, play, and QA runs with 0 console errors and 0 warnings.
 - [x] Firefox: Joe played it.
 - [x] `file://` launch: Joe loaded the file from disk in Firefox.
+- [x] The game ships as one HTML file. Three.js r160 comes from a CDN. The file needs no other asset and no server-side step. (Wording approved by Joe 2026-10-01. The built `index.html` loads only the jsdelivr Three.js URL. The worker runs from a Blob URL.)
+- [x] `npm run build` writes that file from the modules in `src/`. Git tracks the built file. (`npm run check` fails when the root `index.html` differs from a fresh build.)
 
 ## World
 
@@ -50,7 +52,7 @@ The first criteria (sections "Delivery" to "Presentation") came from `Minecraft 
 - [x] Log to 4 planks and 4 planks to a crafting table, through real DOM clicks. Shift-click on the result works.
 - [x] The recipe book renders.
 - [x] Tool recipes through the UI: a Diamond Pickaxe crafted from the recipe book in Batch 2 QA.
-- [ ] Full inventory leaves drops in the world: not tested.
+- [x] Full inventory leaves drops in the world. (2026-10-01: 35 slots of 64 cobblestone and 63 dirt. A drop of 3 dirt topped the dirt to 64. The other 2 stayed in the world for 8 s. After one slot was emptied, the player picked up the 2. Block breaks use the same `spawnDrop` path.)
 
 ## Mobs
 
@@ -81,7 +83,7 @@ The first criteria (sections "Delivery" to "Presentation") came from `Minecraft 
 - [x] Moon: a white square disc in a soft glow at night, with effects on and off. It matches the Fable moon.
 - [x] Clouds hide the stars behind them. No stars show below the horizon.
 - [x] A full day lasts 720 s (`CONFIG.dayLength`). Superseded: Batch 2 sets 900 s.
-- [ ] LDR fallback (no half-float render targets): not tested. The Chromium GPU supports HDR.
+- [x] LDR fallback (no half-float render targets). (2026-10-01: an init script hid `EXT_color_buffer_float` and `EXT_color_buffer_half_float`. `post.hdr` was false. The sun bloomed through the clouds, with shafts. The console had 0 errors and 0 warnings, and `gl.getError()` returned 0.)
 
 ## Batch 2: depth, liquids, ores, machines, saves
 
