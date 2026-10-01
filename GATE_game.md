@@ -168,7 +168,7 @@ Observed in Chromium through Playwright on 2026-09-27 (seed 4242, pointer-lock s
 - [x] A drop 3 blocks away flies to the player. A drop 4 blocks away does not.
 - [x] A Q throw lands 2.9 blocks away and stays while the player stands still. Walking to it picks it up.
 - [x] Chromium: 0 console errors and 0 warnings.
-- [ ] Joe confirms the colors and the density of pink trees in plains in his own world.
+- [x] Joe confirms the colors and the density of pink trees in plains in his own world. (Joe, 2026-10-01 11:24 CT: "F1-F5 are fine.")
 
 ## Batch 5b: denser pink groves
 
@@ -189,7 +189,7 @@ Observed in Chromium through Playwright on 2026-09-27 (seed 4242).
 - [x] Yellow leaves decay after nearby logs are removed (47 to 0). Leaves still connected to a neighbor trunk stay.
 - [x] A placed yellow leaf becomes id 86, never decays, drops item 87 when broken, and survives a reload.
 - [x] Chromium: 0 console errors and 0 warnings.
-- [ ] Joe confirms the forest mosaic in his own world.
+- [x] Joe confirms the forest mosaic in his own world. (Joe, 2026-10-01 11:24 CT: "F1-F5 are fine.")
 
 ## Batch 7: trash slot
 
@@ -313,9 +313,9 @@ Scope: gates that span Batches 13–18.
 - [x] Unsaved input survives a window resize on every new screen (R9). (The altar is the only new screen. At 800×600 it keeps its tool, 3 crystals, and 3 offers, and the layout fits. Back at 1200×824 the contents are the same.)
 - [x] The id plan holds: no id collides, and `UNLOADED` (255) stays free. (A scan of ids 0–255: every `ITEMS[k].id` is k, every block item points at its own block, no non-block item sits on a block id, no duplicate names. Free ids: 200, 210, 220, 230, 240, 250–255.)
 - [x] The atlas holds every new tile (≤ 256 tiles). (`tileCount` is 94 of the 256 tiles that the 256 px atlas of 16 px tiles holds.)
-- [ ] Owner review (Joe): combat feel with the new mobs.
-- [ ] Owner review (Joe): the look of the structures.
-- [ ] Owner review (Joe): the weather mood.
+- [x] Owner review (Joe): combat feel with the new mobs. (Joe, 2026-10-01 11:24 CT: "F1-F5 are fine.")
+- [x] Owner review (Joe): the look of the structures. (Joe, 2026-10-01 11:24 CT: "F1-F5 are fine.")
+- [x] Owner review (Joe): the weather mood. (Joe, 2026-10-01 11:24 CT: "F1-F5 are fine.") Joe also saw patches of snow amid rain and of rain amid snow: "it looks a little funky".
 
 ## Slot grids at 44 px (Joe, 2026-09-28)
 
