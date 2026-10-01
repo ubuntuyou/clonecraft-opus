@@ -23,18 +23,18 @@ The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. 
 
 ## Step 2: split (gate G2)
 
-- [ ] T7: `tools/parity.js` passes PA1, PA2, and PA3. The 9 setters and the 11 write sites are the only edits.
-- [ ] T8: `tools/depcheck.js` passes: every import obeys D39; every free name in a module is an import or a listed host global; `worldgen.js` has zero imports; the nine modules do not reach `order.js`; `order.js` lists each module once; no module imports `main.js`.
-- [ ] T9: `tools/depcheck.js` fails on a planted break of each rule. Each plant is removed after the check.
-- [ ] `src/` holds `order.js` and the 43 modules of the module map, in the load order of the map.
-- [ ] `tools/split.js` wrote every module. No module holds a hand edit.
-- [ ] T10: dev mode (`npm run dev`) loads in Chromium with 0 console errors. A world starts.
-- [ ] T11: the built file passes T4, T5, and T6 again.
-- [ ] T12: smoke test on the built file, seed 12345, with 0 console errors: break a block, place a block, open and close the inventory, craft one item, pause and resume, save, reload, and find the edit and the item still there.
-- [ ] T12: a save made by the baseline loads in the built file.
-- [ ] `window.clonecraft` in the built file has the same keys as in the baseline.
-- [ ] T13: at the stress view, the built file is at most 5% slower than the baseline. Each file is measured 3 times in turn on the same machine; the medians are compared.
-- [ ] The root `index.html` holds the generated-file comment after the doctype.
+- [x] T7: `tools/parity.js` passes PA1, PA2, and PA3. The 9 setters and the 11 write sites are the only edits. (Also PAGE. 8,689 non-blank lines. A planted `REACH = 6` in `src/config.js` fails PA2.)
+- [x] T8: `tools/depcheck.js` passes: every import obeys D39; every free name in a module is an import or a listed host global; `worldgen.js` has zero imports; the nine modules do not reach `order.js`; `order.js` lists each module once; no module imports `main.js`.
+- [x] T9: `tools/depcheck.js` fails on a planted break of each rule. Each plant is removed after the check. (`tests/depcheck.test.js`: 12 of 12. Each plant goes into a temporary copy of `src/`.)
+- [x] `src/` holds `order.js` and the 43 modules of the module map, in the load order of the map.
+- [x] `tools/split.js` wrote every module. No module holds a hand edit. (A second run of `tools/split.js` gives the same hash of `src/*.js`.)
+- [x] T10: dev mode (`npm run dev`) loads in Chromium with 0 console errors. A world starts. (Port 5281, seed 12345, 4 workers, 0 console messages.)
+- [x] T11: the built file passes T4, T5, and T6 again. (Over `http://` and `file://`: 4 workers, `fallback` false, 0 console messages.)
+- [x] T12: smoke test on the built file, seed 12345, with 0 console errors: break a block, place a block, open and close the inventory, craft one item, pause and resume, save, reload, and find the edit and the item still there. (Broke grass at -9, 139, 21. Placed a log at -9, 140, 23. Crafted 4 planks from 1 log by slot clicks. After the reload: air, log, 4 planks, 2 logs. 0 console messages.)
+- [x] T12: a save made by the baseline loads in the built file. (Seed 31337: the broken block, the placed log, and 7 logs in the inventory load in the built file.)
+- [x] `window.clonecraft` in the built file has the same keys as in the baseline. (98 keys, same names, same order.)
+- [x] T13: at the stress view, the built file is at most 5% slower than the baseline. Each file is measured 3 times in turn on the same machine; the medians are compared. (3240×2025, device pixel ratio 1, seed 12345, spawn view, 6 s after 2 s warm-up. Baseline 20.8, 21.8, 23.3 fps; median 21.8. Built 20.8, 23.3, 23.0 fps; median 23.0. 90th-percentile frame 51.1 ms and 51.1 ms.)
+- [x] The root `index.html` holds the generated-file comment after the doctype. (Line 2. The root file equals `dist/index.html`.)
 
 ## Step 3: tests
 

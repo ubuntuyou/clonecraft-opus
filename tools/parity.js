@@ -1,8 +1,8 @@
 // Parity check for the module split (SPEC_modules.md, D42). One-off tool: Step 5 removes it.
 // It compares src/ and dist/index.html with the baseline (git tag in tools/modmap.json).
 //   PA1  The module ranges cover the baseline script once, in order.
-//   PA2  Each src/<module>.js, without its relative imports and its export line, equals
-//        its baseline lines plus its edits and setters.
+//   PA2  Each src/<module>.js, without its relative imports and its export list, equals
+//        its baseline lines plus its edits and setters. Blank lines do not count.
 //   PA3  The built script equals the baseline script plus the edits and setters, in order.
 //        Blank lines, the Vite CSS line, and the place of the living header do not count.
 //   PAGE The built page outside the script equals the baseline page, except the generated comment.
@@ -10,6 +10,7 @@
 //        node tools/parity.js --unsplit  before the split (Step 1): no edits, no PA1, no PA2
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import * as acorn from 'acorn';
 
 const map = JSON.parse(readFileSync('tools/modmap.json', 'utf8'));
 const unsplit = process.argv.includes('--unsplit');
@@ -30,7 +31,16 @@ function expected(m) {
   return out;
 }
 const firstDiff = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) return `line ${i}: ${JSON.stringify((a[i] ?? '<end>').slice(0, 90))} vs ${JSON.stringify((b[i] ?? '<end>').slice(0, 90))}`; return ''; };
-const trimBlank = (a) => { a = [...a]; while (a.length && !a[0].trim()) a.shift(); while (a.length && !a.at(-1).trim()) a.pop(); return a; };
+
+// A module's text without its relative imports and its export list (the lines split.js adds).
+function withoutLinks(text) {
+  const drop = new Set();
+  for (const n of acorn.parse(text, { ecmaVersion: 'latest', sourceType: 'module', locations: true }).body) {
+    const link = (n.type === 'ImportDeclaration' && n.source.value.startsWith('./')) || (n.type === 'ExportNamedDeclaration' && !n.declaration && !n.source);
+    if (link) for (let l = n.loc.start.line; l <= n.loc.end.line; l++) drop.add(l);
+  }
+  return text.split('\n').filter((_, i) => !drop.has(i + 1));
+}
 
 // PA1
 if (!unsplit) {
@@ -47,9 +57,8 @@ if (!unsplit) {
   for (const m of modules) {
     const path = `src/${m.name}.js`;
     if (!existsSync(path)) { bad.push(`${path} missing`); continue; }
-    const got = readFileSync(path, 'utf8').split('\n')
-      .filter((l) => !/^import .*'\.\/[\w-]+\.js';$/.test(l) && !/^import '\.\/[\w-]+\.js';$/.test(l) && !/^export \{[^}]*\};$/.test(l));
-    const d = firstDiff(trimBlank(got), trimBlank(expected(m)));
+    const got = withoutLinks(readFileSync(path, 'utf8'));
+    const d = firstDiff(got.filter((l) => l.trim()), expected(m).filter((l) => l.trim()));
     if (d) bad.push(`${m.name} ${d}`);
   }
   check(`PA2 each of ${modules.length} module bodies equals its baseline lines plus its edits`, !bad.length, bad.slice(0, 3).join('; '));

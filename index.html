@@ -220,62 +220,6 @@
 
 const index_html_htmlProxy_inlineCss_index_0 = '';
 
-/* =====================================================================================
- * CLONECRAFT — living header
- * -------------------------------------------------------------------------------------
- * An infinite, Minecraft-style voxel sandbox in one HTML file. Three.js comes from a CDN.
- * Everything else (noise, textures, sounds, models) is generated at runtime.
- *
- * Section map (search for "=== N."):
- *   1. Constants and configuration
- *   2. Block and item definitions (ENCH: enchantments; restack() copies a stack with dur and ench)
- *   3. Procedural texture atlas generation (blocks, cracks, item icons, mob skins)
- *   4. Noise functions + 5. World generation — both live inside WorldGenModule(), a pure
- *      function that is serialized into Web Workers. Chunk data = f(seed, cx, cz).
- *      Structures (dungeon, temple, tower, mineshaft) stamp only cells of their own chunk and
- *      report chests and spawners as chunk `features`.
- *   6. Chunk class and chunk management (streaming, block overrides, unloading)
- *   7. Voxel lighting (sky, block, and crystal light, BFS flood fill, incremental updates;
- *      a LIGHT_STOP cell such as a stair takes light but never passes it on)
- *   8. Mesh generation (hidden-face culling, smooth light + AO, sloped liquids, doors, crystals, stairs,
- *      wet faces for caustics: WET_ALPHA; TERRAIN_FS: water waves and glitter, shadows, held light;
- *      rails: railMesh() rotates one flat, slope, or curve quad)
- *   9. Player controls and health (water and lava physics, lava damage; damagePlayer applies
- *      armor by damage kind; the temple trap and its warning: trapNear, audio.trapWarn)
- *  10. Collision detection (per-axis clip against solidBoxes(): full cells and stair boxes;
- *      step-up by stepH for the player and mobs; shared by player/mobs/items). The player alone
- *      passes through leaves (_passLeaf) and climbs in leaf and ladder cells (CLIMB).
- *  11. Raycasting and block editing (DDA, mining, doors, flowing liquids, leaf decay,
- *      farming: saplings, farmland, crops, bone meal, buckets; rails: railPlan() picks the shape
- *      and railJoin() re-shapes a neighbour)
- *  12. Held item view model (the bow pulls back while it draws)
- *  13. Inventory and crafting systems (armor slots, furnace and chest tile entities; lootChest()
- *      fills a generated chest once, and the save keeps `looted`; the altar
- *      screen: altarOffers() seeded by enchantSeed, enchantAltar(); the .ench icon shimmer)
- *  14. Mob entities and AI (skeleton, spider, Magma Brute; creeper and TNT explosions;
- *      arrows in `projectiles`; spawning; `spawners` run the spawner features). `vehicles`: boats
- *      (moveEntity, float in water) and minecarts (a rail cell plus t along it; railLink() hops
- *      cells); player.vehicle seats the rider
- *  15. Particles and audio
- *  16. HUD and UI (menus, save and load, export and import, homes, the compass dial)
- *  17. Day/night cycle and sky; `weather` (clear, rain, storm): per-column rain or snow pools,
- *      lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps the clock)
- *  18. Main animation loop and post-processing (bloom, light shafts); `shadows` (sun or moon
- *      shadow map, G3) and `heldLight` (a held torch flood-fills light into a 32^3 texture, G4)
- *
- * Key invariants:
- *  - Chunk index: idx = (y << 8) | (z << 4) | x, with local x,z in 0..15 and y in 0..H-1 (175).
- *  - Block variants (furnace, chest, wall torch, and stair facing, door states, liquid levels, placed leaves, rail shapes) are separate ids;
- *    baseOf(id) gives the block that the item places and the break drops.
- *  - Every setBlock calls world.onEdit. It wakes nearby liquids, queues leaf-decay checks, and
- *    registers saplings, crops, and farmland with `farming`.
- *  - A chunk is meshed only when it and all 8 neighbours are lit (smooth light reads 1 cell
- *    across every border).
- *  - Block edits go through world.setBlock(): it stores the override, relights, and remeshes.
- *  - A stair id holds its half and facing only. Its corner shape comes from its neighbours
- *    at read time (stairKey), so the mesher, collision, raycast, and outline must all use stairKey.
- *  - Terrain shader works in gamma space. THREE.ColorManagement is disabled on purpose.
- * ===================================================================================== */
 THREE.ColorManagement.enabled = false;
 
 /* =====================================================================================
@@ -364,9 +308,12 @@ const rand = Math.random;
 const randRange = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
+function setGlowGain(v) { glowGain = v; }
+
 /* =====================================================================================
  * === 2. BLOCK AND ITEM DEFINITIONS
  * ===================================================================================== */
+
 const B = {
   AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, COBBLE: 4, COAL_ORE: 5, IRON_ORE: 6, SAND: 7, WATER: 8,
   LOG: 9, PLANKS: 10, LEAVES: 11, SNOW: 12, TABLE: 13, TORCH: 14, BEDROCK: 15,
@@ -828,6 +775,8 @@ function breakTime(id, stack) {
   speed *= 1 + 0.3 * enchLevel(stack, 'efficiency');
   return b.hardness * (harvest ? 1.5 : 5) / speed;
 }
+
+function setEnchantSeed(v) { enchantSeed = v; }
 
 /* =====================================================================================
  * === 3. PROCEDURAL TEXTURE ATLAS GENERATION
@@ -2736,6 +2685,7 @@ class GenService {
  *   -> lit (initChunkLight) -> meshed (when it and all 8 neighbours are lit)
  *   -> unloaded (beyond renderDistance + 3; meshes disposed).
  * ===================================================================================== */
+
 class Chunk {
   constructor(cx, cz, data) {
     this.cx = cx; this.cz = cz; this.key = ckey(cx, cz);
@@ -3168,6 +3118,7 @@ class World {
  * the face; ambient occlusion comes from the 3 opaque neighbours of that vertex.
  * Two meshes per chunk: opaque/cutout and water (transparent).
  * ===================================================================================== */
+
 const PAD = 18, PSY = PAD * PAD, PVOL = PSY * (H + 2);
 const PB = new Uint8Array(PVOL), PS = new Uint8Array(PVOL), PL = new Uint8Array(PVOL), PC = new Uint8Array(PVOL);   // blocks, sky, block light, crystal light
 const pidx = (x, y, z) => (y + 1) * PSY + (z + 1) * PAD + (x + 1);
@@ -3678,6 +3629,7 @@ function setChunkGeometry(world, chunk, mesh, buf, material, y0, y1, order) {
 }
 
 /* ---- terrain materials: custom shader with baked light, day scaling, fog ---------- */
+
 const terrainUniforms = {
   map: { value: atlasTexture },
   uDaylight: { value: 1 },
@@ -3931,6 +3883,7 @@ const waterMaterial = new THREE.ShaderMaterial({
  * Only 'playing' holds pointer lock. The simulation runs in 'playing', 'inventory', 'homes',
  * and 'dead'; it freezes in 'paused' and before the first start.
  * ===================================================================================== */
+
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -3971,6 +3924,7 @@ const input = { keys: new Set(), mouseL: false, mouseR: false, lastWTap: 0, wSpr
 // Esc: the menu closes on the keydown, and the lock request waits for the keyup (`escLock`).
 // Firefox ends pointer lock on the Esc keyup, so a lock taken on the keydown ends at once.
 // An unlock within 300 ms of a soft lock shows #resume, not the pause screen.
+
 let lockSoft = false, escLock = false, softLockAt = -1e9, pausedAt = -1e9;
 const resumeEl = document.getElementById('resume');   // $() is defined later
 function lockRefused() {
@@ -4321,6 +4275,9 @@ function touchesAny(e, table) {
   return false;
 }
 
+function setEscLock(v) { escLock = v; }
+function setPausedAt(v) { pausedAt = v; }
+
 /* =====================================================================================
  * === 10. COLLISION DETECTION
  * -------------------------------------------------------------------------------------
@@ -4335,6 +4292,7 @@ function touchesAny(e, table) {
  * up a half step. UNLOADED cells count as solid, so nothing falls out of the world while
  * terrain streams in.
  * ===================================================================================== */
+
 const EPS = 1e-7;
 // Solid boxes (world units, flat x0 y0 z0 x1 y1 z1) of the cells that overlap a region. A stair
 // gives its slab and step boxes. Every other solid block gives its whole cell.
@@ -4458,6 +4416,7 @@ function cellBlockedByEntity(x, y, z) {
  * flow into a dug gap. Right click uses a block (table, furnace, chest, door) unless Shift
  * is held; otherwise it eats or places the held item.
  * ===================================================================================== */
+
 const SEL_BOX = [];
 for (const def of BLOCKS) if (def) SEL_BOX[def.id] = [0, 0, 0, 1, 1, 1];
 SEL_BOX[B.TORCH] = [0.4, 0, 0.4, 0.6, 0.625, 0.6];
@@ -4943,6 +4902,10 @@ function useBucket(item) {
   inv.changed(); audio.splash(); interacted();
 }
 
+function setTarget(v) { target = v; }
+function setTargetMob(v) { targetMob = v; }
+function setTargetVehicle(v) { targetVehicle = v; }
+
 // ---- liquids -------------------------------------------------------------------------
 // Water and lava flow on a tick: water every 0.25 s, lava every 0.75 s. A cell is queued
 // when a block at or next to it changes (`wake`). Per tick, a queued flow cell first takes
@@ -4953,6 +4916,7 @@ function useBucket(item) {
 // past the source (8 including it). A flow whose feeders are gone drains to air. Two water
 // sources beside a cell over solid ground make a new source. Lava that touches water turns
 // into obsidian (source) or cobblestone (flow).
+
 const liquids = (() => {
   const TICK = [0, 0.25, 0.75], queues = [null, new Map(), new Map()], timers = [0, 0, 0];
   const key = (x, y, z) => `${x},${y},${z}`;
@@ -5045,6 +5009,7 @@ const liquids = (() => {
 // leaf is checked once, after a random delay, so a canopy falls apart over a few seconds.
 // A decay wakes nothing: a leaf with a path to a log never depends on a leaf without one.
 // A decaying leaf drops a stick 1 time in 20. The queue is saved with the world.
+
 const leafDecay = (() => {
   const REACH = 6, DELAY_MIN = 0.4, DELAY_MAX = 6, STICK_CHANCE = 0.05, BUDGET_MS = 2;
   const queue = new Map();            // "x,y,z" -> [x, y, z, due game.clock]
@@ -5123,6 +5088,7 @@ const leafDecay = (() => {
 //   - Crop: 4 stages (0..3). A stage takes 40-80 s on wet farmland and twice that on dry farmland.
 //   - Farmland: checked every 5 s. It is wet with water within 4 blocks horizontally, at its own
 //     level or one above. Dry farmland without a crop turns to dirt after 60 s.
+
 const farming = (() => {
   const SAPLING_STAGE = [30, 90], SAPLING_WAIT = 20, CROP_STAGE = [40, 80], FARM_CHECK = 5, DRY_TO_DIRT = 60, WATER_REACH = 4;
   const RIPE = B.WHEAT + 3;
@@ -5279,11 +5245,11 @@ function updateInteraction(dt) {
   mining.cooldown -= dt;
   camera.getWorldDirection(_dir);
   const ox = camera.position.x, oy = camera.position.y, oz = camera.position.z;
-  target = player.dead ? null : raycast(ox, oy, oz, _dir.x, _dir.y, _dir.z, REACH);
+  setTarget(player.dead ? null : raycast(ox, oy, oz, _dir.x, _dir.y, _dir.z, REACH));
   const vh = player.dead ? null : vehicles.ray(ox, oy, oz, _dir.x, _dir.y, _dir.z, target ? target.t : REACH);
-  targetMob = player.dead ? null : raycastMobs(ox, oy, oz, _dir.x, _dir.y, _dir.z, Math.min(3.5, vh ? vh.t : target ? target.t : REACH));
-  targetVehicle = targetMob || !vh ? null : vh.v;
-  if (targetMob || targetVehicle) target = null;
+  setTargetMob(player.dead ? null : raycastMobs(ox, oy, oz, _dir.x, _dir.y, _dir.z, Math.min(3.5, vh ? vh.t : target ? target.t : REACH)));
+  setTargetVehicle(targetMob || !vh ? null : vh.v);
+  if (targetMob || targetVehicle) setTarget(null);
 
   stairOutline.visible = !!target && !!IS_STAIR[target.id];
   if (stairOutline.visible) {
@@ -5344,6 +5310,7 @@ function updateInteraction(dt) {
 
 // ---- dropped items -------------------------------------------------------------------
 // A drop is a small spinning item model with physics. The player collects it on contact.
+
 const drops = [];
 class Drop {
   constructor(id, count, dur, x, y, z, vel, delay) {
@@ -5426,6 +5393,7 @@ function updateDrops(dt) {
  * The same models serve dropped items. Transform stack:
  *   vmRoot (bob, sway, equip dip) -> vmSwing (attack swing) -> held mesh (per-kind pose).
  * ===================================================================================== */
+
 // Atlas copy with biome tint applied (grass/leaves use the plains/forest colour).
 const itemAtlasCanvas = document.createElement('canvas');
 itemAtlasCanvas.width = itemAtlasCanvas.height = ATLAS_SIZE;
@@ -5627,6 +5595,7 @@ const viewModel = {
  * and 'chest'. A furnace or chest keeps its slots in a tile entity (`tileEntities`, keyed
  * "x,y,z"). Furnaces smelt in `updateFurnaces` whether or not their screen is open.
  * ===================================================================================== */
+
 const inv = {
   slots: new Array(36).fill(null), sel: 0,
   craft: new Array(9).fill(null), craftSize: 2, cursor: null,
@@ -5736,6 +5705,7 @@ function dropEverything() {
 }
 
 // ---- recipes ------------------------------------------------------------------------
+
 const RECIPES = [];
 function shaped(pattern, key, out, count = 1) {
   RECIPES.push({ pattern, key, out, count, w: pattern[0].length, h: pattern.length });
@@ -5810,6 +5780,7 @@ function matchRecipe(grid, size) {
   }
   return null;
 }
+
 const craftGrid = () => inv.craft.slice(0, inv.craftSize * inv.craftSize);
 function craftOutput() {
   const r = matchRecipe(craftGrid(), inv.craftSize);
@@ -5821,6 +5792,7 @@ function consumeCraft() {
 }
 
 // ---- tile entities: furnace and chest contents ------------------------------------------
+
 const tileEntities = new Map();   // "x,y,z" -> { type, x, y, z, slots, burn?, burnMax?, cook? }
 const ui = { mode: 'craft', te: null };   // what the inventory screen shows
 function tileEntity(x, y, z) {
@@ -5933,6 +5905,7 @@ function updateFurnaces(dt) {
 }
 
 // ---- inventory screen -----------------------------------------------------------------
+
 const invEl = document.getElementById('inventory'), invPanelEl = document.getElementById('invPanel');
 const chestGridEl = document.getElementById('chestGrid');
 const craftGridEl = document.getElementById('craftGrid');
@@ -6053,7 +6026,7 @@ function enchantAltar(k) {
   s.ench = { ...s.ench, [o.key]: o.level };
   s.dur ??= ITEMS[s.id].maxDur;
   if ((gem.count -= o.cost) <= 0) inv.altar[1] = null;
-  enchantSeed = (Math.random() * 2 ** 31) | 0;
+  setEnchantSeed((Math.random() * 2 ** 31) | 0);
   audio.enchant();
   inv.changed();
   return true;
@@ -6340,6 +6313,7 @@ function fillRecipe(r, row) {
  * so dark caves spawn them by day too. Zombies burn in direct sunlight; creepers under
  * open sky despawn by day. Creepers hiss for 1.5 s near the player, then explode.
  * ===================================================================================== */
+
 const mobs = [];
 const MOB_TEX = {};
 function mtex(key, base, variance, painter) { return MOB_TEX[key] || (MOB_TEX[key] = mobTexture(base, variance, painter)); }
@@ -6804,6 +6778,7 @@ function updateMobs(dt) {
 // cell, `t` its place from rail end A (0) to rail end B (1), and `u` its signed speed (blocks per s)
 // toward B. A cart without a rail falls until it meets one. `update` moves each vehicle before
 // `updatePlayer`, which seats the rider.
+
 const VEHICLE_KINDS = {
   boat: { item: I.BOAT, w: 1.375, h: 0.6, stepH: 0.45, eye: 1.1, sound: 'wood' },
   cart: { item: I.MINECART, w: 0.98, h: 0.7, stepH: 0, eye: 1.25, sound: 'stone' },
@@ -7060,6 +7035,7 @@ const vehicles = (() => {
 // mob on its path; a mob arrow hits only the player. An arrow that meets a solid cell sticks there
 // for ARROW_STUCK s. The player picks up a stuck player arrow by walking near it. An arrow whose
 // block is broken falls again. An arrow in an unloaded chunk, or in flight for ARROW_FLIGHT s, is removed.
+
 const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10;
 const projectiles = (() => {
   const list = [];
@@ -7153,6 +7129,7 @@ const projectiles = (() => {
 })();
 
 // ---- explosions ------------------------------------------------------------------------
+
 function explode(x, y, z, r, cause = 'was blown up by a creeper') {
   audio.explode(x, y, z);
   particles.explosion(x, y, z, r);
@@ -7223,6 +7200,7 @@ function updateTnt(dt) {
 }
 
 // ---- spawning ---------------------------------------------------------------------------
+
 const entityStore = new Map();   // chunk key -> [{type, x, y, z, hp}] saved passive mobs
 const spawnedChunks = new Set(); // chunk keys that already rolled their passive mobs
 const PASSIVE_BY_BIOME = {
@@ -7397,6 +7375,7 @@ const spawners = (() => {
  * Audio: WebAudio, every sound is synthesized from oscillators and a noise buffer.
  * Positional sounds pan with the camera's right vector and fade over 32 blocks.
  * ===================================================================================== */
+
 const MAX_PARTICLES = 6000;
 const particles = (() => {
   const N = MAX_PARTICLES;
@@ -7633,6 +7612,7 @@ const particles = (() => {
 })();
 
 // ---- audio --------------------------------------------------------------------------------
+
 const audio = {
   ctx: null, master: null, noiseBuf: null, _v: new THREE.Vector3(), _r: new THREE.Vector3(),
   init() {
@@ -7865,6 +7845,7 @@ const audio = {
  * Game states: loading -> menu -> playing <-> paused | inventory | homes | dead.
  * `setState` is the only place that shows and hides the screens.
  * ===================================================================================== */
+
 const $ = (id) => document.getElementById(id);
 const SPLASHES = [
   'Infinite voxels!', 'One file!', 'Zero assets!', '100% procedural!', 'Now with creepers!', 'Punch trees!',
@@ -8002,6 +7983,7 @@ const hud = {
 hud.build();
 
 // ---- menus and settings -------------------------------------------------------------
+
 const overlayEl = $('overlay'), deathEl = $('death'), playBtn = $('playBtn');
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 $('seedText').textContent = `Seed ${SEED} · the world saves itself · ?seed=${SEED} reopens it`;
@@ -8013,7 +7995,7 @@ function setState(s) {
   homesEl.classList.toggle('show', s === 'homes');
   deathEl.classList.toggle('show', s === 'dead');
   $('crosshair').style.display = s === 'playing' ? 'block' : 'none';
-  if (s !== 'playing') { resumeEl.style.display = 'none'; escLock = false; }
+  if (s !== 'playing') { resumeEl.style.display = 'none'; setEscLock(false); }
   $('hud').style.display = game.started ? 'block' : 'none';
   if (s === 'paused') { playBtn.textContent = 'Resume'; playBtn.disabled = false; }
   if (s === 'menu' || s === 'paused') syncTimeSetting();
@@ -8022,7 +8004,7 @@ function setState(s) {
 function showPause() {
   if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes') return;
   setState('paused');
-  pausedAt = performance.now();
+  setPausedAt(performance.now());
   persist.save();
 }
 // Fades the view in from black (first start and respawn).
@@ -8090,6 +8072,7 @@ freezeEl.addEventListener('change', () => {
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
 // play, on pause, and when the page hides or closes. An import sets `blocked`, so the
 // page-hide save cannot overwrite the imported save before the reload.
+
 const persist = {
   timer: 0, savedAt: 0, warned: false, blocked: false,
   savedAgo() { return this.savedAt ? `${Math.round((performance.now() - this.savedAt) / 1000)} s ago` : 'never'; },
@@ -8141,11 +8124,11 @@ const persist = {
       world.overridesByChunk.set(k, m);
     }
     for (const t of d.te || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t);
-    homes = d.homes || [];
+    setHomes(d.homes || []);
     liquids.load(d.liquids);
     leafDecay.load(d.leaves);
     farming.load(d.farm);
-    if (Number.isInteger(d.enchantSeed)) enchantSeed = d.enchantSeed;
+    if (Number.isInteger(d.enchantSeed)) setEnchantSeed(d.enchantSeed);
     vehicles.load(d.vehicles);
     for (const k of d.looted || []) looted.add(k);
     weather.load(d.weather);
@@ -8221,6 +8204,7 @@ $('importFile').addEventListener('change', async (e) => {
 });
 
 // ---- homes: named places to teleport to (H) ---------------------------------------------
+
 const MAX_HOMES = 10;
 let homes = [];   // [{ name, x, y, z, yaw }]
 const homesEl = $('homes'), homesListEl = $('homesList'), homeNameEl = $('homeName');
@@ -8288,6 +8272,8 @@ function renderHomes() {
 }
 $('homeSetBtn').addEventListener('click', () => setHome());
 
+function setHomes(v) { homes = v; }
+
 /* =====================================================================================
  * === 17. DAY/NIGHT CYCLE AND SKY
  * -------------------------------------------------------------------------------------
@@ -8301,6 +8287,7 @@ $('homeSetBtn').addEventListener('click', () => setHome());
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
  * ===================================================================================== */
+
 const sky = (() => {
   const group = new THREE.Group();
   scene.add(group);
@@ -8539,6 +8526,7 @@ const sky = (() => {
 // SNOW_LINE, rain elsewhere. A drop never falls below the top non-air block of its column, so roofs,
 // trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
 // the player and mobs within 3 blocks and lights nothing. Thunder follows at THUNDER_SPEED blocks/s.
+
 const weather = (() => {
   const RADIUS = 24, FADE = 6, BOLT_RANGE = 64, THUNDER_SPEED = 34, NRAIN = 2600, NSNOW = 1100, STREAK = 1.3;
   let kind = 'clear', left = randRange(300, 900), k = 0, storm = 0, boltT = randRange(5, 20), flash = 0;
@@ -8745,6 +8733,7 @@ const weather = (() => {
  * update the sky and HUD, render the world through `post` (bloom and light shafts), clear depth,
  * then render the held item.
  * ===================================================================================== */
+
 function findSpawnColumn() {
   const good = (c) => c.biome !== BIOME.OCEAN && c.biome !== BIOME.RIVER && c.h > SEA + 1 && c.h < SEA + 28;
   const pref = (c) => c.biome === BIOME.PLAINS || c.biome === BIOME.FOREST;
@@ -8816,6 +8805,8 @@ function onLoaded() {
   loadText.textContent = SAVE ? `Welcome back · ${at}` : `Spawn: ${at}`;
 }
 
+function setLast(v) { last = v; }
+
 // ---- post-processing: bloom and light shafts ------------------------------------------
 // `post.render()` draws the world. With CONFIG.bloom off it renders straight to the screen.
 // Otherwise it renders into `sceneRT` (HDR half float when the GPU allows, with a depth
@@ -8835,6 +8826,7 @@ function onLoaded() {
 // vehicles, and arrows. The pass hides water, transparent and alpha-tested materials, points,
 // lines, and every ShaderMaterial but the terrain (the sky). Off when Shadows is off and while the
 // light is below the horizon. TERRAIN_FS reads it through uShadowMap and uShadowMat.
+
 const shadows = (() => {
   const SIZE = 2048, HALF = 64, DEPTH = 320;
   const rt = new THREE.WebGLRenderTarget(SIZE, SIZE, { depthBuffer: true, stencilBuffer: false });
@@ -8914,6 +8906,7 @@ const shadows = (() => {
 // and never through OPAQUE blocks. The levels live in a 32³ R8 3D texture centred on the head
 // (linear filtering smooths it). It refills when the head cell, the held item, or any block changes.
 // TERRAIN_FS samples it (uHeld); world.brightnessAt reads levelAt() for mobs, drops, and particles.
+
 const heldLight = (() => {
   const N = 32, R = 16, LEVEL = 14;
   const data = new Uint8Array(N * N * N);
@@ -9109,7 +9102,7 @@ const post = (() => {
   }
 
   function render() {
-    glowGain = CONFIG.bloom && hdr ? 2 : 1;
+    setGlowGain(CONFIG.bloom && hdr ? 2 : 1);
     terrainUniforms.uGlow.value = glowGain;
     if (!CONFIG.bloom) {
       renderer.setRenderTarget(null);
@@ -9153,10 +9146,67 @@ const post = (() => {
   return { render, resize, hdr };
 })();
 
+/* =====================================================================================
+ * CLONECRAFT — living header
+ * -------------------------------------------------------------------------------------
+ * An infinite, Minecraft-style voxel sandbox in one HTML file. Three.js comes from a CDN.
+ * Everything else (noise, textures, sounds, models) is generated at runtime.
+ *
+ * Section map (search for "=== N."):
+ *   1. Constants and configuration
+ *   2. Block and item definitions (ENCH: enchantments; restack() copies a stack with dur and ench)
+ *   3. Procedural texture atlas generation (blocks, cracks, item icons, mob skins)
+ *   4. Noise functions + 5. World generation — both live inside WorldGenModule(), a pure
+ *      function that is serialized into Web Workers. Chunk data = f(seed, cx, cz).
+ *      Structures (dungeon, temple, tower, mineshaft) stamp only cells of their own chunk and
+ *      report chests and spawners as chunk `features`.
+ *   6. Chunk class and chunk management (streaming, block overrides, unloading)
+ *   7. Voxel lighting (sky, block, and crystal light, BFS flood fill, incremental updates;
+ *      a LIGHT_STOP cell such as a stair takes light but never passes it on)
+ *   8. Mesh generation (hidden-face culling, smooth light + AO, sloped liquids, doors, crystals, stairs,
+ *      wet faces for caustics: WET_ALPHA; TERRAIN_FS: water waves and glitter, shadows, held light;
+ *      rails: railMesh() rotates one flat, slope, or curve quad)
+ *   9. Player controls and health (water and lava physics, lava damage; damagePlayer applies
+ *      armor by damage kind; the temple trap and its warning: trapNear, audio.trapWarn)
+ *  10. Collision detection (per-axis clip against solidBoxes(): full cells and stair boxes;
+ *      step-up by stepH for the player and mobs; shared by player/mobs/items). The player alone
+ *      passes through leaves (_passLeaf) and climbs in leaf and ladder cells (CLIMB).
+ *  11. Raycasting and block editing (DDA, mining, doors, flowing liquids, leaf decay,
+ *      farming: saplings, farmland, crops, bone meal, buckets; rails: railPlan() picks the shape
+ *      and railJoin() re-shapes a neighbour)
+ *  12. Held item view model (the bow pulls back while it draws)
+ *  13. Inventory and crafting systems (armor slots, furnace and chest tile entities; lootChest()
+ *      fills a generated chest once, and the save keeps `looted`; the altar
+ *      screen: altarOffers() seeded by enchantSeed, enchantAltar(); the .ench icon shimmer)
+ *  14. Mob entities and AI (skeleton, spider, Magma Brute; creeper and TNT explosions;
+ *      arrows in `projectiles`; spawning; `spawners` run the spawner features). `vehicles`: boats
+ *      (moveEntity, float in water) and minecarts (a rail cell plus t along it; railLink() hops
+ *      cells); player.vehicle seats the rider
+ *  15. Particles and audio
+ *  16. HUD and UI (menus, save and load, export and import, homes, the compass dial)
+ *  17. Day/night cycle and sky; `weather` (clear, rain, storm): per-column rain or snow pools,
+ *      lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps the clock)
+ *  18. Main animation loop and post-processing (bloom, light shafts); `shadows` (sun or moon
+ *      shadow map, G3) and `heldLight` (a held torch flood-fills light into a 32^3 texture, G4)
+ *
+ * Key invariants:
+ *  - Chunk index: idx = (y << 8) | (z << 4) | x, with local x,z in 0..15 and y in 0..H-1 (175).
+ *  - Block variants (furnace, chest, wall torch, and stair facing, door states, liquid levels, placed leaves, rail shapes) are separate ids;
+ *    baseOf(id) gives the block that the item places and the break drops.
+ *  - Every setBlock calls world.onEdit. It wakes nearby liquids, queues leaf-decay checks, and
+ *    registers saplings, crops, and farmland with `farming`.
+ *  - A chunk is meshed only when it and all 8 neighbours are lit (smooth light reads 1 cell
+ *    across every border).
+ *  - Block edits go through world.setBlock(): it stores the override, relights, and remeshes.
+ *  - A stair id holds its half and facing only. Its corner shape comes from its neighbours
+ *    at read time (stairKey), so the mesher, collision, raycast, and outline must all use stairKey.
+ *  - Terrain shader works in gamma space. THREE.ColorManagement is disabled on purpose.
+ * ===================================================================================== */
+
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
-  last = now;
+  setLast(now);
 
   camera.getWorldDirection(camDir);
   world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' ? 40 : 7);
