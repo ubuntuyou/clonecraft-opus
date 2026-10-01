@@ -39,7 +39,7 @@ This keeps procedural texture colors identical to their canvas values.
 
 `setState()` is the only function that shows or hides screens. The states are `loading`, `menu`, `paused`, `playing`, `inventory`, `homes`, and `dead`.
 `game.simulating()` is true for `playing`, `inventory`, `homes`, and `dead`. The main loop runs the simulation only then. A pause therefore freezes time, mobs, drops, and particles.
-A menu close returns to `playing`, not `paused`. Esc on the pause screen also returns to `playing`. After Esc, the lock request waits for the Esc keyup, because Firefox ends pointer lock on that keyup. A browser can refuse the lock without a user gesture. The game then shows a resume hint, and the next click takes the lock.
+A menu close returns to `playing`, not `paused`. Esc on the pause screen also returns to `playing`. After Esc, the lock request waits for the Esc keyup. In Chrome and Brave, Joe saw a lock taken on the keydown end at once. A browser can refuse the lock without a user gesture. The game then shows a resume hint, and the next click takes the lock.
 
 ### D7. A fixed per-frame budget for world work
 

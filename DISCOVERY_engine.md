@@ -18,7 +18,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 ## Gotchas
 
 - Headless Chromium refuses pointer lock. A hard lock (`requestLock()` from Play or respawn) then calls `showPause()`, and the state becomes `paused`. A soft lock (`requestLock(true)` from a menu close) keeps `playing` and shows `#resume`.
-- Esc closes a menu on the keydown and requests the lock on the keyup (`escLock`). Joe saw a lock requested on the keydown end in the pause screen. The likely cause: Firefox ends pointer lock on the Esc keyup. An unlock within 300 ms of a soft lock shows `#resume`, not the pause screen.
+- Esc closes a menu on the keydown and requests the lock on the keyup (`escLock`). In Chrome and Brave, Joe saw a lock requested on the keydown end in the pause screen. The likely cause: the browser ends pointer lock on the Esc keyup. I did not verify this. An unlock within 300 ms of a soft lock shows `#resume`, not the pause screen.
 - Esc on the pause screen resumes only 400 ms or more after the pause (`pausedAt`). The guard skips an Esc that paused the game.
 - A refused soft lock shows `#resume`. The next canvas click takes the lock and does not mine.
 - Playwright cannot get pointer lock on this Mac, even headed. Test lock paths with a stub: replace `canvas.requestPointerLock` and `document.exitPointerLock`, and define `document.pointerLockElement`.

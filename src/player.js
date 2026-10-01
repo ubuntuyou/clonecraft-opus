@@ -5,7 +5,7 @@
 // A menu close (inventory, homes, pause by Esc) asks for a soft lock. On a refused soft lock
 // the game stays in 'playing' and shows #resume; the next click on the canvas takes the lock.
 // Esc: the menu closes on the keydown, and the lock request waits for the keyup (`escLock`).
-// Firefox ends pointer lock on the Esc keyup, so a lock taken on the keydown ends at once.
+// In Chrome and Brave (Joe's report), a lock taken on the Esc keydown ends at once.
 // An unlock within 300 ms of a soft lock shows #resume, not the pause screen.
 import {
   BOB_RATE, clamp, CLIMB_V, CONFIG, EYE, FLY_SPEED, FLY_V, GRAVITY, JUMP_V, LEAF_SPEED, randRange,

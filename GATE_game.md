@@ -6,8 +6,8 @@ The first criteria (sections "Delivery" to "Presentation") came from `Minecraft 
 
 - [x] Code is in the spec's sections, numbered 1–18, with a living header.
 - [x] Chromium: load, play, and QA runs with 0 console errors and 0 warnings.
-- [x] Firefox: Joe played it.
-- [x] `file://` launch: Joe loaded the file from disk in Firefox.
+- [x] Chrome and Brave: Joe played it. (Corrected 2026-10-01: the line said Firefox. Joe does not use Firefox.)
+- [x] `file://` launch: Joe loaded the file from disk in Chrome or Brave. (Corrected 2026-10-01: the line said Firefox.)
 - [x] The game ships as one HTML file. Three.js r160 comes from a CDN. The file needs no other asset and no server-side step. (Wording approved by Joe 2026-10-01. The built `index.html` loads only the jsdelivr Three.js URL. The worker runs from a Blob URL.)
 - [x] `npm run build` writes that file from the modules in `src/`. Git tracks the built file. (`npm run check` fails when the root `index.html` differs from a fresh build.)
 
@@ -68,7 +68,7 @@ The first criteria (sections "Delivery" to "Presentation") came from `Minecraft 
 - [x] HUD: hearts, hotbar, item-name toast, and the debug text (FPS, XYZ, chunk, biome, facing, time).
 - [x] Particles: block break, explosion (size capped near the camera), torch flame, and fire on burning zombies.
 - [x] Held item: arm, cube, tool, and torch poses.
-- [x] Audio: Joe heard it in Firefox.
+- [x] Audio: Joe heard it in Chrome or Brave. (Corrected 2026-10-01: the line said Firefox.)
 - [x] Leaves and plants sway: the frame changes when only the shader time changes. Trees show no gaps.
 - [x] Water glints toward the sun by day and the moon by night.
 - [x] Menu panorama, frosted panel, and the new controls rows render. The hotbar selector centers on the selected slot. A stack that grows pops its icon.
@@ -123,10 +123,10 @@ Observed in Chromium through Playwright on 2026-09-25 (seed 4242).
 - [x] Esc in the inventory, crafting table, furnace, chest, and homes screens returns to `playing`, not `paused`. The resume hint shows.
 - [x] Esc while the resume hint shows opens the pause screen. A lock grant hides the hint. A canvas click without the lock does not mine.
 - [x] The resume click takes the pointer lock in a real browser. (Joe, 2026-09-29, in his browser: "esc and resume work fine".)
-- [x] Fix after Joe's report (Esc in menus still paused): the Esc lock request moved to the keyup. With a stub that grants every lock and ends it on an Esc keyup (the Firefox model), Esc from the inventory, chest, and homes screens returned to `playing` with the lock held. The lock request ran on `keyup`.
+- [x] Fix after Joe's report (Esc in menus still paused): the Esc lock request moved to the keyup. With a stub that grants every lock and ends it on an Esc keyup (the model of Joe's report), Esc from the inventory, chest, and homes screens returned to `playing` with the lock held. The lock request ran on `keyup`.
 - [x] Esc on the pause screen resumes `playing` (stub: lock held). An Esc within 400 ms of the pause does not resume. A held Esc (repeat) does not pause again.
 - [x] A refused lock after Esc shows the resume hint in `playing`. A canvas click then takes the lock.
-- [x] Esc behavior in a real browser. (Joe, 2026-09-29: "esc and resume work fine". Firefox not named.)
+- [x] Esc behavior in a real browser. (Joe, 2026-09-29: "esc and resume work fine". Chrome or Brave.)
 - [x] Chromium: 0 console errors and 0 warnings.
 
 ## Batch 3b: required pickaxe level
