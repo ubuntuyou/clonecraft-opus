@@ -1,3 +1,9 @@
+// ---- texture atlas (section 3) ---------------------------------------------------------
+// Paints every block tile into one 256×256 canvas at startup (16×16 pixels per tile).
+// TILE maps a tile name to its index; TILE_PIX keeps the pixels for item icons and particles.
+// atlasTexture wraps the canvas for the terrain shader. The crack stages and the item icons
+// come from the same painters. Each tile seeds its RNG from its name, so a tile looks the same
+// in every world.
 import { THREE } from './three.js';
 import { clamp, hashString, lerp, mulberry32 } from './config.js';
 import {

@@ -46,14 +46,14 @@ The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. 
 
 ## Step 4: docs (gate G3)
 
-- [ ] T18: the built script at Step 4 has the same token stream as the built script at Step 2.
-- [ ] T19: `ARCHITECTURE.md` holds D36–D42 and the seams S1–S4.
-- [ ] T19: `README.md` gives the dev, build, test, and check commands.
-- [ ] T19: `CHANGELOG.md` `[Unreleased]` records the change.
-- [ ] T19: no doc states that the project has no build step. No doc points at a baseline line number.
-- [ ] T19: `DISCOVERY_build.md` exists and records the Vite 7 pin and the reason.
-- [ ] T20: each module over 150 lines starts with a section banner or a living header.
-- [ ] The living header in `src/order.js` describes the module layout.
+- [x] T18: the built script at Step 4 has the same token stream as the built script at Step 2. (acorn tokenizer: 139,672 tokens each, no difference. A planted `REACH = 9` fails at token 47. The only markup change is the HTML comment in `src/index.html`.)
+- [x] T19: `ARCHITECTURE.md` holds D36–D42 and the seams S1–S4. (grep: 7 headings, S1–S4 rows.)
+- [x] T19: `README.md` gives the dev, build, test, and check commands. (Section "Develop".)
+- [x] T19: `CHANGELOG.md` `[Unreleased]` records the change. (Two lines under "Changed".)
+- [x] T19: no doc states that the project has no build step. No doc points at a baseline line number. (`SPEC_expansion.md` and `SPEC_graphics.md` carry dated superseded notes. `SPEC_modules.md` cites baseline lines on purpose: it describes the tag.)
+- [x] T19: `DISCOVERY_build.md` exists and records the Vite 7 pin and the reason. (Gotchas, first item.)
+- [x] T20: each module over 150 lines starts with a section banner or a living header. (Script: every such module has a comment in its first 3 lines. `atlas.js`, `post.js`, and `player.js` got new headers.)
+- [x] The living header in `src/order.js` describes the module layout. ("Module layout" block; the section map names the modules.)
 
 ## Step 5: close
 

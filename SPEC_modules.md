@@ -198,9 +198,9 @@ The load order equals the row order. "Lines" are baseline line numbers. The 43 r
 3. The module's setters, if any.
 4. One line: `export { name, name, ... };`.
 
-The split measures 274 exported names. `tools/split.js` derives each import and export list from the baseline with a parser. Nobody writes the lists by hand.
+The split measures 281 exported names. `tools/split.js` derives each import and export list from the baseline with a parser. Nobody writes the lists by hand.
 
-#### Upward names in `order.js` (43 names, measured)
+#### Upward names in `order.js` (44 names, measured)
 
 | Module | Names |
 |---|---|
@@ -224,7 +224,7 @@ The split measures 274 exported names. `tools/split.js` derives each import and 
 | `hud` | `hud` |
 | `menus` | `setState`, `showPause`, `fadeIn`, `clockText` |
 | `persist` | `persist` |
-| `homes` | `homes`, `homesEl`, `openHomes`, `homesKey` |
+| `homes` | `homes`, `homesEl`, `openHomes`, `homesKey`, `setHomes` |
 | `weather` | `weather` |
 | `held-light` | `heldLight` |
 
@@ -252,7 +252,7 @@ A setter is one line: `function setTarget(v) { target = v; }`. A write site keep
 |---|---|
 | `npm run dev` | Vite serves `src/` with native modules. It needs `http://`. |
 | `npm run build` | Writes the root `index.html`. Two runs give the same bytes. |
-| `npm test` | Runs `node --test tests/`. |
+| `npm test` | Runs `node --test "tests/**/*.test.js"`. Node 25 rejects a bare folder. |
 | `npm run check` | Runs `tools/depcheck.js`, the tests, and the fresh-build comparison. |
 
 #### The parity check (`tools/parity.js`)
@@ -260,7 +260,7 @@ A setter is one line: `function setTarget(v) { target = v; }`. A write site keep
 `tools/modmap.json` holds the module ranges, the 9 setter lines, and the 11 write-site edits. `tools/parity.js` reads the baseline from the tag and checks three things:
 
 - PA1: the ranges cover lines 430–9382 once, in order.
-- PA2: each `src/<module>.js`, without its import lines and its export line, equals its baseline lines plus its listed edits.
+- PA2: each `src/<module>.js`, without its import lines and its export line, equals its baseline lines plus its listed edits. Blank lines do not count.
 - PA3: the built script, without blank lines and the Vite CSS line, equals the baseline script without blank lines, plus the listed edits. The order is the baseline order. The living header may sit at a different place.
 
 It also checks that the CSS and the markup of the built file equal baseline lines 1–372, except the generated-file comment and the script tag.

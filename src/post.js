@@ -1,3 +1,7 @@
+// ---- post-processing (section 18) -------------------------------------------------------
+// `post` renders the scene into an offscreen target, then adds bloom (a 5-level blur chain)
+// and light shafts toward the sun or the moon. It uses half-float targets when the GPU has
+// them. glowGain sets the bloom strength; post writes it through setGlowGain().
 import { THREE } from './three.js';
 import { CONFIG, glowGain, H, setGlowGain } from './config.js';
 import { terrainUniforms } from './terrain-material.js';

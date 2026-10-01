@@ -7,8 +7,8 @@
 <title>Clonecraft</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'%3E%3Crect width='4' height='4' fill='%23866043'/%3E%3Crect width='4' height='1' fill='%235d9e3a'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%235d9e3a'/%3E%3C/svg%3E">
 <!--
-  CLONECRAFT — a single-file, infinite, Minecraft-style voxel sandbox.
-  Living header: see the top of the module script below for the section map.
+  CLONECRAFT — an infinite, Minecraft-style voxel sandbox that ships as one file.
+  Living header: src/order.js holds the section map and the module load order.
 -->
 <style>
   :root { --slot: 44px; --islot: 44px; }   /* --islot: every inventory-screen slot; 44 px meets the tap-target rule (R3) */
@@ -799,6 +799,13 @@ const BIOME_FOLIAGE = BIOME_GRASS.map(([r, g, b], i) =>
   i === BIOME.SNOWY_MOUNTAINS || i === BIOME.SNOWY_PLAINS ? [96, 138, 116] :
   i === BIOME.RAINFOREST ? [60, 170, 30] : [Math.round(r * 0.82), Math.round(g * 0.9), Math.round(b * 0.75)]);
 const TINT_ALPHA = 191;
+
+// ---- texture atlas (section 3) ---------------------------------------------------------
+// Paints every block tile into one 256×256 canvas at startup (16×16 pixels per tile).
+// TILE maps a tile name to its index; TILE_PIX keeps the pixels for item icons and particles.
+// atlasTexture wraps the canvas for the terrain shader. The crack stages and the item icons
+// come from the same painters. Each tile seeds its RNG from its name, so a tile looks the same
+// in every world.
 
 const ATLAS_SIZE = 256;
 const atlasCanvas = document.createElement('canvas');
@@ -3919,6 +3926,10 @@ const player = {
 };
 const input = { keys: new Set(), mouseL: false, mouseR: false, lastWTap: 0, wSprint: false, rightRepeat: 0 };
 
+// ---- player: pointer lock, movement, health (section 9) ------------------------------------
+// updatePlayer(dt) reads input and moves the player through moveEntity (walk, sprint, fly,
+// swim, climb). A rider sits still; vehicles.seat() places it. updateCamera(dt) places the
+// camera. damagePlayer, die, and respawn own health. The pointer-lock rules follow.
 // A menu close (inventory, homes, pause by Esc) asks for a soft lock. On a refused soft lock
 // the game stays in 'playing' and shows #resume; the next click on the canvas takes the lock.
 // Esc: the menu closes on the keydown, and the lock request waits for the keyup (`escLock`).
@@ -8965,6 +8976,11 @@ const heldLight = (() => {
   };
 })();
 
+// ---- post-processing (section 18) -------------------------------------------------------
+// `post` renders the scene into an offscreen target, then adds bloom (a 5-level blur chain)
+// and light shafts toward the sun or the moon. It uses half-float targets when the GPU has
+// them. glowGain sets the bloom strength; post writes it through setGlowGain().
+
 const post = (() => {
   const hdr = renderer.capabilities.isWebGL2 &&
     (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float'));
@@ -9147,47 +9163,70 @@ const post = (() => {
 })();
 
 /* =====================================================================================
- * CLONECRAFT — living header
+ * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
- * An infinite, Minecraft-style voxel sandbox in one HTML file. Three.js comes from a CDN.
- * Everything else (noise, textures, sounds, models) is generated at runtime.
+ * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 43 modules
+ * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
- * Section map (search for "=== N."):
- *   1. Constants and configuration
- *   2. Block and item definitions (ENCH: enchantments; restack() copies a stack with dur and ench)
- *   3. Procedural texture atlas generation (blocks, cracks, item icons, mob skins)
- *   4. Noise functions + 5. World generation — both live inside WorldGenModule(), a pure
- *      function that is serialized into Web Workers. Chunk data = f(seed, cx, cz).
+ * Module layout:
+ *  - This file lists every module once, in load order. main.js imports this file first,
+ *    so the browser evaluates the modules in the order below.
+ *  - A module imports an earlier module's names directly from that module.
+ *  - A module imports a later module's names (upward names) from './order.js' and uses them
+ *    only inside a function. The `export { } from` lines below re-export the upward names.
+ *  - An imported binding is read-only. A write to another module's `let` goes through the
+ *    owner's setter (setTarget, setHomes, ...).
+ *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
+ *  - three, config, blocks, biomes, atlas, worldgen, gen-service, terrain-material, and
+ *    crafting never reach this file. Node tests import them.
+ *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
+ *
+ * Section map (search for "=== N."; the modules of each section follow it):
+ *   1. Constants and configuration: config
+ *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
+ *      dur and ench)
+ *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
+ *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
+ *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
  *      Structures (dungeon, temple, tower, mineshaft) stamp only cells of their own chunk and
  *      report chests and spawners as chunk `features`.
- *   6. Chunk class and chunk management (streaming, block overrides, unloading)
- *   7. Voxel lighting (sky, block, and crystal light, BFS flood fill, incremental updates;
- *      a LIGHT_STOP cell such as a stair takes light but never passes it on)
- *   8. Mesh generation (hidden-face culling, smooth light + AO, sloped liquids, doors, crystals, stairs,
- *      wet faces for caustics: WET_ALPHA; TERRAIN_FS: water waves and glitter, shadows, held light;
- *      rails: railMesh() rotates one flat, slope, or curve quad)
- *   9. Player controls and health (water and lava physics, lava damage; damagePlayer applies
- *      armor by damage kind; the temple trap and its warning: trapNear, audio.trapWarn)
- *  10. Collision detection (per-axis clip against solidBoxes(): full cells and stair boxes;
- *      step-up by stepH for the player and mobs; shared by player/mobs/items). The player alone
- *      passes through leaves (_passLeaf) and climbs in leaf and ladder cells (CLIMB).
- *  11. Raycasting and block editing (DDA, mining, doors, flowing liquids, leaf decay,
- *      farming: saplings, farmland, crops, bone meal, buckets; rails: railPlan() picks the shape
- *      and railJoin() re-shapes a neighbour)
- *  12. Held item view model (the bow pulls back while it draws)
- *  13. Inventory and crafting systems (armor slots, furnace and chest tile entities; lootChest()
- *      fills a generated chest once, and the save keeps `looted`; the altar
- *      screen: altarOffers() seeded by enchantSeed, enchantAltar(); the .ench icon shimmer)
- *  14. Mob entities and AI (skeleton, spider, Magma Brute; creeper and TNT explosions;
- *      arrows in `projectiles`; spawning; `spawners` run the spawner features). `vehicles`: boats
- *      (moveEntity, float in water) and minecarts (a rail cell plus t along it; railLink() hops
- *      cells); player.vehicle seats the rider
- *  15. Particles and audio
- *  16. HUD and UI (menus, save and load, export and import, homes, the compass dial)
- *  17. Day/night cycle and sky; `weather` (clear, rain, storm): per-column rain or snow pools,
- *      lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps the clock)
- *  18. Main animation loop and post-processing (bloom, light shafts); `shadows` (sun or moon
- *      shadow map, G3) and `heldLight` (a held torch flood-fills light into a 32^3 texture, G4)
+ *   6. Chunk class and chunk management + 7. Voxel lighting: world (streaming, block
+ *      overrides, unloading; sky, block, and crystal light, BFS flood fill, incremental
+ *      updates; a LIGHT_STOP cell such as a stair takes light but never passes it on)
+ *   8. Mesh generation: mesher (hidden-face culling, smooth light + AO, sloped liquids, doors,
+ *      crystals, stairs, wet faces for caustics: WET_ALPHA; rails: railMesh() rotates one
+ *      flat, slope, or curve quad); terrain-material (TERRAIN_FS: water waves and glitter,
+ *      shadows, held light)
+ *   9. Renderer and player: engine, player (water and lava physics, lava damage;
+ *      damagePlayer applies armor by damage kind; the temple trap and its warning: trapNear,
+ *      audio.trapWarn)
+ *  10. Collision detection: collision (per-axis clip against solidBoxes(): full cells and
+ *      stair boxes; step-up by stepH for the player and mobs; shared by player/mobs/items).
+ *      The player alone passes through leaves (_passLeaf) and climbs in leaf and ladder
+ *      cells (CLIMB).
+ *  11. Raycasting and block editing: interact (DDA, mining, doors; rails: railPlan() picks
+ *      the shape and railJoin() re-shapes a neighbour), liquids, leaf-decay, farming
+ *      (saplings, farmland, crops, bone meal, buckets), targeting (world.onEdit wiring,
+ *      selection box, crack overlay), drops
+ *  12. Held item view model: held-item (the bow pulls back while it draws)
+ *  13. Inventory and crafting: inventory, crafting, craft-grid, tile-entities (furnaces,
+ *      chests; lootChest() fills a generated chest once, and the save keeps `looted`),
+ *      inventory-ui (armor slots; the altar screen: altarOffers() seeded by enchantSeed,
+ *      enchantAltar(); the .ench icon shimmer)
+ *  14. Mob entities and AI: mobs (skeleton, spider, Magma Brute, creeper), vehicles (boats:
+ *      moveEntity, float in water; minecarts: a rail cell plus t along it, railLink() hops
+ *      cells; player.vehicle seats the rider), projectiles (arrows), explosions (TNT),
+ *      spawning (`spawners` run the spawner features)
+ *  15. Particles and audio: particles, audio
+ *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
+ *      import), homes
+ *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): per-column rain or snow
+ *      pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
+ *      the clock)
+ *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,
+ *      G3), held-light (a held torch flood-fills light into a 32^3 texture, G4), post (bloom,
+ *      light shafts), main (frame loop, window.clonecraft)
  *
  * Key invariants:
  *  - Chunk index: idx = (y << 8) | (z << 4) | x, with local x,z in 0..15 and y in 0..H-1 (175).

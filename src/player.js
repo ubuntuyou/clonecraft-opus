@@ -1,3 +1,7 @@
+// ---- player: pointer lock, movement, health (section 9) ------------------------------------
+// updatePlayer(dt) reads input and moves the player through moveEntity (walk, sprint, fly,
+// swim, climb). A rider sits still; vehicles.seat() places it. updateCamera(dt) places the
+// camera. damagePlayer, die, and respawn own health. The pointer-lock rules follow.
 // A menu close (inventory, homes, pause by Esc) asks for a soft lock. On a refused soft lock
 // the game stays in 'playing' and shows #resume; the next click on the canvas takes the lock.
 // Esc: the menu closes on the keydown, and the lock request waits for the keyup (`escLock`).

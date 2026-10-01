@@ -121,6 +121,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- Source layout (SPEC_modules.md): the source is now 43 ES modules in `src/`. Vite 7 and vite-plugin-singlefile build them into the root `index.html`, which still ships as one file. The game plays the same; a save from the single-file version loads unchanged.
+- Build and checks: `npm run dev` serves `src/` with live reload. `npm run build` writes the root `index.html`. `npm test` runs Node tests for world generation (golden chunk hashes), block and item ids, and crafting. `npm run check` runs the dependency check, the tests, and a fresh build, and fails when the root `index.html` is stale.
 - Pause menu: the settings rows sit closer together (30 px apart, was 56 px). The desktop menu no longer uses the 44 px touch targets. Effects is now two check boxes, "Shadows" and "Bloom + shafts", which work on their own. An old Effects value of 1 or 2 turns both on. The `fx` URL parameter is now a bit mask: 1 shadows, 2 bloom and shafts, 3 both.
 
 - Oak, spruce, and jungle trees grow 1 or 2 blocks taller, and their crowns move up with the trunk. Trees stand where they stood before. This applies to existing worlds too; a tree chopped in an old save can leave 1–2 leaf blocks on top.

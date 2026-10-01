@@ -14,7 +14,7 @@ Gate: `GATE.md`, section "Graphics G1–G4".
 
 ### Constraints
 
-- All code stays in `index.html`. No external assets. Three.js r160 only.
+- All code stays in `index.html`. No external assets. Three.js r160 only. (Superseded 2026-10-01 by SPEC_modules.md: the source is the modules in `src/`. `npm run build` writes the one shipped `index.html`.)
 - Light does not pass through opaque blocks. This holds for shadows (G3) and the held torch (G4).
 - Effects 0 turns off shadows. The world then looks as it does today, plus G1, G2, and G4. (Superseded 2026-09-29: the "Shadows" box turns shadows off.)
 - Frame rate at 1200×824 with default settings stays at or above 50 fps on Joe's Mac.

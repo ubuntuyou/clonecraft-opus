@@ -18,7 +18,7 @@ Six feature groups give the player goals past rubies, diamonds, and TNT.
 
 ### Constraints
 
-- All code stays in `index.html`, in its numbered sections. No build step and no external assets.
+- All code stays in `index.html`, in its numbered sections. No build step and no external assets. (Superseded 2026-10-01 by SPEC_modules.md: the source is the modules in `src/`. `npm run build` writes the one shipped `index.html`.)
 - Block and item ids stay one byte. `UNLOADED` (255) stays reserved. The id plan in Part 2 is fixed.
 - The world generator stays pure: the same seed gives the same chunks, structures, and loot.
 - Saves from before this spec load without loss. New save fields are optional in `validSave`.
@@ -120,7 +120,7 @@ Six feature groups give the player goals past rubies, diamonds, and TNT.
 
 ### Where it lives
 
-All code is in `index.html`.
+All code is in `index.html`. (Superseded 2026-10-01 by SPEC_modules.md: the source is the modules in `src/`. `npm run build` writes the one shipped `index.html`.)
 
 | Feature | Section |
 | --- | --- |

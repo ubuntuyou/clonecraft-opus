@@ -1,7 +1,8 @@
 # Clonecraft
 
-Clonecraft is an infinite, Minecraft-style voxel sandbox in one HTML file.
+Clonecraft is an infinite, Minecraft-style voxel sandbox that ships as one HTML file.
 Three.js r160 loads from the jsdelivr CDN. The game generates all textures, sounds, models, and terrain at runtime.
+The source is the modules in `src/`. `npm run build` writes them into the root `index.html`.
 
 ## Run
 
@@ -10,6 +11,18 @@ Three.js r160 loads from the jsdelivr CDN. The game generates all textures, soun
 3. Wait for the loading bar, then click **Play**.
 
 Opening `index.html` directly from disk (`file://`) is not verified.
+
+## Develop
+
+Edit the modules in `src/`. Never edit the root `index.html`; the build overwrites it.
+
+1. Install the tools once: `npm install`.
+2. Run the dev server: `npm run dev`. Vite serves `src/` with live reload.
+3. Write the shipped file: `npm run build`. Commit the new `index.html` with the source change.
+4. Run the tests: `npm test`. The tests cover world generation, block and item ids, and crafting.
+5. Run all checks before a commit: `npm run check`. It runs the dependency check, the tests, and a fresh build. It fails when the root `index.html` differs from that build.
+
+`src/order.js` holds the living header and the module load order. `DISCOVERY_build.md` holds the build gotchas.
 
 ## URL parameters
 

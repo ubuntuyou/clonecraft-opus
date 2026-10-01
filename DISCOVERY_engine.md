@@ -1,6 +1,6 @@
 # DISCOVERY: engine
 
-Gotchas, pointers, and invariants for `index.html`. Read this file before you change the world, the renderer, or the game states.
+Gotchas, pointers, and invariants for the game modules in `src/`. Read this file before you change the world, the renderer, or the game states. `src/order.js` maps the sections to the modules. `DISCOVERY_build.md` covers the build and the module rules.
 
 ## Invariants
 
@@ -10,7 +10,7 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 - `world.setBlock()` is the only write path for blocks. Wrap many edits in `beginBatch()` and `endBatch()`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, and registers farming cells. `beginBatch()` does not nest: an inner `endBatch()` ends the outer batch. Check `world.batch` first (see `batched()` in `farming`).
 - Use `baseOf(id)`, not `BLOCKS[id].base`, when `id` can be `UNLOADED`. `BLOCKS[255]` is undefined.
 - `setState()` is the only function that shows or hides screens.
-- `WorldGenModule()` must read no outside state. The worker runs its source text.
+- `WorldGenModule()` must read no outside state. The worker runs its source text. `src/worldgen.js` therefore has no imports; `tools/depcheck.js` fails on one.
 - A structure stamp writes only cells inside its own chunk (`structCtx` drops the others). Every placement decision uses a world hash or `column()`, never the chunk's own blocks, so neighbour chunks agree (D28).
 - A structure must stay reachable on foot. After a stamp change, run the walk check (see Pointers).
 - `game.daylight` includes the weather (`clearDaylight × weather.dim` plus the flash). Code that means the time of day, such as mob burning, reads `game.clearDaylight` (D29).
@@ -35,7 +35,7 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 - `P.fill(fn)` in `paintTile` ignores the return value of `fn`. A painter must call `P.set(x, y, c)`. A painter that returns colors gives a transparent tile, and the shader discards every texel.
 - Wind sway and glow codes include 232 for crystal faces (emissive). The fragment shader tests the alpha range 0.88..0.94.
 - Particle point size is capped at `uScale * 0.35` pixels, and points closer than 1.6 blocks fade out. Without the cap, explosion smoke fills the screen.
-- `python3 -m http.server` lets Chromium cache `index.html`. After an edit, load the page with a new query value (`&v=N`).
+- `python3 -m http.server` lets Chromium cache the built `index.html`. After an edit, load the page with a new query value (`&v=N`).
 - `glowGain` is 2 only with `CONFIG.bloom` on and an HDR target. Anything multiplied by it must look the same at 1 as before bloom existed.
 - The shaft mask treats a pixel above y `H + 4` (180) as cloud (30% open). Clouds fly at y 192. Terrain tops out near y 173.
 - Do not draw a bright sky body with additive blending. The composite roll-off keeps the hue, so white added to blue sky turns pale blue. The sun and the moon use normal blending (`discTexture`, `discMat`). The sun gain is `glowGain²`, and the moon gain is `glowGain`.
@@ -52,6 +52,8 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 - A new `.islot` kind needs `slotStack`, `slotArray`, `slotAccepts`, `quickMove`, and the `closeInventory` return list. A missed `closeInventory` entry deletes the items on close. `dropEverything` and the `persist.data()` loose list need it too.
 - `enchantSeed` is module state. A test cannot set it. Call `enchantAltar(k)` to re-roll it, and read it through the `clonecraft.enchantSeed` getter.
 - `player.pitch` is positive when the player looks up.
+- An imported binding is read-only. `x = v` on another module's `let` throws a `TypeError`, but only when that line runs. Call the owner's setter (`setTarget(v)`). `tools/depcheck.js` (rule `readonly`) catches the write without a run.
+- A module may use a later module's name (an upward name, from `./order.js`) only inside a function. At load time that module has not run yet. `tools/depcheck.js` (rule `upward`) catches a load-time use.
 - A test that places the player near hostile mobs must respawn on death and pin the position every poll. A skeleton arrow knocks the player back, and a platform edge is a lethal fall.
 - A ranged mob refreshes line of sight (`sees`) every 0.25 s. After a wall appears, one stale shot can still fire.
 - A spider is calm while `max(sky light × daylight, block light)` at its head is 12 or more and it is not `angry`. Night sky light at daylight 0.27 gives about 4, so a spider in the open chases at night.
@@ -82,15 +84,15 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 
 - Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.
 - `game.clearDaylight` runs from 4.5/15 (`NIGHT_DAYLIGHT`) at night to 1 at day. Keep round(15 × floor) at 7 or less, or hostile mobs stop spawning in the open. Caustics gate at `uDaylight` 0.35, so the floor must stay below it. `game.daylight` is that value dimmed by the weather. `sky.update()` sets both.
-- Weather: `weather` (section 17). `RADIUS` 24, `FADE` 6 s, `BOLT_RANGE` 64, `THUNDER_SPEED` 34 blocks/s. `precip(x, z, top)` gives 0 none, 1 rain, 2 snow. `top(x, z)` gives -1 for an unloaded column. `rainGain` reads the rain loop volume.
+- Weather: `weather` (`src/weather.js`). `RADIUS` 24, `FADE` 6 s, `BOLT_RANGE` 64, `THUNDER_SPEED` 34 blocks/s. `precip(x, z, top)` gives 0 none, 1 rain, 2 snow. `top(x, z)` gives -1 for an unloaded column. `rainGain` reads the rain loop volume.
 - Hostile spawns need `max(round(sky * daylight), blockLight) <= 7`, 24–44 blocks from the player.
 - Slot size: `--islot` (44 px) sizes every inventory-screen slot and `#cursorStack`. `.grid` sets the 12 px gap between slots. The `.gap` spacer sets the 12 px between the backpack and the hotbar row. Do not size a slot group on its own.
 - Menu text contrast: `.menu` is `rgba(8,10,16,.8)` over the live scene. At .8, `#aaa` text holds 4.97:1 over a white sky. A lighter panel fails R2 in daylight.
 - UI rule scan: `tools/uiscan.js` defines `window.__uiscan()` (load it with `page.addScriptTag`). It returns target-size, target-gap, and contrast breaks for the current state. The gradient title is a known false positive.
-- Shadows: `shadows` (before `post`). 2048² map, box ±64 blocks, depth 320, bias `0.1 / DEPTH`, normal offset 0.12 block. `sampler2DShadow`: 4 reads at 2.2 texels on a noise-turned square (terrain), 1 read (water). Fade over the outer 20 % of the box. Leaf faces drop half of their 4×4-texel cells in the pass (dappled light).
-- Held torch: `heldLight` (before `post`). `levelAt(x, y, z)` gives 0..15. `on` is true while the selected slot holds `B.TORCH`. The shader samples at the face centre plus half a block along the normal, flipped toward the camera.
-- Water patterns: `bakeWaterPatterns` fills `uCaus` (caustic net) and `uRipple` (RG slope) once at startup; 256², repeat, mipmapped.
-- Caustics: faces with sway alpha `WET_ALPHA` (246). `pushQuad` writes it when `wetFace` is set by `emitCubeFace`.
+- Shadows: `shadows` (`src/shadows.js`, before `post`). 2048² map, box ±64 blocks, depth 320, bias `0.1 / DEPTH`, normal offset 0.12 block. `sampler2DShadow`: 4 reads at 2.2 texels on a noise-turned square (terrain), 1 read (water). Fade over the outer 20 % of the box. Leaf faces drop half of their 4×4-texel cells in the pass (dappled light).
+- Held torch: `heldLight` (`src/held-light.js`, before `post`). `levelAt(x, y, z)` gives 0..15. `on` is true while the selected slot holds `B.TORCH`. The shader samples at the face centre plus half a block along the normal, flipped toward the camera.
+- Water patterns: `bakeWaterPatterns` (`src/terrain-material.js`) fills `uCaus` (caustic net) and `uRipple` (RG slope) once at startup; 256², repeat, mipmapped.
+- Caustics: faces with sway alpha `WET_ALPHA` (246). `pushQuad` (`src/mesher.js`) writes it when `wetFace` is set by `emitCubeFace`.
 - Caustics must scale `sky`, not add to `light`. An added term driven by `uSunAmt` (0.4 under the moon then, 0.5 now) glowed at night and ignored depth. Depth fade: `smoothstep(0.5, 0.95, vLight.x)`; night gate: `uDaylight` below 0.35.
 - Caustic projection: shift `cp` by depth (`15*(1-vLight.x)`), never by `vWorld.y`. Absolute y (about 125) times the moving sun direction slid the net up to about 7 blocks/s. A QA script that resets `game.dayTime` before each shot hides this.
 - Sky discs: `Object3D.lookAt` takes a world-space target. The sky group follows the camera, so the sun, moon, and halo must `lookAt(camera.position)`, not `(0, 0, 0)`.
@@ -107,7 +109,7 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 - The walk bob and the footsteps share `walkPhase`. A footstep plays when `floor(walkPhase)` changes.
 - Before `game.started`, `updateCamera()` shows the menu panorama and ignores the player's yaw.
 - Liquids: `LIQ_KIND` (1 water, 2 lava) and `LIQ_LEVEL` (8 source, 1..7 flow). `liquids.pending` counts queued cells. F3 shows it.
-- Tile entities: `tileEntities` ("x,y,z"). A furnace has `slots` [input, fuel, output], `burn`, `burnMax`, and `cook`. `SMELT_TIME` is 5 s.
+- Tile entities: `tileEntities` (`src/tile-entities.js`; "x,y,z"). A furnace has `slots` [input, fuel, output], `burn`, `burnMax`, and `cook`. `SMELT_TIME` is 5 s.
 - Light curves: sky light uses `0.83^(15 - l)` and block light uses `0.85^(15 - l)`. The shader (`curve`, `curveB`) and `world.brightnessAt()` must match.
 - Wall torches: `B.TORCH_WALL + f` leans toward `DIR4[f]`, and its wall is the cell at `-DIR4[f]`. `torchFor()` picks the id on placement. `breakBlock()` breaks wall torches on the four sides of a removed block.
 - Doors: `doorTimers` maps the bottom half to the close time in `game.clock`. A blocked doorway retries every 0.5 s.
@@ -118,12 +120,12 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 - Crystals: `B.CRYSTAL + v` grows along `CRYSTAL_GROW[v]` (0 up, 1 down, 2..5 walls). Its rock is the cell at `-CRYSTAL_GROW[v]`. `crystalFor()` picks the id on placement. `breakBlock()` breaks crystals on the removed cell's faces. Floor crystals use the generic `NEEDS_SUPPORT` check above the cell.
 - Stairs: `B.STAIRS_COBBLE` (111) and `B.STAIRS_PLANKS` (119) are bases. The id is `base + (top << 2 | facing)`, and the tall half lies toward `DIR4[facing]`. `IS_STAIR` marks all 16 ids. `stairKey(id, get)` gives the index into `STAIR_BOXES` (boxes in 1/16 units: slab first). Pass `get(dx, dz)` for the same-height neighbours. `stairFor()` picks the id on placement.
 - A stair is `opaque: false` and in `LIGHT_STOP`. `propagate` never spreads from a `LIGHT_STOP` cell, and `relightAt` skips such neighbours as candidates. Do not make stairs opaque: an opaque cell has no light of its own, so its faces go black.
-- Collision: `solidBoxes()` fills the flat `_boxes` array, and `clipAxis()` clips one axis. `moveEntity` handles step-up only for entities with `stepH`. Only the player has `stepRise`, and `updateCamera` eases it. The selection crack overlay stays a full cube on a stair.
+- Collision: `solidBoxes()` (`src/collision.js`) fills the flat `_boxes` array, and `clipAxis()` clips one axis. `moveEntity` handles step-up only for entities with `stepH`. Only the player has `stepRise`, and `updateCamera` eases it. The selection crack overlay stays a full cube on a stair.
 - Crystals: `CRYSTAL_PATCHES` (2.5) is a mean. The loop runs `ceil` times and keeps the last patch with the fractional chance. A new value moves crystals in existing worlds. Saves keep only edits, so no save breaks.
 - Light channels: `CH_SKY` 0, `CH_BLK` 1, `CH_CRY` 2. `chunk.chan[ch]` holds each array, and `CH_EMIT[ch]` holds each emission table (`EMIT`, `EMIT_CRY`). `propagate`, `unpropagate`, and `relightAt` take the channel number. Add a light source to a channel by its `defBlock` field (`emit` or `emitCry`).
-- TNT: `primedTnt` ("x,y,z" to fuse state) lives outside the save. `updateTnt()` drops an entry when its cell is no longer TNT, so any break defuses it. Tests read `c.primedTnt`.
-- Leaf decay: `leafDecay` (queue, reach 6). F3 shows "Leaves queued". A decay calls `breakBlock()` silently and wakes nothing.
-- Farming: `farming` holds one registry (Map "x,y,z" to `[x, y, z, due, n]`) for saplings, unripe crops, and farmland. `due` is in `game.clock`. `n` is the sapling stage or the dry seconds of a farmland. `farming.save()` stores the remaining time, so the save is clock-free. `farming.boost()` is bone meal. `farming.toDirt()` also breaks the crop above. Tests read `c.farming.save()` for stages and timers.
+- TNT: `primedTnt` (`src/explosions.js`; "x,y,z" to fuse state) lives outside the save. `updateTnt()` drops an entry when its cell is no longer TNT, so any break defuses it. Tests read `c.primedTnt`.
+- Leaf decay: `leafDecay` (`src/leaf-decay.js`; queue, reach 6). F3 shows "Leaves queued". A decay calls `breakBlock()` silently and wakes nothing.
+- Farming: `farming` (`src/farming.js`) holds one registry (Map "x,y,z" to `[x, y, z, due, n]`) for saplings, unripe crops, and farmland. `due` is in `game.clock`. `n` is the sapling stage or the dry seconds of a farmland. `farming.save()` stores the remaining time, so the save is clock-free. `farming.boost()` is bone meal. `farming.toDirt()` also breaks the crop above. Tests read `c.farming.save()` for stages and timers.
 - `raycast(..., sources = true)` also stops at liquid sources (level 8). Only the empty bucket uses it. Flow cells stay transparent to the ray.
 - A food with `regen` (golden apple) sets `player.regenLeft` and can be eaten at full health. `FUEL_LEFT` names the item a fuel leaves behind (lava bucket to bucket).
 - Pickup: `PICKUP_RANGE` 3.3 for all drops. A drop from `dropStack()` has `thrown` set and uses `THROWN_PICKUP_RANGE` 1.8, so a Q throw does not return to a still player.
@@ -131,6 +133,6 @@ Gotchas, pointers, and invariants for `index.html`. Read this file before you ch
 - Rails: `B.RAIL + v` (157..166). v 0 runs along z, v 1 along x, v 2..5 slope up toward `DIR4[v - 2]`, and v 6..9 are curves. `RAIL_ENDS[v]` lists the two ends. `railLink(x, y, z, v, d)` finds the linked rail at end `d`, one block up or down included. Only v 0 drops the Rail item (`noItem`).
 - Vehicle speeds: `BOAT_WATER_SPEED` 6, `BOAT_LAND_SPEED` 1, `BOAT_TURN` 2 rad/s, and `CART_MAX` 8. A slope adds 7 × grade per second to a cart.
 - The trap warning (`trapNear`) matches any chiseled sandstone over TNT, not only temples, like the trap trigger itself. It scans 7×7×15 cells 4 times a second.
-- Structures: `stampDungeon`, `stampTemple`, `stampTower`, and `stampMineshafts` in `WorldGenModule`. Rates: a dungeon in about 1 chunk in 12, a temple in about 1 desert chunk in 40, a tower in about 1 chunk in 50 of plains, forest, and highlands. `mineshaftPlan(gx, gz)` is pure per 96-block cell.
-- Loot: `LOOT[type]` entries are `[item, min, max, weight]`. `'ench'` and `'armor'` are special entries. `featureAt(x, y, z, kind)` finds a chunk feature.
-- Walk check method: extract `WorldGenModule` from `index.html` into Node, generate the chunks around each structure, and run a BFS with steps up 1 and drops up to 3. A structure passes when the BFS reaches its goal (hall floor, top chest) and walks back out. Also compare 2 generations of the same chunk for determinism.
+- Structures: `stampDungeon`, `stampTemple`, `stampTower`, and `stampMineshafts` in `WorldGenModule` (`src/worldgen.js`). Rates: a dungeon in about 1 chunk in 12, a temple in about 1 desert chunk in 40, a tower in about 1 chunk in 50 of plains, forest, and highlands. `mineshaftPlan(gx, gz)` is pure per 96-block cell.
+- Loot: `LOOT[type]` (`src/tile-entities.js`) entries are `[item, min, max, weight]`. `'ench'` and `'armor'` are special entries. `featureAt(x, y, z, kind)` finds a chunk feature.
+- Walk check method: import `WorldGenModule` from `src/worldgen.js` in Node (`tests/worldgen.test.js` shows the constants it needs), generate the chunks around each structure, and run a BFS with steps up 1 and drops up to 3. A structure passes when the BFS reaches its goal (hall floor, top chest) and walks back out. Also compare 2 generations of the same chunk for determinism.

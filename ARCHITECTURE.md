@@ -1,6 +1,6 @@
 # Architecture
 
-Clonecraft is one HTML file with one module script. The script has numbered sections 1–18. The living header at the top of the script maps the sections. This document records the decisions and the seams between the sections.
+Clonecraft ships as one HTML file with one module script. The source is 43 ES modules in `src/`. `npm run build` writes them into the root `index.html` (D36). The code keeps its numbered sections 1–18 as banners in the modules. The living header in `src/order.js` maps the sections to the modules. This document records the decisions and the seams.
 
 ## Decisions
 
@@ -205,6 +205,34 @@ The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the d
 
 `SOLID` stays shared by every entity, so leaves still stop mobs, drops, vehicles, and arrows. `moveEntity` reads `e.passLeaves` (set on the player only) and sets `_passLeaf` for `solidBoxes`, which skips leaf cells. The top leaf of a column stays solid while the feet are on or above it and the fall is slower than `LEAF_CATCH_V`, so a canopy is a floor to walk on and a net to fall into. `CLIMB` marks leaves and ladders; `updatePlayer` swaps gravity for the climb while the body touches one. The tree `lift` comes from `hash3` of the trunk base, not from the chunk rng, so taller trees do not move any later draw: trees, ores, and structures keep their places.
 
+### D36. The source lives in `src/`; the built file is generated and committed
+
+`src/index.html` holds the CSS, the markup, and one script tag for `main.js`. `npm run build` writes the root `index.html`. Git tracks the built file, so Joe can open it or copy it to a laptop without Node. A comment after the doctype says the file is generated. `npm run check` fails when the root file differs from a fresh build.
+
+### D37. The build is Vite 7 with `vite-plugin-singlefile`, pinned
+
+`package.json` pins exact versions of Vite 7 and the plugin. The build does not minify, tree-shake, or down-level, so the built script keeps the module text. Vite 8 bundles with Rolldown and rewrites the code (comments removed, `const` to `var`, constants inlined), so the project stays on Vite 7. `DISCOVERY_build.md` holds the details.
+
+### D38. `src/order.js` pins the load order
+
+`main.js` imports `./order.js` first. `order.js` lists every other module once, in load order. ES modules evaluate depth-first, and `order.js` stays in progress during the whole load, so an import of `./order.js` from inside a module never changes the order. The load order equals the order of the old single script, so every statement runs in the same order as before.
+
+### D39. One import rule
+
+A module imports an earlier module's names directly. It imports a later module's names (upward names) from `./order.js`, which re-exports them, and uses them only inside a function body. No module imports `main.js`. `tools/depcheck.js` enforces the rule and also rejects any free name that is not a JavaScript or browser global.
+
+### D40. Setters replace cross-module writes
+
+An imported binding is read-only. A `let` that another module writes gets a one-line setter in its owner (`setTarget`, `setHomes`, `setGlowGain`, and 6 more). The other module calls the setter. A write inside the owner stays a plain assignment.
+
+### D41. The worker keeps the Blob and `toString()`
+
+`src/worldgen.js` holds `WorldGenModule` and has no imports. `GenService` still builds each worker from `WorldGenModule.toString()`. The build keeps the function text, so the worker source does not change. The same rule lets Node tests import `worldgen.js` directly.
+
+### D42. Text proved the split; tests guard it now
+
+The split was mechanical. `tools/split.js` cut the old script into modules, and `tools/parity.js` proved the built script equal to the old script plus the setters. The git tag `baseline-single-file` keeps the old file. From now on, `npm run check` guards the build: depcheck, the Node tests (worldgen golden hashes, block ids, recipes), and the fresh-build comparison.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -230,4 +258,8 @@ The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the d
 | weather | `weather.update(dt)` runs once per frame before `sky.update`. The sky reads `weather.k`, `storm`, `dim`, and `flash`. Mobs read `weather.wetAt(x, z)`. `set(kind, seconds)` and `strike(x, z)` are the entry points (D29). |
 | screens | `setState(s)`. |
 | rendering | `heldLight.update()`, then `shadows.render()`, then `post.render()` draw the world each frame. `post.resize()` follows the window. `terrainUniforms` carries the shadow map, the held-light texture, and `uWet` (D30, D31, D32). |
-| tests | `window.clonecraft` exposes the game objects. |
+| S1: load order | `src/order.js` lists every module once, in load order, and re-exports the upward names. A new module goes in its place in that list (D38, D39). |
+| S2: build | `src/` goes in; the root `index.html` comes out. `npm run build` writes it; `npm run check` proves it is fresh (D36, D37). |
+| S3: setters | A setter in the owner module is the only way to write another module's `let` (D40). |
+| S4: worker source | `src/worldgen.js` has no imports, so the worker and Node can both load it (D41). |
+| tests | `window.clonecraft` exposes the game objects in the browser. `npm test` runs the Node tests on the modules that never reach `order.js`. |
