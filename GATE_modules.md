@@ -38,11 +38,11 @@ The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. 
 
 ## Step 3: tests
 
-- [ ] T14: `worldgen` tests pass: the same seed gives the same chunk bytes twice; an instance built from `WorldGenModule.toString()` gives the same chunk as a direct instance; the hashes of three fixed chunks match recorded values.
-- [ ] T15: `blocks` tests pass: the ids in `B` and `I` are unique and do not overlap; each `B` id has a `BLOCKS` entry; each `I` id has an `ITEMS` entry.
-- [ ] T16: `crafting` tests pass: three known recipes match; an empty grid gives `null`; a shaped recipe smaller than the grid matches at each offset and when mirrored.
-- [ ] T17: `npm run check` exits 0.
-- [ ] T17: `npm run check` exits non-zero after a one-character edit of the root `index.html`. The file is restored after the check.
+- [x] T14: `worldgen` tests pass: the same seed gives the same chunk bytes twice; an instance built from `WorldGenModule.toString()` gives the same chunk as a direct instance; the hashes of three fixed chunks match recorded values. (Chunks 0,0; 5,-3; -12,7 at seed 12345. The hashes come from the baseline `WorldGenModule`, cut from the git tag. A planted change in `hash3` fails all three; the file is restored.)
+- [x] T15: `blocks` tests pass: the ids in `B` and `I` are unique and do not overlap; each `B` id has a `BLOCKS` entry; each `I` id has an `ITEMS` entry.
+- [x] T16: `crafting` tests pass: three known recipes match; an empty grid gives `null`; a shaped recipe smaller than the grid matches at each offset and when mirrored. (Planks, stone pickaxe, furnace. Sticks at all 6 offsets. The axe mirrored and shifted.)
+- [x] T17: `npm run check` exits 0. (depcheck pass, 29 of 29 tests, the root file equals a fresh build.)
+- [x] T17: `npm run check` exits non-zero after a one-character edit of the root `index.html`. The file is restored after the check. (A space added on line 5: exit 1. `git checkout` restored the file.)
 
 ## Step 4: docs (gate G3)
 

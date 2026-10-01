@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"require('fs').copyFileSync('dist/index.html','index.html')\""
+    "build": "vite build && node -e \"require('fs').copyFileSync('dist/index.html','index.html')\"",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "check": "node tools/depcheck.js && npm test && vite build && node -e \"const f=require('fs');if(f.readFileSync('dist/index.html','utf8')!==f.readFileSync('index.html','utf8')){console.error('check: index.html differs from a fresh build of src/. Run npm run build.');process.exit(1)}console.log('check: index.html equals a fresh build')\""
   },
   "devDependencies": {
     "acorn": "8.18.0",
