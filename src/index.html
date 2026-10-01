@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clonecraft</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'%3E%3Crect width='4' height='4' fill='%23866043'/%3E%3Crect width='4' height='1' fill='%235d9e3a'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%235d9e3a'/%3E%3C/svg%3E">
+<!--
+  CLONECRAFT — a single-file, infinite, Minecraft-style voxel sandbox.
+  Living header: see the top of the module script below for the section map.
+-->
+<style>
+  :root { --slot: 44px; --islot: 44px; }   /* --islot: every inventory-screen slot; 44 px meets the tap-target rule (R3) */
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #000; color: #fff;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+    user-select: none; -webkit-user-select: none;
+  }
+  canvas#view { display: block; width: 100vw; height: 100vh; }
+  .px { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    transform: translate(-50%, -50%); mix-blend-mode: difference; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { top: 10px; left: 0; width: 22px; height: 2px; }
+  #debug { position: absolute; left: 6px; top: 6px; font-size: 14px; line-height: 1.4; white-space: pre;
+    text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,.6); padding: 4px 7px; border-radius: 2px; }   /* .6: white text holds 5.9:1 over a white sky (R2) */
+  #hotbar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); display: flex;
+    padding: 2px; background: rgba(20,20,20,.55); border: 2px solid rgba(0,0,0,.85);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.14); }
+  #hotbar .slot { width: var(--slot); height: var(--slot); position: relative;
+    border: 2px solid rgba(255,255,255,.10); margin: 1px; }
+  #hotsel { position: absolute; left: 0; top: 0; width: calc(var(--slot) + 6px); height: calc(var(--slot) + 6px);
+    border: 3px solid #fff; box-shadow: 0 0 0 2px #000, 0 0 10px rgba(255,255,255,.35); z-index: 1;
+    transition: transform .09s ease-out; pointer-events: none; }
+  #hotbar .slot.pop .icon { animation: pop .28s ease-out; }
+  @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  .icon { position: absolute; inset: 3px; background-size: contain; background-repeat: no-repeat;
+    background-position: center; image-rendering: pixelated; }
+  .count { position: absolute; right: 2px; bottom: -1px; font-size: 14px; font-weight: bold;
+    text-shadow: 2px 2px 0 #3f3f3f; color: #fff; background: rgba(0,0,0,.55); padding: 0 3px; border-radius: 3px; line-height: 16px; }   /* backing: 4.7:1 even on white (R2) */
+  .dur { position: absolute; left: 5px; right: 5px; bottom: 4px; height: 3px; background: #000; display: none; }
+  .dur i { display: block; height: 2px; }
+  #hearts { position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(8px + var(--slot) + 18px); width: calc(9 * (var(--slot) + 6px)); display: flex; gap: 1px; }
+  .heart { width: 18px; height: 18px; background-size: contain; image-rendering: pixelated; }
+  #hearts.low .heart:nth-child(odd) { transform: translateY(-2px); }
+  #hearts.flash .heart { filter: brightness(2.2); }
+  /* Armor bar: 10 icons above the hearts, 2 armor points per icon. Hidden at 0 points. */
+  #armorbar { position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(8px + var(--slot) + 38px); width: calc(9 * (var(--slot) + 6px)); display: none; gap: 1px; }
+  #armorbar.on { display: flex; }
+  #armorbar i { width: 18px; height: 18px; background-size: contain; image-rendering: pixelated; }
+  #itemname { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(8px + var(--slot) + 62px);
+    font-size: 17px; font-weight: bold; text-shadow: 2px 2px 0 #3f3f3f; opacity: 0; transition: opacity .5s; }
+  #toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 18px; font-weight: bold;
+    text-shadow: 2px 2px 0 #3f3f3f; opacity: 0; transition: opacity .6s; text-align: center; }
+  /* compass dial (Batch 16): the needle points to the spawn while a compass is held */
+  #compass { position: absolute; right: 16px; top: 16px; display: none; flex-direction: column; align-items: center; gap: 6px; }
+  #compass.on { display: flex; }
+  #compass .dial { position: relative; width: 96px; height: 96px; border-radius: 50%; box-shadow: 0 3px 0 #3f3f3f;
+    background: radial-gradient(circle, #ece6d2 0 56%, #b0b6c0 58% 68%, #787e88 70%); }
+  #compass i { position: absolute; left: 45px; top: 14px; width: 6px; height: 68px; border-radius: 3px;
+    background: linear-gradient(#d62828 0 50%, #6e6e78 50%); }
+  #compass span { font-size: 15px; font-weight: bold; text-shadow: 1px 1px 0 #000; white-space: nowrap;
+    background: rgba(0,0,0,.6); padding: 3px 8px; border-radius: 2px; }   /* .6 keeps 4.5:1 over white cloud */
+  #resume { position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%); display: none; pointer-events: none;
+    padding: 6px 14px; background: rgba(0,0,0,.45); border-radius: 4px; font-size: 15px; text-shadow: 2px 2px 0 #3f3f3f; }
+  #hurt { position: absolute; inset: 0; opacity: 0; transition: opacity .25s;
+    background: radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(190,0,0,.6) 100%); }
+  #underwater { position: absolute; inset: 0; background: rgba(25,55,150,.38); display: none; }
+  #inlava { position: absolute; inset: 0; display: none;
+    background: radial-gradient(ellipse at center, rgba(255,120,20,.55), rgba(190,40,0,.85)); }
+  #vignette { position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 58%, rgba(0,0,0,.34) 100%); }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 40; }
+  #miningbar { position: absolute; left: 50%; top: calc(50% + 18px); transform: translateX(-50%);
+    width: 44px; height: 4px; background: rgba(0,0,0,.55); display: none; }
+  #miningbar i { display: block; height: 100%; width: 0; background: #fff; }
+
+  /* ---------- menus ---------- */
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; }
+  .screen.show { display: flex; animation: fadein .22s ease-out; }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  #overlay { background: radial-gradient(ellipse at center, rgba(10,14,28,.18), rgba(0,0,0,.62)); cursor: pointer; }
+  .menu { width: min(620px, 94vw); max-height: 94vh; overflow: auto; text-align: center; padding: 20px 24px;
+    background: rgba(8,10,16,.8); border: 2px solid rgba(0,0,0,.9);   /* .8 keeps #aaa text at 4.5:1 over a white sky (R2) */
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.10), 0 18px 60px rgba(0,0,0,.55);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); cursor: default; }
+  .title { font-size: 52px; font-weight: 900; letter-spacing: 4px; margin: 4px 0 2px; color: transparent;
+    background: linear-gradient(180deg, #ffffff 0%, #d9d9d9 45%, #8f8f8f 52%, #b5b5b5 100%);
+    -webkit-background-clip: text; background-clip: text;
+    filter: drop-shadow(3px 3px 0 #2a2a2a) drop-shadow(2px 2px 0 #0d0d0d); }
+  .subtitle { color: #ffff55; font-size: 15px; font-weight: bold; text-shadow: 2px 2px 0 #3f3f00; margin-bottom: 12px;
+    display: inline-block; animation: splash .9s ease-in-out infinite alternate; }
+  @keyframes splash { from { transform: rotate(-4deg) scale(1); } to { transform: rotate(-4deg) scale(1.08); } }
+  .controls { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; text-align: left; font-size: 14px;
+    margin: 10px auto 12px; width: fit-content; }
+  .controls b { color: #ffff55; font-weight: bold; text-shadow: 1px 1px 0 #3f3f00; }
+  .settings { display: grid; grid-template-columns: auto minmax(150px, 1fr) auto; gap: 4px 10px; align-items: center;   /* compact rows: a desktop menu, not a touch screen (Joe) */
+    font-size: 14px; margin: 8px auto; width: min(540px, 100%); text-align: left; }
+  .settings input[type=range] { width: 100%; height: 26px; margin: 0; accent-color: #8b8b8b; cursor: pointer; }
+  .settings .chks { display: flex; gap: 20px; }
+  .settings .chk { display: flex; align-items: center; gap: 8px; min-height: 26px; justify-self: start; cursor: pointer; }   /* the label text is part of the hit area */
+  .settings input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: #8b8b8b; cursor: pointer; }
+  .btn { display: inline-block; min-width: 220px; min-height: 44px; padding: 9px 16px; margin: 6px; font: inherit; font-size: 16px; color: #fff;
+    background: #707070; border: 2px solid #000; box-shadow: inset 2px 2px 0 #aaa, inset -2px -2px 0 #4a4a4a;
+    text-shadow: 2px 2px 0 #3f3f3f; cursor: pointer; transition: background .12s, transform .12s; }
+  .btn:active { transform: translateY(1px); }
+  .btn:hover { background: #5a62a8; box-shadow: inset 2px 2px 0 #9aa2e6, inset -2px -2px 0 #363b70; }   /* white text on it: 5.6:1 (R2) */
+  .btnrow .btn { min-width: 164px; }
+  .btn:disabled { background: #444; color: #999; cursor: default; box-shadow: none; }
+  #loadbar { width: 100%; height: 8px; background: #222; border: 1px solid #000; margin: 8px 0 4px; }
+  #loadbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4c9a3a, #8fdc5c); transition: width .2s; }
+  #loadtext { font-size: 14px; color: #bbb; min-height: 18px; }
+  .hint { font-size: 14px; color: #aaa; margin-top: 6px; }
+
+  /* ---------- inventory ---------- */
+  #inventory { background: rgba(0,0,0,.55); }
+  .gui { background: #c6c6c6; color: #3f3f3f; padding: 12px 12px 10px; border: 3px solid;
+    border-color: #fff #555 #555 #fff; box-shadow: 0 0 0 2px #000; position: relative; }
+  .gui h3 { margin: 0 0 6px; font-size: 15px; font-weight: bold; color: #3f3f3f; text-align: left; }
+  .grid { display: grid; gap: 12px; }   /* 12 px between slots (R3) */
+  .islot { width: var(--islot); height: var(--islot); position: relative; background: #8b8b8b;
+    border: 2px solid; border-color: #373737 #fff #fff #373737; }
+  .islot:hover::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.4); pointer-events: none; }
+  .islot.big { width: 52px; height: 52px; }
+  .gui-top { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; min-height: 130px; }
+  .arrow { width: 44px; height: 30px; position: relative; }
+  .arrow::before { content: ""; position: absolute; left: 2px; top: 11px; width: 26px; height: 8px; background: #8b8b8b; }
+  .arrow::after { content: ""; position: absolute; left: 26px; top: 3px; border: 12px solid transparent;
+    border-left: 14px solid #8b8b8b; border-right: 0; }
+  .gap { height: 12px; }   /* backpack to hotbar: 12 px (R3) */
+  .hotrow { display: flex; align-items: flex-end; gap: 12px; }
+  /* Trash slot: a bin icon when empty; a red-shaded slot while it holds the last trashed stack.
+     A white bar at the top drains over CONFIG.trashDelay (--trash-delay); then the stack is gone. */
+  .islot.trash { background: #8b8b8b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%23373737' d='M6 2h4v1h3v2H3V3h3zM4 6h8v8H4zm2 1v6h1V7zm3 0v6h1V7z'/%3E%3C/svg%3E") center / 24px no-repeat; }
+  .islot.trash.full { background: #a56a6a; }
+  .islot.trash.full::before { content: ""; position: absolute; left: 2px; right: 2px; top: 2px; height: 3px; background: #fff;
+    transform-origin: left; animation: trashdrain var(--trash-delay, 3s) linear forwards; pointer-events: none; }
+  @keyframes trashdrain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  #furnaceTop, #chestTop, #altarTop { display: none; }
+  #invPanel[data-mode="furnace"] #craftTop, #invPanel[data-mode="chest"] #craftTop, #invPanel[data-mode="altar"] #craftTop { display: none; }
+  #invPanel[data-mode="altar"] #altarTop { display: flex; }
+  /* Altar: the item slot above the crystal slot, then 3 offers. Each offer is a 44 px target with 12 px gaps. */
+  .altarRow { display: flex; align-items: flex-start; gap: 16px; }
+  .acolumn { display: flex; flex-direction: column; gap: 12px; }
+  #altarGem.empty::before { content: ""; position: absolute; inset: 6px; background: var(--ghost) center / contain no-repeat;
+    image-rendering: pixelated; filter: grayscale(1) brightness(.35); opacity: .45; pointer-events: none; }
+  #altarOffers { display: flex; flex-direction: column; gap: 12px; width: 300px; }
+  #altarOffers .offer { display: flex; justify-content: space-between; align-items: center; min-width: 0; width: 100%; margin: 0;
+    text-align: left; background: #6b4f86; box-shadow: inset 2px 2px 0 #a07cc4, inset -2px -2px 0 #3f2b52; }
+  #altarOffers .offer:hover:not(:disabled) { background: #7d5d9c; }
+  #altarOffers .offer small { font-size: 14px; color: #e6d2ff; }
+  #altarOffers .offer:disabled { cursor: default; background: #5a5a5a; color: #dcdcdc; box-shadow: inset 2px 2px 0 #777, inset -2px -2px 0 #3a3a3a; }
+  #altarOffers .offer:disabled small { color: #dcdcdc; }
+  #altarOffers .offer[hidden] { display: none; }
+  #altarNote { margin: 0; font-size: 14px; color: #3a3a3a; line-height: 1.4; }
+  #altarNote:empty { display: none; }
+  /* Enchanted icons: a purple sweep over the icon's own pixels. */
+  .icon.ench::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, rgba(170,90,255,.35) 20%, rgba(235,190,255,.95) 45%, rgba(170,90,255,.35) 70%) 0 0 / 300% 100%;
+    -webkit-mask: var(--img) center / contain no-repeat; mask: var(--img) center / contain no-repeat;
+    mix-blend-mode: screen; animation: enchsweep 2.2s linear infinite; }
+  @keyframes enchsweep { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+  #invPanel[data-mode="furnace"] #furnaceTop { display: flex; }
+  #invPanel[data-mode="chest"] #chestTop { display: block; }
+  #invPanel:not([data-mode="craft"]) #recipes { display: none; }
+  /* Armor column: an empty slot shows a faint outline of its piece. */
+  .acol { display: flex; flex-direction: column; gap: 12px; }
+  .islot.armor.empty::before { content: ""; position: absolute; inset: 4px; background: var(--ghost) center / contain no-repeat;
+    image-rendering: pixelated; filter: grayscale(1) brightness(.35); opacity: .45; pointer-events: none; }
+  .fcol { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .flame { width: 18px; height: 18px; position: relative; background: #8b8b8b;
+    clip-path: polygon(50% 0, 88% 45%, 100% 75%, 78% 100%, 22% 100%, 0 75%, 12% 45%); }
+  .flame i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, #ff6a00, #ffd24a); }
+  .arrow i { position: absolute; left: 2px; top: 11px; height: 8px; width: 0; background: #fff; z-index: 1; }
+  #homesList { margin: 8px auto; width: min(460px, 100%); text-align: left; }
+  /* Homes: 44 px buttons, 12 px between buttons and between rows, 14 px minimum text (R2, R3). */
+  .home { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.12); font-size: 16px; }
+  .home .hname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home .hpos { color: #aaa; font-size: 14px; }
+  .home .btn, .homeset .btn { min-width: 88px; margin: 0; }
+  .home .btn.armed { background: #a33; box-shadow: inset 2px 2px 0 #d66, inset -2px -2px 0 #611; }   /* Delete waits for its confirm click */
+  .homeset { display: flex; gap: 12px; justify-content: center; margin: 8px 0; }
+  .homeset input { font: inherit; font-size: 16px; min-height: 44px; box-sizing: border-box; padding: 5px 8px; width: 220px; color: #fff; background: rgba(0,0,0,.5);
+    border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); outline: none; }
+  .homeset input::placeholder { color: #9a9a9a; }   /* 6:1 on the field (R2) */
+  #recipeToggle { margin-left: auto; align-self: flex-start; font-size: 14px; padding: 4px 10px; min-width: 0; }
+  #recipes { position: absolute; left: calc(100% + 10px); top: 0; width: 280px; max-height: 100%; overflow: auto;
+    display: none; }
+  #recipes.show { display: block; }
+  /* Recipe rows: the whole row is the target, at least 44 px tall with 12 px between rows; text 14 px (R2, R3). */
+  .recipe { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 4px 0; margin-bottom: 12px; border-bottom: 1px solid #aaa; font-size: 14px; }
+  .rgrid { display: grid; grid-template-columns: repeat(3, 18px); gap: 1px; background: #8b8b8b; padding: 1px; }
+  .rgrid div { width: 18px; height: 18px; background: #a8a8a8; background-size: contain; image-rendering: pixelated; }
+  .rout { width: 26px; height: 26px; background-size: contain; image-rendering: pixelated; position: relative; }
+  .rout span { position: absolute; right: -4px; bottom: -4px; font-size: 14px; background: rgba(0,0,0,.55); padding: 0 3px; border-radius: 3px; line-height: 16px; color: #fff; text-shadow: 1px 1px 0 #333; font-weight: bold; }
+  .recipe { cursor: pointer; }
+  .recipe:hover { background: #b8b8b8; }
+  .recipe.dim { opacity: .45; }
+  .recipe.missing { background: #d9a0a0; }
+  .rname { flex: 1; }
+  #cursorStack { position: fixed; width: var(--islot); height: var(--islot); pointer-events: none; z-index: 50;
+    transform: translate(-50%, -50%); display: none; }
+  #tooltip { position: fixed; pointer-events: none; z-index: 60; display: none; padding: 4px 7px; font-size: 14px;
+    background: rgba(16,0,16,.94); color: #fff; border: 2px solid #28007f; text-shadow: 1px 1px 0 #3f3f3f; white-space: pre; }
+
+  /* ---------- death ---------- */
+  #death { background: rgba(120,0,0,.55); flex-direction: column; }
+  #death h1 { font-size: 48px; margin: 0 0 10px; text-shadow: 3px 3px 0 #3f0000; }
+  #death p { margin: 0 0 18px; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="fade"></div>
+
+<div id="hud">
+  <div id="underwater"></div>
+  <div id="inlava"></div>
+  <div id="vignette"></div>
+  <div id="hurt"></div>
+  <div id="crosshair"></div>
+  <div id="resume">Click to resume · Esc for the menu</div>
+  <div id="miningbar"><i></i></div>
+  <div id="debug"></div>
+  <div id="toast"></div>
+  <div id="itemname"></div>
+  <div id="hearts"></div>
+  <div id="armorbar"></div>
+  <div id="hotbar"></div>
+  <div id="compass"><div class="dial"><i></i></div><span></span></div>
+</div>
+
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<div id="overlay" class="screen show">
+  <div class="menu" id="menuPanel">
+    <div class="title">CLONECRAFT</div>
+    <div class="subtitle" id="splash">Infinite voxels!</div>
+    <div id="loadbar"><i></i></div>
+    <div id="loadtext">Generating terrain…</div>
+    <button class="btn" id="playBtn" disabled>Loading…</button>
+    <div class="controls">
+      <b>Click</b><span>Lock the mouse and play</span>
+      <b>W A S D</b><span>Move</span>
+      <b>Mouse</b><span>Look around</span>
+      <b>Space</b><span>Jump / swim up</span>
+      <b>K</b><span>Start or stop flying</span>
+      <b>Shift / Ctrl</b><span>Sprint (1.5×) · double-tap W also sprints</span>
+      <b>Riding</b><span>W goes · S brakes or backs up · A / D steer a boat · Shift gets out</span>
+      <b>In flight</b><span>Space rises · Shift sinks · Ctrl sprints</span>
+      <b>Leaves / ladder</b><span>Space climbs · Shift climbs down · no key holds on</span>
+      <b>Left click</b><span>Hold to break blocks · click to attack mobs</span>
+      <b>Right click</b><span>Place · eat · use blocks · till · plant · buckets · ride boats and carts</span>
+      <b>Stairs</b><span>Face your view · click high or underside to flip</span>
+      <b>1–9 / Wheel</b><span>Select hotbar slot</span>
+      <b>Shift + right</b><span>Place a block against a usable block</span>
+      <b>I</b><span>Open inventory and 2×2 crafting</span>
+      <b>H</b><span>Homes: save places and teleport to them</span>
+      <b>Q</b><span>Drop the held item</span>
+      <b>F3</b><span>Toggle debug details</span>
+      <b>Esc</b><span>Pause</span>
+    </div>
+    <div class="settings">
+      <label for="setRd">Render distance</label><input id="setRd" type="range" min="3" max="16" step="1"><span id="valRd"></span>
+      <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
+      <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
+      <label for="setVol">Volume</label><input id="setVol" type="range" min="0" max="1" step="0.05"><span id="valVol"></span>
+      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
+      <label for="setTime">Time of day</label><input id="setTime" type="range" min="0" max="24" step="0.25"><span id="valTime"></span>
+      <label for="setFreeze">Freeze time</label><label class="chk"><input id="setFreeze" type="checkbox"></label><span id="valFreeze"></span>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="newWorldBtn">New World</button>
+      <button class="btn" id="exportBtn">Export World</button>
+      <button class="btn" id="importBtn">Import World</button>
+    </div>
+    <div class="hint" id="seedText"></div>
+  </div>
+</div>
+
+<div id="homes" class="screen">
+  <div class="menu">
+    <h2 style="margin:4px 0 6px">Homes</h2>
+    <div class="homeset">
+      <input id="homeName" maxlength="24" placeholder="Home name" autocomplete="off">
+      <button class="btn" id="homeSetBtn">Set home here</button>
+    </div>
+    <div id="homesList"></div>
+    <div class="hint">Up to 10 homes. H or Esc closes this screen.</div>
+  </div>
+</div>
+
+<div id="inventory" class="screen">
+  <div class="gui" id="invPanel" data-mode="craft">
+    <div class="gui-top" id="craftTop">
+      <div class="acol" id="armorCol">
+        <div class="islot armor" data-kind="armor" data-index="0"></div>
+        <div class="islot armor" data-kind="armor" data-index="1"></div>
+        <div class="islot armor" data-kind="armor" data-index="2"></div>
+        <div class="islot armor" data-kind="armor" data-index="3"></div>
+      </div>
+      <div>
+        <h3 id="craftTitle">Crafting</h3>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="grid" id="craftGrid"></div>
+          <div class="arrow"></div>
+          <div class="islot big" id="craftResult" data-kind="result" data-index="0"></div>
+        </div>
+      </div>
+      <button class="btn" id="recipeToggle">Recipes</button>
+    </div>
+    <div class="gui-top" id="furnaceTop">
+      <div>
+        <h3>Furnace</h3>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="fcol">
+            <div class="islot" data-kind="furnace" data-index="0"></div>
+            <div class="flame"><i id="flameFill"></i></div>
+            <div class="islot" data-kind="furnace" data-index="1"></div>
+          </div>
+          <div class="arrow"><i id="cookFill"></i></div>
+          <div class="islot big" data-kind="furnace" data-index="2"></div>
+        </div>
+      </div>
+    </div>
+    <div class="gui-top" id="altarTop">
+      <div>
+        <h3>Enchanting Altar</h3>
+        <div class="altarRow">
+          <div class="acolumn">
+            <div class="islot" id="altarItem" data-kind="altar" data-index="0"></div>
+            <div class="islot" id="altarGem" data-kind="altar" data-index="1"></div>
+          </div>
+          <div id="altarOffers">
+            <button class="btn offer" data-offer="0"></button>
+            <button class="btn offer" data-offer="1"></button>
+            <button class="btn offer" data-offer="2"></button>
+            <p id="altarNote"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="chestTop">
+      <h3>Chest</h3>
+      <div class="grid" id="chestGrid" style="grid-template-columns: repeat(9, var(--islot))"></div>
+      <div class="gap"></div>
+    </div>
+    <h3>Inventory</h3>
+    <div class="grid" id="storageGrid" style="grid-template-columns: repeat(9, var(--islot))"></div>
+    <div class="gap"></div>
+    <div class="hotrow">
+      <div class="grid" id="invHotbar" style="grid-template-columns: repeat(9, var(--islot))"></div>
+      <div class="islot trash" id="trashSlot" data-kind="trash" data-index="0"></div>
+    </div>
+    <div class="gui" id="recipes"></div>
+  </div>
+</div>
+<div id="cursorStack"><div class="icon"></div><div class="count"></div></div>
+<div id="tooltip"></div>
+
+<div id="death" class="screen">
+  <h1>You died!</h1>
+  <p id="deathMsg"></p>
+  <button class="btn" id="respawnBtn">Respawn</button>
+</div>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

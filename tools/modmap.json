@@ -1,0 +1,171 @@
+{
+ "baseline": "baseline-single-file",
+ "header": {
+  "from": 374,
+  "to": 429
+ },
+ "script": {
+  "from": 430,
+  "to": 9382
+ },
+ "modules": [
+  { "name": "three", "from": 430, "to": 432 },
+  { "name": "config", "from": 433, "to": 518 },
+  { "name": "blocks", "from": 519, "to": 983 },
+  { "name": "biomes", "from": 984, "to": 1005 },
+  { "name": "atlas", "from": 1006, "to": 2047 },
+  { "name": "worldgen", "from": 2048, "to": 2806 },
+  { "name": "gen-service", "from": 2807, "to": 2883 },
+  { "name": "world", "from": 2884, "to": 3311 },
+  { "name": "mesher", "from": 3312, "to": 3830 },
+  { "name": "terrain-material", "from": 3831, "to": 4076 },
+  { "name": "engine", "from": 4077, "to": 4120 },
+  { "name": "player", "from": 4121, "to": 4475 },
+  { "name": "collision", "from": 4476, "to": 4600 },
+  { "name": "interact", "from": 4601, "to": 5097 },
+  { "name": "liquids", "from": 5098, "to": 5192 },
+  { "name": "leaf-decay", "from": 5193, "to": 5265 },
+  { "name": "farming", "from": 5266, "to": 5371 },
+  { "name": "targeting", "from": 5372, "to": 5495 },
+  { "name": "drops", "from": 5496, "to": 5570 },
+  { "name": "held-item", "from": 5571, "to": 5767 },
+  { "name": "inventory", "from": 5768, "to": 5889 },
+  { "name": "crafting", "from": 5890, "to": 5964 },
+  { "name": "craft-grid", "from": 5965, "to": 5974 },
+  { "name": "tile-entities", "from": 5975, "to": 6085 },
+  { "name": "inventory-ui", "from": 6086, "to": 6482 },
+  { "name": "mobs", "from": 6483, "to": 6952 },
+  { "name": "vehicles", "from": 6953, "to": 7208 },
+  { "name": "projectiles", "from": 7209, "to": 7305 },
+  { "name": "explosions", "from": 7306, "to": 7375 },
+  { "name": "spawning", "from": 7376, "to": 7542 },
+  { "name": "particles", "from": 7543, "to": 7785 },
+  { "name": "audio", "from": 7786, "to": 8011 },
+  { "name": "hud", "from": 8012, "to": 8155 },
+  { "name": "menus", "from": 8156, "to": 8237 },
+  { "name": "persist", "from": 8238, "to": 8373 },
+  { "name": "homes", "from": 8374, "to": 8442 },
+  { "name": "sky", "from": 8443, "to": 8684 },
+  { "name": "weather", "from": 8685, "to": 8890 },
+  { "name": "boot", "from": 8891, "to": 8969 },
+  { "name": "shadows", "from": 8970, "to": 9062 },
+  { "name": "held-light", "from": 9063, "to": 9125 },
+  { "name": "post", "from": 9126, "to": 9306 },
+  { "name": "main", "from": 9307, "to": 9382 }
+ ],
+ "edits": [
+  {
+   "line": 5434,
+   "module": "targeting",
+   "binding": "target",
+   "text": "  setTarget(player.dead ? null : raycast(ox, oy, oz, _dir.x, _dir.y, _dir.z, REACH));"
+  },
+  {
+   "line": 5436,
+   "module": "targeting",
+   "binding": "targetMob",
+   "text": "  setTargetMob(player.dead ? null : raycastMobs(ox, oy, oz, _dir.x, _dir.y, _dir.z, Math.min(3.5, vh ? vh.t : target ? target.t : REACH)));"
+  },
+  {
+   "line": 5437,
+   "module": "targeting",
+   "binding": "targetVehicle",
+   "text": "  setTargetVehicle(targetMob || !vh ? null : vh.v);"
+  },
+  {
+   "line": 5438,
+   "module": "targeting",
+   "binding": "target",
+   "text": "  if (targetMob || targetVehicle) setTarget(null);"
+  },
+  {
+   "line": 6208,
+   "module": "inventory-ui",
+   "binding": "enchantSeed",
+   "text": "  setEnchantSeed((Math.random() * 2 ** 31) | 0);"
+  },
+  {
+   "line": 8168,
+   "module": "menus",
+   "binding": "escLock",
+   "text": "  if (s !== 'playing') { resumeEl.style.display = 'none'; setEscLock(false); }"
+  },
+  {
+   "line": 8177,
+   "module": "menus",
+   "binding": "pausedAt",
+   "text": "  setPausedAt(performance.now());"
+  },
+  {
+   "line": 8296,
+   "module": "persist",
+   "binding": "homes",
+   "text": "    setHomes(d.homes || []);"
+  },
+  {
+   "line": 8300,
+   "module": "persist",
+   "binding": "enchantSeed",
+   "text": "    if (Number.isInteger(d.enchantSeed)) setEnchantSeed(d.enchantSeed);"
+  },
+  {
+   "line": 9264,
+   "module": "post",
+   "binding": "glowGain",
+   "text": "    setGlowGain(CONFIG.bloom && hdr ? 2 : 1);"
+  },
+  {
+   "line": 9311,
+   "module": "main",
+   "binding": "last",
+   "text": "  setLast(now);"
+  }
+ ],
+ "setters": [
+  {
+   "module": "config",
+   "binding": "glowGain",
+   "text": "function setGlowGain(v) { glowGain = v; }"
+  },
+  {
+   "module": "blocks",
+   "binding": "enchantSeed",
+   "text": "function setEnchantSeed(v) { enchantSeed = v; }"
+  },
+  {
+   "module": "player",
+   "binding": "escLock",
+   "text": "function setEscLock(v) { escLock = v; }"
+  },
+  {
+   "module": "player",
+   "binding": "pausedAt",
+   "text": "function setPausedAt(v) { pausedAt = v; }"
+  },
+  {
+   "module": "interact",
+   "binding": "target",
+   "text": "function setTarget(v) { target = v; }"
+  },
+  {
+   "module": "interact",
+   "binding": "targetMob",
+   "text": "function setTargetMob(v) { targetMob = v; }"
+  },
+  {
+   "module": "interact",
+   "binding": "targetVehicle",
+   "text": "function setTargetVehicle(v) { targetVehicle = v; }"
+  },
+  {
+   "module": "homes",
+   "binding": "homes",
+   "text": "function setHomes(v) { homes = v; }"
+  },
+  {
+   "module": "boot",
+   "binding": "last",
+   "text": "function setLast(v) { last = v; }"
+  }
+ ]
+}

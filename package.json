@@ -1,0 +1,13 @@
+{
+  "name": "clonecraft",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node -e \"require('fs').copyFileSync('dist/index.html','index.html')\""
+  },
+  "devDependencies": {
+    "vite": "7.3.6",
+    "vite-plugin-singlefile": "2.3.3"
+  }
+}

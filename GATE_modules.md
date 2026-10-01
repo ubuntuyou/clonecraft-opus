@@ -13,13 +13,13 @@ The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. 
 
 ## Step 1: pipeline (gate G1)
 
-- [ ] T2: `npm run build` exits 0 with no warning. Two runs give the same SHA-256.
-- [ ] T3: the built script equals the baseline script (PA3, empty edit list). The CSS and markup equal baseline lines 1–372, except the generated-file comment and the script tag.
-- [ ] T4: the built file loads over `http://` in Chromium with 0 console errors and 0 warnings. A world starts.
-- [ ] T5: the built file loads over `file://` in Chromium with 0 console errors. A world starts.
-- [ ] T6: in the built file, `clonecraft.world.gen.fallback === false` after the world starts.
-- [ ] `vite` is pinned to an exact 7.x version. `vite-plugin-singlefile` is pinned to an exact 2.x version. `package-lock.json` is committed.
-- [ ] The build does not minify, tree-shake, or down-level the code.
+- [x] T2: `npm run build` exits 0 with no warning. Two runs give the same SHA-256. (2026-10-01: SHA-256 `42f03281…` on two runs; the log has no warning.)
+- [x] T3: the built script equals the baseline script (PA3, empty edit list). The CSS and markup equal baseline lines 1–372, except the generated-file comment and the script tag. (`node tools/parity.js --unsplit`: 8,680 non-blank lines equal. A planted `REACH = 6` fails the check.)
+- [x] T4: the built file loads over `http://` in Chromium with 0 console errors and 0 warnings. A world starts. (seed 12345: 293 chunks, state `playing`, frames advance.)
+- [x] T5: the built file loads over `file://` in Chromium with 0 console errors. A world starts. (0 errors and 0 warnings.)
+- [x] T6: in the built file, `clonecraft.world.gen.fallback === false` after the world starts. (4 workers over `http://` and over `file://`.)
+- [x] `vite` is pinned to an exact 7.x version. `vite-plugin-singlefile` is pinned to an exact 2.x version. `package-lock.json` is committed. (vite 7.3.6, vite-plugin-singlefile 2.3.3.)
+- [x] The build does not minify, tree-shake, or down-level the code. (`vite.config.js`: `minify: false`, `treeshake: false`, `target: 'esnext'`.)
 
 ## Step 2: split (gate G2)
 
