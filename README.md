@@ -96,7 +96,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 - Sun and moon light with dynamic shadows. Terrain, trees, mobs, and vehicles cast shadows, and leaves let light dapple through. Shadows move with the time of day and fade in rain.
 - Water with moving waves, sky reflection, and a glittering sun (or moon) path. Sunlight makes moving caustics on blocks under shallow water.
 - A torch held in the selected hotbar slot lights the area around the player. The light does not pass through walls.
-- Weather: rain, snow, and thunderstorms. Deserts stay dry, and snow falls in snowy biomes and on high peaks. Rain darkens the sky and plays a rain sound. Lightning strikes during storms and hurts anything within 3 blocks. Zombies and skeletons do not burn in the rain.
+- Weather: rain, snow, and thunderstorms. Deserts stay dry, and snow falls in snowy biomes at every height. Elsewhere snow falls above y 158 and turns to rain below it, so a slope has one clean snow line. Rain darkens the sky and plays a rain sound. Lightning strikes during storms and hurts anything within 3 blocks. Zombies and skeletons do not burn in the rain.
 - Autosave per seed in `localStorage`: every 30 s, on pause, and when the page hides. New World in the menu keeps the old world.
 - Export World downloads the current world as a JSON file. Import World opens a world from such a file. If that seed already has a save, the game asks before it replaces the save.
 - Procedural WebAudio sound effects and point particles.

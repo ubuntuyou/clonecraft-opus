@@ -611,3 +611,14 @@ Joe chose: the warning plays near the trap, before it fires.
 - [x] Coming near does not fire the trap. (In the room for 5 s: the TNT stays unlit, health 20.)
 - [x] Chromium: 0 console errors, 0 warnings.
 
+
+## Snow line by height (Joe, 2026-10-01 11:27 CT)
+
+Joe saw snow patches amid rain and rain amid snow. Joe chose O1: the drop's height decides the kind, not the column.
+
+- [x] Outside snowy biomes and deserts, snow falls only at or above y 159 (`SNOW_LINE` + 1). Rain falls only at or below it. This holds in every column. (Storm on a rocky highlands slope at (-74, 51), camera at y 175, 162, 152, and 145, 10 frames each: about 80,000 rain drops and 39,000 zone-1 flakes. 0 rain drops above y 159 and 0 flakes below it.)
+- [x] On a slope across y 159, columns with ground above the line get snow, and columns with ground below get rain. No column breaks the rule because of its own height or a treetop. (Same run: 0 rain drops in a column whose top block reaches y 159. `precip` gives snow at (-88, 44), top 160, and rain at (-88, 51), top 149.)
+- [x] Near the line, snow falls from above and turns to rain at y 159. (About 410–460 columns per height held both snow above y 159 and rain below it. The screenshot from y 162 shows flakes on the ridge and rain streaks in the valley.)
+- [x] Snowy biomes still get snow at every height. Deserts stay dry. (Snowy mountains at (-66, 99), top 172: 997 flakes, 0 rain. Snowy plains at (116, 257), top 135: 1,096 flakes, 1,084 of them below y 159, 0 rain. Desert at (-436, -355): 0 drops in desert columns, `wetAt` false, rain gain 0.)
+- [x] The rain sound plays where rain lands on the player's column, and not where snow lands. (`rainGain` 0 on the column with top 160, 0.338 on the column with top 149, then 0.002 and falling 3 s after the return to top 160.)
+- [x] Chromium: 0 console errors, 0 warnings. `npm run check` exits 0. (0 errors and 0 warnings for the whole game session. `npm run check` exit 0, 29 tests.)

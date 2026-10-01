@@ -171,11 +171,11 @@ A structure must be reachable. A temple reads the ground outside its 4 doors fro
 A stamp reports each chest and spawner as a chunk feature `{kind, x, y, z, type}`. The block grid holds no loot. `lootChest()` rolls the loot the first time the game opens, breaks, or explodes a generated chest. The roll uses the seed and the position. `looted` holds the filled positions and goes into the save, so a position never fills twice.
 `spawners` reads the spawner features of the loaded chunks near the player. A feature counts only while its block is still `B.SPAWNER`, so a mined spawner stops with no extra state.
 
-### D29. Weather is one global state, and each column decides its own precipitation
+### D29. Weather is one global state; the biome and the drop's height decide the precipitation
 
 `weather` holds one global state: a kind (`clear`, `rain`, or `storm`) and the time left. Two fade values, `k` (wet) and `storm`, move toward the kind over 6 s. Every consumer reads the fade values, not the kind, so no consumer jumps at a change.
-The column decides what falls. `precip(x, z, top)` reads the chunk biome and the top block: a desert gives nothing, a snowy biome or a top above `SNOW_LINE` gives snow, and all else gives rain. The biome map and the block grid already exist, so weather adds no world data.
-Drops live in two fixed pools around the camera. A drop takes the top block of its column as its floor, so it never falls through a roof or into a cave. A snow flake that sways into another column re-reads that column. The pools cost no lighting work and no mesh rebuild.
+The biome and the height decide what falls. `zone(x, z)` reads the chunk biome: a desert gives nothing, and a snowy biome gives snow at every height. Elsewhere the drop's height decides: snow at or above `SNOW_LINE` + 1, rain below it. The rule once read the column's top block instead. That speckled slopes and treetops near the line with snow amid rain (Joe, 2026-10-01). A height rule gives one clean line. The biome map and the block grid already exist, so weather adds no world data.
+Drops live in two fixed pools around the camera. A drop takes the top block of its column as its floor, so it never falls through a roof or into a cave. A snow flake in a by-height zone takes the higher of the top block and the snow line as its floor. A snow flake that sways into another column re-reads that column. The pools cost no lighting work and no mesh rebuild.
 The sky keeps its own clock. `game.clearDaylight` is the daylight without weather. `game.daylight` multiplies in `weather.dim` and the lightning flash, so terrain, mobs, and fog darken with no change of their own. Mob burning reads `clearDaylight` and `wetAt()`, so rain stops the burn and a dark storm alone does not.
 Only the kind and the time left go into the save. The fade values restart at their end values on load.
 

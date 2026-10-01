@@ -57,7 +57,7 @@
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes
- *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): per-column rain or snow
+ *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): rain or snow by biome and height
  *      pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
  *      the clock)
  *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,

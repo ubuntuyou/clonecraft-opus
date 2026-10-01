@@ -84,7 +84,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 
 - Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.
 - `game.clearDaylight` runs from 4.5/15 (`NIGHT_DAYLIGHT`) at night to 1 at day. Keep round(15 × floor) at 7 or less, or hostile mobs stop spawning in the open. Caustics gate at `uDaylight` 0.35, so the floor must stay below it. `game.daylight` is that value dimmed by the weather. `sky.update()` sets both.
-- Weather: `weather` (`src/weather.js`). `RADIUS` 24, `FADE` 6 s, `BOLT_RANGE` 64, `THUNDER_SPEED` 34 blocks/s. `precip(x, z, top)` gives 0 none, 1 rain, 2 snow. `top(x, z)` gives -1 for an unloaded column. `rainGain` reads the rain loop volume.
+- Weather: `weather` (`src/weather.js`). `RADIUS` 24, `FADE` 6 s, `BOLT_RANGE` 64, `THUNDER_SPEED` 34 blocks/s. `zone(x, z)` gives -1 unloaded, 0 dry (desert), 1 by height, 2 snow (snowy biomes). In zone 1, snow falls at or above `melt()` (`SNOW_LINE` + 1 = 159) and rain below it. `precip(x, z, top)` gives what lands on the top block: 0 none, 1 rain, 2 snow. `top(x, z)` gives -1 for an unloaded column. `rainGain` reads the rain loop volume.
 - Hostile spawns need `max(round(sky * daylight), blockLight) <= 7`, 24–44 blocks from the player.
 - Slot size: `--islot` (44 px) sizes every inventory-screen slot and `#cursorStack`. `.grid` sets the 12 px gap between slots. The `.gap` spacer sets the 12 px between the backpack and the hotbar row. Do not size a slot group on its own.
 - Menu text contrast: `.menu` is `rgba(8,10,16,.8)` over the live scene. At .8, `#aaa` text holds 4.97:1 over a white sky. A lighter panel fails R2 in daylight.

@@ -160,6 +160,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- Weather no longer speckles a slope with patches of snow amid rain. Outside snowy biomes, the drop's height decides the kind: snow above y 158, rain below.
 - The sun, moon, and sun halo turned toward the world origin instead of the player, so they looked squished (or vanished) far from spawn.
 - Caustics raced across the floor as the sun moved. The pattern now shifts by the water depth, not by the block's height in the world.
 - Blocks built above the generated terrain height disappeared after a reload, and the sky light under them could be wrong. Saved edits now update the column height and sky floor when a chunk loads.

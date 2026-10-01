@@ -8533,9 +8533,10 @@ const sky = (() => {
 // The weather is global: 'clear' (300..900 s) or 'rain' (120..360 s); 1 rain spell in 3 is a 'storm'.
 // `k` (0..1) follows the rain and `storm` (0..1) follows the storm, each over FADE s. The sky dims
 // daylight to 0.75x in rain and 0.55x in a storm, greys the sky and clouds, and pulls the fog 30% in.
-// The precipitation depends on the column: none in a desert, snow in snowy biomes and above
-// SNOW_LINE, rain elsewhere. A drop never falls below the top non-air block of its column, so roofs,
-// trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
+// The precipitation depends on the biome and the height: none in a desert, snow at every height in
+// snowy biomes. Elsewhere the drop's height decides: snow at or above MELT (SNOW_LINE + 1), rain below
+// it, so a slope or a treetop never mixes the two. A drop never falls below the top non-air block of
+// its column, so roofs, trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
 // the player and mobs within 3 blocks and lights nothing. Thunder follows at THUNDER_SPEED blocks/s.
 
 const weather = (() => {
@@ -8550,13 +8551,26 @@ const weather = (() => {
     for (let y = H - 1; y > 0; y--) if (c.blocks[lidx(lx, y, lz)] !== B.AIR) return y;
     return 0;
   }
-  // 0 none, 1 rain, 2 snow for the column (x, z) with top block t.
-  function precip(x, z, t) {
+  // The zone of column (x, z): -1 unloaded, 0 dry (desert), 1 by height (snow at or above MELT, rain
+  // below), 2 snow (snowy biomes).
+  function zone(x, z) {
     const c = world.chunkAt(x, z);
-    if (!c || t < 0) return 0;
+    if (!c) return -1;
     const b = c.biomes[(z & 15) * CS + (x & 15)];
-    if (b === BIOME.DESERT) return 0;
-    return b === BIOME.SNOWY_PLAINS || b === BIOME.SNOWY_MOUNTAINS || t > WG.SNOW_LINE ? 2 : 1;
+    return b === BIOME.DESERT ? 0 : b === BIOME.SNOWY_PLAINS || b === BIOME.SNOWY_MOUNTAINS ? 2 : 1;
+  }
+  const melt = () => WG.SNOW_LINE + 1;
+  // What lands on the top block t of column (x, z): 0 none, 1 rain, 2 snow.
+  function precip(x, z, t) {
+    if (t < 0) return 0;
+    const zn = zone(x, z);
+    return zn === 1 ? (t + 1 >= melt() ? 2 : 1) : Math.max(0, zn);
+  }
+  // The floor of a snow flake in column (x, z) with top block t: the top, or MELT in zone 1.
+  // Returns -1 when no snow falls in the column.
+  function snowFloor(x, z, t) {
+    const zn = t < 0 ? -1 : zone(x, z);
+    return zn === 2 ? t + 1 : zn === 1 ? Math.max(t + 1, melt()) : -1;
   }
 
   // Particle pools: rain as line streaks, snow as points. Each drop stores x, y, z, its floor, and a phase.
@@ -8575,16 +8589,24 @@ const weather = (() => {
     const obj = snow ? new THREE.Points(g, mat) : new THREE.LineSegments(g, mat);
     obj.frustumCulled = false; group.add(obj);
     for (let i = 0; i < n; i++) d[i * 5 + 3] = 1e9;   // floor above everything: respawn on the first frame
-    return { n, d, pos, g, mat, snow, kindId: snow ? 2 : 1 };
+    return { n, d, pos, g, mat, snow };
   }
   const rain = pool(NRAIN, false), snow = pool(NSNOW, true);
-  // A new drop in the disc around the camera, from `y0` up by `span`. Returns false when its column has another kind.
+  // A new drop in the disc around the camera, from `y0` up by `span`. Returns false when the drop's
+  // kind cannot fall there: rain only below MELT, snow only above its floor.
   function spawn(P, i, y0, span) {
     const cp = camera.position, a = Math.random() * Math.PI * 2, r = RADIUS * Math.random();   // denser near the camera
     const x = cp.x + Math.cos(a) * r, z = cp.z + Math.sin(a) * r, ix = Math.floor(x), iz = Math.floor(z);
     const t = top(ix, iz), d = P.d, o = i * 5;
-    if (precip(ix, iz, t) !== P.kindId) return false;
-    d[o] = x; d[o + 1] = Math.max(t + 1, y0 + Math.random() * span); d[o + 2] = z; d[o + 3] = t + 1; d[o + 4] = Math.random() * 6.28;
+    let floor, y = y0 + Math.random() * span;
+    if (P.snow) {
+      floor = snowFloor(ix, iz, t);
+      if (floor < 0 || y0 + span <= floor) return false;
+    } else {
+      if (t < 0 || zone(ix, iz) !== 1 || t + 1 >= melt()) return false;
+      floor = t + 1; y = Math.min(y, melt());
+    }
+    d[o] = x; d[o + 1] = Math.max(floor, y); d[o + 2] = z; d[o + 3] = floor; d[o + 4] = Math.random() * 6.28;
     return true;
   }
   function stepPool(P, dt, active) {
@@ -8594,10 +8616,13 @@ const weather = (() => {
       if (i >= active) { pos[q + 1] = -9999; if (!P.snow) pos[q + 4] = -9999; d[o + 3] = 1e9; continue; }
       d[o + 1] -= fall * dt * (P.snow ? 1 : 0.9 + 0.2 * ((i * 7) % 10) / 10);
       let moved = false;
-      if (P.snow) {   // sway; a flake that drifts into another column takes that column's floor and kind
+      if (P.snow) {   // sway; a flake that drifts into another column takes that column's floor
         const cx = Math.floor(d[o]);
         d[o] += Math.sin(game.clock * 1.3 + d[o + 4]) * 0.5 * dt;
-        if (Math.floor(d[o]) !== cx) { const t = top(Math.floor(d[o]), Math.floor(d[o + 2])); d[o + 3] = t + 1; moved = precip(Math.floor(d[o]), Math.floor(d[o + 2]), t) !== P.kindId; }
+        if (Math.floor(d[o]) !== cx) {
+          const nx = Math.floor(d[o]), nz = Math.floor(d[o + 2]), f = snowFloor(nx, nz, top(nx, nz));
+          moved = f < 0; d[o + 3] = f;
+        }
       }
       const far = Math.abs(d[o] - cp.x) > RADIUS + 2 || Math.abs(d[o + 2] - cp.z) > RADIUS + 2;
       if (moved || d[o + 1] <= d[o + 3] || d[o + 1] < cp.y - 14 || far) {
@@ -8725,7 +8750,7 @@ const weather = (() => {
     if (kn === 'storm') boltT = Math.min(boltT, 5);
   }
   return {
-    update, set, strike, wetAt, precip, top,
+    update, set, strike, wetAt, precip, top, zone, melt,
     get kind() { return kind; }, get left() { return left; }, get k() { return k; }, get storm() { return storm; }, get flash() { return flash; },
     get dim() { return 1 - 0.25 * k - 0.2 * storm; },
     get rainGain() { return loop ? loop.gain.gain.value : 0; },   // for tests: the rain loop's current volume
@@ -9221,7 +9246,7 @@ const post = (() => {
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes
- *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): per-column rain or snow
+ *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): rain or snow by biome and height
  *      pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
  *      the clock)
  *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,
