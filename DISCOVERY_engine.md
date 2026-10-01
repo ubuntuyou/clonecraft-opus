@@ -1,0 +1,136 @@
+# DISCOVERY: engine
+
+Gotchas, pointers, and invariants for `index.html`. Read this file before you change the world, the renderer, or the game states.
+
+## Invariants
+
+- Chunk index: `lidx(x, y, z) = (y << 8) | (z << 4) | x`. Local x and z are 0..15. y is 0..175 (`H` 176).
+- `getBlock()` returns `UNLOADED` (255) outside loaded chunks. Treat `UNLOADED` as "do not act", never as air.
+- The world meshes a chunk only when the chunk and all 8 neighbours are lit.
+- `world.setBlock()` is the only write path for blocks. Wrap many edits in `beginBatch()` and `endBatch()`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, and registers farming cells. `beginBatch()` does not nest: an inner `endBatch()` ends the outer batch. Check `world.batch` first (see `batched()` in `farming`).
+- Use `baseOf(id)`, not `BLOCKS[id].base`, when `id` can be `UNLOADED`. `BLOCKS[255]` is undefined.
+- `setState()` is the only function that shows or hides screens.
+- `WorldGenModule()` must read no outside state. The worker runs its source text.
+- A structure stamp writes only cells inside its own chunk (`structCtx` drops the others). Every placement decision uses a world hash or `column()`, never the chunk's own blocks, so neighbour chunks agree (D28).
+- A structure must stay reachable on foot. After a stamp change, run the walk check (see Pointers).
+- `game.daylight` includes the weather (`clearDaylight × weather.dim` plus the flash). Code that means the time of day, such as mob burning, reads `game.clearDaylight` (D29).
+
+## Gotchas
+
+- Headless Chromium refuses pointer lock. A hard lock (`requestLock()` from Play or respawn) then calls `showPause()`, and the state becomes `paused`. A soft lock (`requestLock(true)` from a menu close) keeps `playing` and shows `#resume`.
+- Esc closes a menu on the keydown and requests the lock on the keyup (`escLock`). Joe saw a lock requested on the keydown end in the pause screen. The likely cause: Firefox ends pointer lock on the Esc keyup. An unlock within 300 ms of a soft lock shows `#resume`, not the pause screen.
+- Esc on the pause screen resumes only 400 ms or more after the pause (`pausedAt`). The guard skips an Esc that paused the game.
+- A refused soft lock shows `#resume`. The next canvas click takes the lock and does not mine.
+- Playwright cannot get pointer lock on this Mac, even headed. Test lock paths with a stub: replace `canvas.requestPointerLock` and `document.exitPointerLock`, and define `document.pointerLockElement`.
+  In a test, call `c.game.started = true; c.setState('playing')` after `respawn()`, `closeInventory()`, or a click on Play.
+- A test loop that forces `setState('playing')` can hide a death. Check `player.dead` before you trust a result.
+- A test that moves the player must reset `player.fallPeak = null`. If not, the next landing counts the whole move as a fall.
+- The canvas `mousedown` handler ignores clicks without pointer lock. Tests call `c.primaryClick()` and `c.useItem()` directly.
+- The held slot is `inv.slots[inv.sel]` (`inv.held()`). There is no `inv.selected`.
+- `c.target` updates only while the state is `playing`. A long wait in a test can leave the game `paused`. Call `setState('playing')` in the same evaluate as `useItem()`.
+- Writing to `inv.slots` directly skips `inv.changed()`, so the hotbar does not redraw. Call `c.inv.changed()` after a direct write.
+- `viewModel.heldId` starts at −2. The value −1 means an empty hand. If it starts at −1, `set(-1)` returns early and no arm mesh is built.
+- `renderer.info.autoReset` is off. The frame loop calls `renderer.info.reset()` once, so the counters cover both render passes.
+- `THREE.ColorManagement` is disabled. Give colors in gamma space, and do not convert them to linear.
+- `P.fill(fn)` in `paintTile` ignores the return value of `fn`. A painter must call `P.set(x, y, c)`. A painter that returns colors gives a transparent tile, and the shader discards every texel.
+- Wind sway and glow codes include 232 for crystal faces (emissive). The fragment shader tests the alpha range 0.88..0.94.
+- Particle point size is capped at `uScale * 0.35` pixels, and points closer than 1.6 blocks fade out. Without the cap, explosion smoke fills the screen.
+- `python3 -m http.server` lets Chromium cache `index.html`. After an edit, load the page with a new query value (`&v=N`).
+- `glowGain` is 2 only with `CONFIG.bloom` on and an HDR target. Anything multiplied by it must look the same at 1 as before bloom existed.
+- The shaft mask treats a pixel above y `H + 4` (180) as cloud (30% open). Clouds fly at y 192. Terrain tops out near y 173.
+- Do not draw a bright sky body with additive blending. The composite roll-off keeps the hue, so white added to blue sky turns pale blue. The sun and the moon use normal blending (`discTexture`, `discMat`). The sun gain is `glowGain²`, and the moon gain is `glowGain`.
+- Stars draw after the clouds (`renderOrder` 2.5 against 2). The clouds write depth, so the depth test hides the stars. Do not move the stars before the clouds: the 0.82 cloud alpha lets them through.
+- `CONFIG.shadows` and `CONFIG.bloom` are read every frame. Tests can switch them at runtime without a reload. `CONFIG.effects` no longer exists; a saved `effects` number migrates once to both booleans.
+- A test that forces `setState('playing')` in lava can hide a death. Lava deals 4 damage every 0.5 s. Check `player.dead`, and call `respawn()` before the next test.
+- The game saves per seed. A test reload with `?seed=N` restores the last test state. Remove `clonecraft.world.<seed>` from `localStorage` for a clean world. `pagehide` saves again, even after a manual clear.
+- `relightAt()` must seed an opaque emitter itself (lit furnace). The BFS never enters opaque cells, so without the seed the furnace stays dark.
+- Export and import: `validSave(d)` checks a file before import. It rejects unknown item ids (`ITEMS`), unknown block ids (`BLOCKS`), and cell indices outside `VOL`. A new save field that `persist.apply` reads without a default must also be checked there. An import sets `persist.blocked`, then navigates to `?seed=N`.
+- Playwright MCP catches file choosers and `alert`/`confirm` as modal states, and a `browser_run_code_unsafe` script stops at them. Use `page.setInputFiles('#importFile', path)` and stub `window.alert` and `window.confirm` in the page. The MCP can read and write files only in the project folder and its own temp folder.
+- A test that edits the save in `localStorage` and then reloads loses the edit. The page saves again on `pagehide` and on `visibilitychange`. Test the load path with `persist.apply(data)` instead.
+- A stack is `{id, count, dur?, ench?}`. A test stack built with `n` instead of `count` breaks the inventory silently.
+- Copy a stack with `restack(s, count)`, never with `{id, count, dur}`. A hand-built copy loses `ench`. A new stack path (a new container, a new drop source) must pass `ench` to `inv.add()` or `spawnDrop()` too.
+- A new `.islot` kind needs `slotStack`, `slotArray`, `slotAccepts`, `quickMove`, and the `closeInventory` return list. A missed `closeInventory` entry deletes the items on close. `dropEverything` and the `persist.data()` loose list need it too.
+- `enchantSeed` is module state. A test cannot set it. Call `enchantAltar(k)` to re-roll it, and read it through the `clonecraft.enchantSeed` getter.
+- `player.pitch` is positive when the player looks up.
+- A test that places the player near hostile mobs must respawn on death and pin the position every poll. A skeleton arrow knocks the player back, and a platform edge is a lethal fall.
+- A ranged mob refreshes line of sight (`sees`) every 0.25 s. After a wall appears, one stale shot can still fire.
+- A spider is calm while `max(sky light × daylight, block light)` at its head is 12 or more and it is not `angry`. Night sky light at daylight 0.27 gives about 4, so a spider in the open chases at night.
+- `damagePlayer(amount, cause, from, kind)` applies armor only for the kinds in `ARMORED` (mob, arrow, explosion, lightning). A new damage source must pass its kind, or armor ignores it.
+- A boat floats with `onGround` false, and `moveEntity` steps up only from the ground. `stepBoat` sets `onGround` in water so the boat climbs a bank. A new floating entity with `stepH` needs the same line.
+- Vehicle tests: `clonecraft.vehicles.mount(v)` mounts without aim. `clonecraft.targetVehicle` shows what the crosshair hits. Drive with `clonecraft.input.keys.add('KeyW')` and delete the key after.
+- A cart in an old save can sit at a rail end edge (before the centre stop). `attach()` then finds no rail below it. Break it and place it again.
+- Spawner tests: the spawner stops at `MAX_HOSTILE` (18) hostiles. Kill the others first with `m.dead = true; m.health = 0`. A dead player also stops it, and `updatePlayer` does nothing while `player.dead`.
+- A teleport keeps `player.fallPeak` while not flying, so the landing can deal lethal fall damage. Set `p.fallPeak = null` after every teleport.
+- A tool's kind is `ITEMS[id].tool.type`, not `ITEMS[id].type`.
+- `lootChest()` marks the position in `looted` before it returns. A test that calls it directly consumes that chest's loot.
+- In the Node walk checks, leaves are passable but not standable, and a log is not a floor. Leaf ids are 11 and 75..86.
+- Rain lowers `game.daylight` to 0.75 and a storm to 0.55. Every light test that multiplies by `daylight` sees it. A spider in daytime rain sees sky light 11 and chases. No hostile spawns by day in a storm: 15 × 0.55 rounds to 8.
+- `weather.set(kind, 0)` picks a random duration. Use a tiny positive time (1e-6) to force the next change.
+- `weather.strike()` near the player hurts the player. Tests that strike near the player reset `player.health` after.
+- A bolt shows for 0.3 s. Take its screenshot in the same `browser_run_code_unsafe` call as the strike.
+- The weather particle pools are not on the test handle. Find them in the main scene: the `LineSegments` with `frustumCulled === false` (rain) and the `Points` with a `map` and size 0.16 (snow). Reach the scene through a chunk mesh's `parent`.
+- The Playwright MCP blocks `file:` URLs. Headless `chrome --dump-dom` does not advance the game, so it cannot test loading either.
+- A saved edit above the generated terrain top was not meshed after a reload: `onChunkData` wrote the overrides but kept the old `heights`. `refreshColumn(c, ci)` now runs for every edited column, in `onChunkData` and in `setBlock`.
+- The shadow pass hides objects by material type (see ARCHITECTURE D30). A new opaque mesh casts a shadow by default. A new sky or effect mesh must be transparent, a ShaderMaterial, or `fog: false`, or it casts one.
+- `shadows.render()` and `heldLight.update()` must run before `post.render()` in `frame`, or the terrain reads last frame's map.
+- The water surface is double-sided. Any lookup along the face normal (held light) must flip the normal toward the camera first.
+- `uShadowMap` is a `sampler2DShadow`. Until its target is rendered, three.js binds a colour placeholder and every terrain draw fails with a sampler-type warning. `shadows.render` clears the target once on the first call; keep that before any early return.
+- To measure GPU cost on the M1 Air, render at 3240×2025 (a 3240×2025 viewport at device pixel ratio 1). Smaller sizes hit the 60 fps cap and hide the difference.
+- `CONFIG.shadows` false sets `uShadowOn` 0. The terrain then uses the old ±12 % face term, not the ambient-plus-direct split.
+
+## Pointers
+
+- Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.
+- `game.clearDaylight` runs from 4.5/15 (`NIGHT_DAYLIGHT`) at night to 1 at day. Keep round(15 × floor) at 7 or less, or hostile mobs stop spawning in the open. Caustics gate at `uDaylight` 0.35, so the floor must stay below it. `game.daylight` is that value dimmed by the weather. `sky.update()` sets both.
+- Weather: `weather` (section 17). `RADIUS` 24, `FADE` 6 s, `BOLT_RANGE` 64, `THUNDER_SPEED` 34 blocks/s. `precip(x, z, top)` gives 0 none, 1 rain, 2 snow. `top(x, z)` gives -1 for an unloaded column. `rainGain` reads the rain loop volume.
+- Hostile spawns need `max(round(sky * daylight), blockLight) <= 7`, 24–44 blocks from the player.
+- Slot size: `--islot` (44 px) sizes every inventory-screen slot and `#cursorStack`. `.grid` sets the 12 px gap between slots. The `.gap` spacer sets the 12 px between the backpack and the hotbar row. Do not size a slot group on its own.
+- Menu text contrast: `.menu` is `rgba(8,10,16,.8)` over the live scene. At .8, `#aaa` text holds 4.97:1 over a white sky. A lighter panel fails R2 in daylight.
+- UI rule scan: `tools/uiscan.js` defines `window.__uiscan()` (load it with `page.addScriptTag`). It returns target-size, target-gap, and contrast breaks for the current state. The gradient title is a known false positive.
+- Shadows: `shadows` (before `post`). 2048² map, box ±64 blocks, depth 320, bias `0.1 / DEPTH`, normal offset 0.12 block. `sampler2DShadow`: 4 reads at 2.2 texels on a noise-turned square (terrain), 1 read (water). Fade over the outer 20 % of the box. Leaf faces drop half of their 4×4-texel cells in the pass (dappled light).
+- Held torch: `heldLight` (before `post`). `levelAt(x, y, z)` gives 0..15. `on` is true while the selected slot holds `B.TORCH`. The shader samples at the face centre plus half a block along the normal, flipped toward the camera.
+- Water patterns: `bakeWaterPatterns` fills `uCaus` (caustic net) and `uRipple` (RG slope) once at startup; 256², repeat, mipmapped.
+- Caustics: faces with sway alpha `WET_ALPHA` (246). `pushQuad` writes it when `wetFace` is set by `emitCubeFace`.
+- Caustics must scale `sky`, not add to `light`. An added term driven by `uSunAmt` (0.4 under the moon then, 0.5 now) glowed at night and ignored depth. Depth fade: `smoothstep(0.5, 0.95, vLight.x)`; night gate: `uDaylight` below 0.35.
+- Caustic projection: shift `cp` by depth (`15*(1-vLight.x)`), never by `vWorld.y`. Absolute y (about 125) times the moving sun direction slid the net up to about 7 blocks/s. A QA script that resets `game.dayTime` before each shot hides this.
+- Sky discs: `Object3D.lookAt` takes a world-space target. The sky group follows the camera, so the sun, moon, and halo must `lookAt(camera.position)`, not `(0, 0, 0)`.
+- Caustic motion: two `uCaus` reads combined by `min`, each warped by its own sum of moving sines (±0.05 tile, wavelength about 0.35 tile). Without the warp, layers with a shared drift look like one sliding pattern (Joe, 2026-09-29).
+- Windows test (2026-09-29): Joe's Arc machine hung at "Generating terrain" with an empty console on files copied off his home network. Every build loaded once he copied the files on the home network. No shader bug was confirmed. Playwright here runs Metal and cannot check Direct3D; after a shader change, ask Joe to load it on his Nvidia and Arc laptops.
+- Mob caps: `MAX_HOSTILE` 18, `MAX_PASSIVE` 40, and `MAX_ANIMALS_PER_CHUNK` 4.
+- `_corners` is an `Int32Array`. Mesh parts (`box`, `emitFlat`) take whole 1/16 units; a fraction truncates.
+- Ladder ids are 250–253 (`B.LADDER + facing`), the last free run below `UNLOADED` (255). Ids 200, 210, … 240 are tool tier-0 slots; do not use them.
+- An older build fails every frame on a save that holds a ladder id (null material on the held item). Saves are not backward compatible.
+- `buildTree` must not draw from `rng` for new features. The chunk rng is shared, so one extra draw moves every later tree and structure. Use `hash3` of a position.
+- Settings live in `localStorage` under `clonecraft.settings`. `freezeTime` is the one boolean; the load loop reads only numbers, so it has its own line. The time-of-day slider is not a setting: it writes `game.dayTime`, and `setState` re-reads the time into it on `menu` and `paused`. The `rd` URL parameter overrides the render distance.
+- Wind sway and glow live in the `aTint` alpha: 255 is still, 128 is leaves, 0 is a plant top, 200 is a torch (glow), and 214 is a soft glow (lava, lit furnace; about 1.2 in HDR). `swayMode` in the mesher sets it. Reset `swayMode` to `SWAY_NONE` after each block that sets it. The vertex shader sways only alpha below 0.6.
+- Flight: `setFlying()` is the only switch. `player.flying` skips gravity and water physics. The K key toggles it. A landing (`onGround`) does not end flight.
+- The walk bob and the footsteps share `walkPhase`. A footstep plays when `floor(walkPhase)` changes.
+- Before `game.started`, `updateCamera()` shows the menu panorama and ignores the player's yaw.
+- Liquids: `LIQ_KIND` (1 water, 2 lava) and `LIQ_LEVEL` (8 source, 1..7 flow). `liquids.pending` counts queued cells. F3 shows it.
+- Tile entities: `tileEntities` ("x,y,z"). A furnace has `slots` [input, fuel, output], `burn`, `burnMax`, and `cook`. `SMELT_TIME` is 5 s.
+- Light curves: sky light uses `0.83^(15 - l)` and block light uses `0.85^(15 - l)`. The shader (`curve`, `curveB`) and `world.brightnessAt()` must match.
+- Wall torches: `B.TORCH_WALL + f` leans toward `DIR4[f]`, and its wall is the cell at `-DIR4[f]`. `torchFor()` picks the id on placement. `breakBlock()` breaks wall torches on the four sides of a removed block.
+- Doors: `doorTimers` maps the bottom half to the close time in `game.clock`. A blocked doorway retries every 0.5 s.
+- Leaves: `IS_LEAF`, `LEAF_DECAYS` (natural only), and `LEAF_COLOR` (0 green, 1 red, 2 orange, 3 brown, 4 pink, 5 white, 6 yellow). Natural yellow is 87 and placed yellow is 86, so natural ids are not one range. The worker-side `isLeaf` in tree generation lists them explicitly; update it with any new color. Natural ids are `LEAF_NATURAL[color]`. Placed ids are `B.LEAVES_PLACED + color`. `placeBlock()` maps a natural id to the placed id. Test for a leaf with `IS_LEAF`, never `=== B.LEAVES`.
+- Storage blocks use ids 88..93 (`STORAGE_DEFS`). `STORAGE_DEFS` drives the block, its tile (`paintStorage`), and both recipes.
+- Block ids 0..99 are full. Crystals use 94..99. Items start at 100 but leave gaps for blocks: TNT 110, stairs 111..126, farmland 127 and wet farmland 128, saplings 146..152 (`B.SAPLING + color`), and wheat 153..156 (`B.WHEAT + stage`). `SPEC_expansion.md` holds the full id plan and the free ids. Every per-id table has 256 entries.
+- Farming items: bucket 167, water bucket 168, lava bucket 169, seeds 170, wheat 171, bread 172, apple 173, golden apple 174, bone 175, and bone meal 208. Hoes use `TOOL_KINDS.hoe.base` 240, so the ids are 241..247.
+- Crystals: `B.CRYSTAL + v` grows along `CRYSTAL_GROW[v]` (0 up, 1 down, 2..5 walls). Its rock is the cell at `-CRYSTAL_GROW[v]`. `crystalFor()` picks the id on placement. `breakBlock()` breaks crystals on the removed cell's faces. Floor crystals use the generic `NEEDS_SUPPORT` check above the cell.
+- Stairs: `B.STAIRS_COBBLE` (111) and `B.STAIRS_PLANKS` (119) are bases. The id is `base + (top << 2 | facing)`, and the tall half lies toward `DIR4[facing]`. `IS_STAIR` marks all 16 ids. `stairKey(id, get)` gives the index into `STAIR_BOXES` (boxes in 1/16 units: slab first). Pass `get(dx, dz)` for the same-height neighbours. `stairFor()` picks the id on placement.
+- A stair is `opaque: false` and in `LIGHT_STOP`. `propagate` never spreads from a `LIGHT_STOP` cell, and `relightAt` skips such neighbours as candidates. Do not make stairs opaque: an opaque cell has no light of its own, so its faces go black.
+- Collision: `solidBoxes()` fills the flat `_boxes` array, and `clipAxis()` clips one axis. `moveEntity` handles step-up only for entities with `stepH`. Only the player has `stepRise`, and `updateCamera` eases it. The selection crack overlay stays a full cube on a stair.
+- Crystals: `CRYSTAL_PATCHES` (2.5) is a mean. The loop runs `ceil` times and keeps the last patch with the fractional chance. A new value moves crystals in existing worlds. Saves keep only edits, so no save breaks.
+- Light channels: `CH_SKY` 0, `CH_BLK` 1, `CH_CRY` 2. `chunk.chan[ch]` holds each array, and `CH_EMIT[ch]` holds each emission table (`EMIT`, `EMIT_CRY`). `propagate`, `unpropagate`, and `relightAt` take the channel number. Add a light source to a channel by its `defBlock` field (`emit` or `emitCry`).
+- TNT: `primedTnt` ("x,y,z" to fuse state) lives outside the save. `updateTnt()` drops an entry when its cell is no longer TNT, so any break defuses it. Tests read `c.primedTnt`.
+- Leaf decay: `leafDecay` (queue, reach 6). F3 shows "Leaves queued". A decay calls `breakBlock()` silently and wakes nothing.
+- Farming: `farming` holds one registry (Map "x,y,z" to `[x, y, z, due, n]`) for saplings, unripe crops, and farmland. `due` is in `game.clock`. `n` is the sapling stage or the dry seconds of a farmland. `farming.save()` stores the remaining time, so the save is clock-free. `farming.boost()` is bone meal. `farming.toDirt()` also breaks the crop above. Tests read `c.farming.save()` for stages and timers.
+- `raycast(..., sources = true)` also stops at liquid sources (level 8). Only the empty bucket uses it. Flow cells stay transparent to the ray.
+- A food with `regen` (golden apple) sets `player.regenLeft` and can be eaten at full health. `FUEL_LEFT` names the item a fuel leaves behind (lava bucket to bucket).
+- Pickup: `PICKUP_RANGE` 3.3 for all drops. A drop from `dropStack()` has `thrown` set and uses `THROWN_PICKUP_RANGE` 1.8, so a Q throw does not return to a still player.
+- Break time: `hardness × 1.5 / speed` when the block drops, and `hardness × 5 / speed` when it does not (stone by hand). A block with `minLevel` (ores, obsidian) returns `Infinity` below that level: it does not break, and a toast names the weakest pickaxe that works (`pickaxeFor`).
+- Rails: `B.RAIL + v` (157..166). v 0 runs along z, v 1 along x, v 2..5 slope up toward `DIR4[v - 2]`, and v 6..9 are curves. `RAIL_ENDS[v]` lists the two ends. `railLink(x, y, z, v, d)` finds the linked rail at end `d`, one block up or down included. Only v 0 drops the Rail item (`noItem`).
+- Vehicle speeds: `BOAT_WATER_SPEED` 6, `BOAT_LAND_SPEED` 1, `BOAT_TURN` 2 rad/s, and `CART_MAX` 8. A slope adds 7 × grade per second to a cart.
+- The trap warning (`trapNear`) matches any chiseled sandstone over TNT, not only temples, like the trap trigger itself. It scans 7×7×15 cells 4 times a second.
+- Structures: `stampDungeon`, `stampTemple`, `stampTower`, and `stampMineshafts` in `WorldGenModule`. Rates: a dungeon in about 1 chunk in 12, a temple in about 1 desert chunk in 40, a tower in about 1 chunk in 50 of plains, forest, and highlands. `mineshaftPlan(gx, gz)` is pure per 96-block cell.
+- Loot: `LOOT[type]` entries are `[item, min, max, weight]`. `'ench'` and `'armor'` are special entries. `featureAt(x, y, z, kind)` finds a chunk feature.
+- Walk check method: extract `WorldGenModule` from `index.html` into Node, generate the chunks around each structure, and run a BFS with steps up 1 and drops up to 3. A structure passes when the BFS reaches its goal (hall floor, top chest) and walks back out. Also compare 2 generations of the same chunk for determinism.
