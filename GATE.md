@@ -1,10 +1,9 @@
 # GATE
 
-The acceptance criteria come from `Minecraft Clone Prompt V3.md`. `[x]` means I observed it in Chromium through Playwright (seed 12345). `[ ]` means it is not verified. A note tells why.
+The first criteria (sections "Delivery" to "Presentation") came from `Minecraft Clone Prompt V3.md`. Joe removed that file on 2026-10-01 because the project has moved beyond it. The later sections come from Joe's requests and the specs they name. `[x]` means I observed it in Chromium through Playwright (seed 12345). `[ ]` means it is not verified. A note tells why.
 
 ## Delivery
 
-- [x] One HTML file. Three.js r160 comes from a CDN. No build tools and no external assets.
 - [x] Code is in the spec's sections, numbered 1–18, with a living header.
 - [x] Chromium: load, play, and QA runs with 0 console errors and 0 warnings.
 - [x] Firefox: Joe played it.

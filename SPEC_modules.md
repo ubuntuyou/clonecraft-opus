@@ -1,6 +1,6 @@
 # SPEC: modules (split the source, build one file)
 
-Status: draft. Requested by Joe on 2026-10-01 ("deep spec o2 to a file"). Joe has not approved it.
+Status: approved by Joe on 2026-10-01 ("Q1 I approve"). Requested by Joe on 2026-10-01 ("deep spec o2 to a file").
 Gate: `GATE_modules.md`.
 
 Terms used in this spec:
@@ -335,7 +335,7 @@ Step 4:
 - G4, owner review (Joe): the built file runs from `file://` in Firefox.
 - G5, owner review (Joe): the built file loads and plays on the Nvidia laptop and the Arc laptop.
 - G6, owner review (Joe): a short play check finds no change in feel.
-- G7, owner decision (Joe): the wording of the `GATE.md` Delivery item "No build tools and no external assets". The built file still needs no build tool to run. The source now needs one.
+- G7, owner decision (Joe): the replacement for the `GATE.md` Delivery item "One HTML file. Three.js r160 comes from a CDN. No build tools and no external assets." Joe removed the item on 2026-10-01 and asked for new wording.
 
 ### Risks
 

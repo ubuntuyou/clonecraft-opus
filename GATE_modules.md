@@ -2,16 +2,14 @@
 
 The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. `[ ]` means it is not verified. A note tells why.
 
-The spec is a draft. Joe has not approved it. No step has started.
-
 ## Spec
 
-- [ ] Joe approves `SPEC_modules.md`.
+- [x] Joe approves `SPEC_modules.md` (2026-10-01, "Q1 I approve").
 
 ## Step 0: init
 
-- [ ] T1: `git status` is clean. The tag `baseline-single-file` holds `index.html` with 511,486 bytes. `HANDOFF.md`, `node_modules/`, and `dist/` are not tracked.
-- [ ] The commit author is `ubuntuyou`. The commit holds no PII and no co-author trailer.
+- [x] T1: `git status` is clean. The tag `baseline-single-file` holds `index.html` with 511,486 bytes. `HANDOFF.md`, `node_modules/`, and `dist/` are not tracked.
+- [x] The commit author is `ubuntuyou`. The commit holds no PII and no co-author trailer.
 
 ## Step 1: pipeline (gate G1)
 
@@ -62,5 +60,5 @@ The spec is a draft. Joe has not approved it. No step has started.
 - [ ] G4, owner review (Joe): the built file runs from `file://` in Firefox.
 - [ ] G5, owner review (Joe): the built file loads and plays on the Nvidia laptop and the Arc laptop.
 - [ ] G6, owner review (Joe): a short play check finds no change in feel.
-- [ ] G7, owner decision (Joe): the wording of the `GATE.md` Delivery item "No build tools and no external assets".
+- [ ] G7, owner decision (Joe): the replacement wording for the removed `GATE.md` Delivery item.
 - [ ] After Joe approves: `tools/split.js`, `tools/parity.js`, and `tools/modmap.json` are removed. `npm run check` still exits 0.
