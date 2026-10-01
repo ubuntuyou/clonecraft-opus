@@ -104,7 +104,7 @@ An imported binding is read-only. Nine `let` bindings have writes from another m
 
 #### D42. Text proves parity
 
-The built script equals the baseline script, line for line, except a fixed list of differences. `tools/parity.js` checks this. The full `GATE.md` re-run is not needed. A browser smoke test and Joe's review cover what text cannot: the load, the worker, and the frame rate.
+The built script equals the baseline script, line for line, except a fixed list of differences. `tools/parity.js` checks this. The full `GATE.md` (now `GATE_game.md`) re-run is not needed. A browser smoke test and Joe's review cover what text cannot: the load, the worker, and the frame rate.
 
 #### Tests
 
@@ -332,7 +332,7 @@ Step 4:
 - G1 (after Step 1): T2–T6 pass. This gate decides Vite 7 or the Rollup fallback.
 - G2 (after Step 2): T7–T13 pass.
 - G3 (after Step 4): T14–T20 pass.
-- G4, owner review (Joe): the built file runs from `file://` in Firefox.
+- G4: removed by Joe on 2026-10-01. Joe does not use Firefox. (Was: the built file runs from `file://` in Firefox.)
 - G5, owner review (Joe): the built file loads and plays on the Nvidia laptop and the Arc laptop.
 - G6, owner review (Joe): a short play check finds no change in feel.
 - G7, owner decision (Joe): the replacement for the `GATE.md` Delivery item "One HTML file. Three.js r160 comes from a CDN. No build tools and no external assets." Joe removed the item on 2026-10-01 and asked for new wording.

@@ -1,7 +1,7 @@
 # SPEC: expansion (O1–O6)
 
 Status: approved by Joe on 2026-09-28 ("Spec and gate o1-o6 in whatever order you want. Then start").
-Gate: `GATE.md`, sections "Batch 13" to "Batch 18".
+Gate: `GATE_game.md` (was `GATE.md`), sections "Batch 13" to "Batch 18".
 
 ## Part 1: General
 

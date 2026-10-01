@@ -1,7 +1,7 @@
 # SPEC: water, sunlight, shadows, and the held torch (G1–G4)
 
 Status: requested by Joe on 2026-09-29. Joe asked for "water [that looks] more realistic with dynamic movement, caustics, and sun glitter without the generated surface texture", then "directional light and dynamic shadows, and make a held torch cast light around the player".
-Gate: `GATE.md`, section "Graphics G1–G4".
+Gate: `GATE_game.md` (was `GATE.md`), section "Graphics G1–G4".
 
 ## Part 1: General
 

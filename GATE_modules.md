@@ -57,8 +57,8 @@ The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. 
 
 ## Step 5: close
 
-- [ ] G4, owner review (Joe): the built file runs from `file://` in Firefox.
-- [ ] G5, owner review (Joe): the built file loads and plays on the Nvidia laptop and the Arc laptop.
+- G4 removed by Joe on 2026-10-01: "I do not use Firefox." (Was: the built file runs from `file://` in Firefox.)
+- [x] G5, owner review (Joe): the built file loads and plays on the Nvidia laptop and the Arc laptop. (Joe, 2026-10-01 09:15 CT: "Works on both laptops.")
 - [ ] G6, owner review (Joe): a short play check finds no change in feel.
-- [x] G7, owner decision (Joe): the replacement wording for the removed `GATE.md` Delivery item. (Joe approved it 2026-10-01 09:01 CT. `GATE.md` "Delivery" holds it.)
+- [x] G7, owner decision (Joe): the replacement wording for the removed `GATE.md` Delivery item. (Joe approved it 2026-10-01 09:01 CT. `GATE_game.md` "Delivery" holds it.)
 - [ ] After Joe approves: `tools/split.js`, `tools/parity.js`, and `tools/modmap.json` are removed. `npm run check` still exits 0.

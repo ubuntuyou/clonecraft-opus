@@ -1,6 +1,6 @@
-# GATE
+# GATE: game
 
-The first criteria (sections "Delivery" to "Presentation") came from `Minecraft Clone Prompt V3.md`. Joe removed that file on 2026-10-01 because the project has moved beyond it. The later sections come from Joe's requests and the specs they name. `[x]` means I observed it in Chromium through Playwright (seed 12345). `[ ]` means it is not verified. A note tells why.
+The first criteria (sections "Delivery" to "Presentation") came from `Minecraft Clone Prompt V3.md`. Joe removed that file on 2026-10-01 because the project has moved beyond it. The later sections come from Joe's requests and the specs they name. `[x]` means I observed it in Chromium through Playwright (seed 12345). `[ ]` means it is not verified. A note tells why. Joe renamed this file from `GATE.md` on 2026-10-01, when the project had three specs.
 
 ## Delivery
 
