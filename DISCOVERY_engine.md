@@ -78,6 +78,9 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - The water surface is double-sided. Any lookup along the face normal (held light) must flip the normal toward the camera first.
 - `uShadowMap` is a `sampler2DShadow`. Until its target is rendered, three.js binds a colour placeholder and every terrain draw fails with a sampler-type warning. `shadows.render` clears the target once on the first call; keep that before any early return.
 - To measure GPU cost on the M1 Air, render at 3240×2025 (a 3240×2025 viewport at device pixel ratio 1). Smaller sizes hit the 60 fps cap and hide the difference.
+- Measure fps only on a quiet Mac. Another browser, RustDesk, or another session's headless Chromium cut the rate by half or more and make it drift during a run. Check `ps` before and during a run.
+- Compare settings in one page, interleaved. `CONFIG.shadows` and `CONFIG.bloom` are read every frame, so set them in place and cycle the settings several times. Separate page loads per setting drift too much.
+- GPU timer queries (`EXT_disjoint_timer_query_webgl2`) work in Chrome on the M1, but the per-pass times are not usable. A 101×63 blur pass reads the same ~4.9 ms as a 1620×1012 pass, and the fixed 2048² shadow pass reads 14.6 ms at 3240×2025 and 6.2 ms at 2160×1350. Use them for A/B differences only.
 - `CONFIG.shadows` false sets `uShadowOn` 0. The terrain then uses the old ±12 % face term, not the ambient-plus-direct split.
 
 ## Pointers
