@@ -1,6 +1,6 @@
 # SPEC: modules (split the source, build one file)
 
-Status: approved by Joe on 2026-10-01 ("Q1 I approve"). Requested by Joe on 2026-10-01 ("deep spec o2 to a file").
+Status: done on 2026-10-01. Every box in `GATE_modules.md` is checked; Joe removed G4. Approved by Joe on 2026-10-01 ("Q1 I approve"). Requested by Joe on 2026-10-01 ("deep spec o2 to a file").
 Gate: `GATE_modules.md`.
 
 Terms used in this spec:

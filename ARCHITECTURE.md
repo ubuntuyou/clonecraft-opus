@@ -231,7 +231,7 @@ An imported binding is read-only. A `let` that another module writes gets a one-
 
 ### D42. Text proved the split; tests guard it now
 
-The split was mechanical. `tools/split.js` cut the old script into modules, and `tools/parity.js` proved the built script equal to the old script plus the setters. The git tag `baseline-single-file` keeps the old file. From now on, `npm run check` guards the build: depcheck, the Node tests (worldgen golden hashes, block ids, recipes), and the fresh-build comparison.
+The split was mechanical. `tools/split.js` cut the old script into modules, and `tools/parity.js` proved the built script equal to the old script plus the setters. Both tools were removed when the spec closed (commit history keeps them). The git tag `baseline-single-file` keeps the old file. From now on, `npm run check` guards the build: depcheck, the Node tests (worldgen golden hashes, block ids, recipes), and the fresh-build comparison.
 
 ### D12. Procedural audio and particles
 
