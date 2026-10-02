@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 44 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 45 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -14,8 +14,8 @@
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, biomes, atlas, worldgen, gen-service, terrain-material, and
- *    crafting never reach this file. Node tests import them.
+ *  - three, config, blocks, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
+ *    and crafting never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
@@ -32,8 +32,9 @@
  *      updates; a LIGHT_STOP cell such as a stair takes light but never passes it on)
  *   8. Mesh generation: mesher (hidden-face culling, smooth light + AO, sloped liquids, doors,
  *      crystals, stairs, wet faces for caustics: WET_ALPHA; rails: railMesh() rotates one
- *      flat, slope, or curve quad); terrain-material (TERRAIN_FS: water waves and glitter,
- *      shadows, held light)
+ *      flat, slope, or curve quad); clouds (the shared cloud density: one baked noise
+ *      texture, GLSL cloudDensity(), the wind, coverage from the weather); terrain-material
+ *      (TERRAIN_FS: water waves and glitter, shadows, held light, cloud shadows)
  *   9. Renderer and player: engine, player (water and lava physics, lava damage;
  *      damagePlayer applies armor by damage kind; the temple trap and its warning: trapNear,
  *      audio.trapWarn)
@@ -87,6 +88,7 @@ import './worldgen.js';
 import './gen-service.js';
 import './world.js';
 export { buildChunkMesh } from './mesher.js';
+import './clouds.js';
 export { terrainMaterial, waterMaterial } from './terrain-material.js';
 import './engine.js';
 import './player.js';

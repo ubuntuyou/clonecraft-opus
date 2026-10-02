@@ -240,6 +240,13 @@ One level gates them all: night (from the sun height) times dry weather (`1 - we
 A firefly lives over a grass block in the plains, forest, or rainforest biome. `ground(x, z)` scans down through air, plants, leaves, and logs, so a forest floor counts and a canopy top does not. Every move is checked against the ground of the new column, so a firefly never drifts over a step, a non-grass block, or another biome.
 The points use additive blending and HDR vertex colors. A flash peaks at 4, above the bloom threshold of 1, so the bloom pass draws its halo. The faint glow between flashes stays under the threshold.
 
+### D44. One cloud density field, owned by `clouds`
+
+`src/clouds.js` owns the cloud texture, the wind offsets, the coverage, and the GLSL `cloudDensity(xz)`. It is pure (three and config only), so `terrain-material` can import it without a cycle. The sky layer, the terrain cloud shadows, the shaft mask, and the sun and moon fade all read this one field. So a shadow always lies under its cloud, and a shaft always comes through a real gap.
+The layer is one flat quad at y 192 with no depth write, not a volume. It costs no measurable frame time at 3240×2025. The price is that the player cannot fly into a cloud.
+`clouds.densityAt(x, z)` is the same function on the CPU. `sky` uses it to fade the sun and moon, and tests use it to check the field without reading pixels.
+The cloud shadow multiplies only the direct-light term `lit`, so caves and block shadows do not change. It follows the Shadows box. The water glitter and the sun disc fade by the cloud with or without the box, because they are images of the sun, not shadows.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -263,6 +270,7 @@ The points use additive blending and HDR vertex colors. A flash peaks at 4, abov
 | structure loot | `lootChest(x, y, z)` returns the filled tile entity of an unfilled generated chest, or null. `tileEntity()` and the chest spill call it (D28). |
 | spawners | `spawners.update(dt)` runs once per frame. It reads `chunk.features` and counts against `MAX_HOSTILE` (D28). |
 | weather | `weather.update(dt)` runs once per frame before `sky.update`. The sky reads `weather.k`, `storm`, `dim`, and `flash`. Mobs read `weather.wetAt(x, z)`. `set(kind, seconds)` and `strike(x, z)` are the entry points (D29). |
+| clouds | `clouds.advance(dt, weather.k, weather.storm)` runs once per frame from `sky.update`. Shaders spread `cloudUniforms` and include `CLOUD_GLSL`; `clouds.densityAt(x, z)` gives the same density on the CPU (D44). |
 | screens | `setState(s)`. |
 | rendering | `heldLight.update()`, then `shadows.render()`, then `post.render()` draw the world each frame. `post.resize()` follows the window. `terrainUniforms` carries the shadow map, the held-light texture, and `uWet` (D30, D31, D32). |
 | S1: load order | `src/order.js` lists every module once, in load order, and re-exports the upward names. A new module goes in its place in that list (D38, D39). |

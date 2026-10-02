@@ -41,6 +41,7 @@ import { closeHomes, goHome, homes, openHomes, setHome } from './homes.js';
 import { sky } from './sky.js';
 import { weather } from './weather.js';
 import { fireflies } from './fireflies.js';
+import { clouds } from './clouds.js';
 import { camDir, last, loadBar, loadText, onLoaded, setLast } from './boot.js';
 import { shadows } from './shadows.js';
 import { heldLight } from './held-light.js';
@@ -119,7 +120,7 @@ window.clonecraft = {
   projectiles, bow, armorId, ARMOR_TIERS, blockDrop, validSave, spawnHostiles, RECIPES, lineOfSight,
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
-  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, heldLight, shadows,
+  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, heldLight, shadows, clouds,
 };
 
 requestAnimationFrame(frame);

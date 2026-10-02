@@ -3,7 +3,8 @@
 // and light shafts toward the sun or the moon. It uses half-float targets when the GPU has
 // them. glowGain sets the bloom strength; post writes it through setGlowGain().
 import { THREE } from './three.js';
-import { CONFIG, glowGain, H, setGlowGain } from './config.js';
+import { CONFIG, glowGain, setGlowGain } from './config.js';
+import { CLOUD_GLSL, cloudUniforms } from './clouds.js';
 import { terrainUniforms } from './terrain-material.js';
 import { camera, player, renderer, scene } from './engine.js';
 import { sky } from './sky.js';
@@ -69,16 +70,24 @@ const post = (() => {
     tDepth: { value: sceneRT.depthTexture }, uInvProj: { value: camera.projectionMatrixInverse },
     uCamWorld: { value: camera.matrixWorld }, uLight: lightUv, uAspect: { value: 1 },
     uFogNear: terrainUniforms.uFogNear, uFogFar: terrainUniforms.uFogFar,
+    ...cloudUniforms, uCloudNear: sky.cloudNear, uCloudFar: sky.cloudFar,
   }, `
     uniform sampler2D tDepth; uniform mat4 uInvProj; uniform mat4 uCamWorld;
     uniform vec2 uLight; uniform float uAspect; uniform float uFogNear; uniform float uFogFar;
+    uniform float uCloudNear; uniform float uCloudFar;
     varying vec2 vUv;
+    ${CLOUD_GLSL}
     void main() {
       float d = texture2D(tDepth, vUv).x, open = 1.0;
-      if (d < 1.0) {
-        vec4 v = uInvProj * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
-        v /= v.w;
-        open = (uCamWorld * vec4(v.xyz, 1.0)).y > ${(H + 4).toFixed(1)} ? 0.3 : smoothstep(uFogNear, uFogFar, length(v.xyz));
+      vec4 v = uInvProj * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);   // d = 1 (sky): a point on the far plane
+      v /= v.w;
+      if (d < 1.0) open = smoothstep(uFogNear, uFogFar, length(v.xyz));
+      // G5: where the ray from the eye to this pixel crosses the cloud layer, the cloud there dims it
+      vec3 eye = uCamWorld[3].xyz, wp = (uCamWorld * vec4(v.xyz, 1.0)).xyz;
+      if ((eye.y - CLOUD_Y) * (wp.y - CLOUD_Y) < 0.0) {
+        float t = (CLOUD_Y - eye.y) / (wp.y - eye.y);
+        float fade = 1.0 - smoothstep(uCloudNear, uCloudFar, t * length(v.xyz));
+        open *= 1.0 - 0.75 * cloudDensity(mix(eye.xz, wp.xz, t)) * fade;
       }
       vec2 dv = (vUv - uLight) * vec2(uAspect, 1.0);
       float r2 = dot(dv, dv);

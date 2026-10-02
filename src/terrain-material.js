@@ -2,6 +2,7 @@
 import { THREE } from './three.js';
 import { mulberry32 } from './config.js';
 import { atlasTexture } from './atlas.js';
+import { CLOUD_GLSL, cloudUniforms } from './clouds.js';
 
 const terrainUniforms = {
   map: { value: atlasTexture },
@@ -20,6 +21,7 @@ const terrainUniforms = {
   uHeld: { value: null }, uHeldOrigin: { value: new THREE.Vector3() }, uHeldOn: { value: 0 },
   uWet: { value: 0 },                                                      // weather wetness 0..1
   uCaus: { value: null }, uRipple: { value: null },                        // baked water patterns (bakeWaterPatterns)
+  ...cloudUniforms,                                                        // G5 cloud shadows (`clouds` module)
 };
 
 // P1: the caustic network and the ripple normals are baked once into small tiling textures, so the
@@ -128,6 +130,14 @@ const TERRAIN_FS = /* glsl */`
     } else s = texture(uShadowMap, vec3(c.xy, z));
     return mix(s, 1.0, smoothstep(0.8, 1.0, edge));
   }
+  ${CLOUD_GLSL}
+  // G5: the cloud density (0..1) where the ray to the sun (or moon) crosses the layer
+  float sunCloud() {
+    vec2 q = vWorld.xz + uSunDir.xz * ((CLOUD_Y - vWorld.y) / max(uSunDir.y, 0.12));
+    return cloudDensity(q);
+  }
+  // G5: direct light under the clouds: 1 = no cloud, 0.25 = under a thick cloud
+  float cloudLit() { return 1.0 - 0.75 * sunCloud(); }
   #ifdef WATER
   // G1: animated surface normal: four sine waves plus the baked ripples; \`detail\` fades the ripples with distance
   vec3 waveNormal(vec2 p, float t, float detail) {
@@ -157,11 +167,11 @@ const TERRAIN_FS = /* glsl */`
     float ndl = dot(n, uSunDir);
     float sunF, lit = 1.0;
     if (uShadowOn > 0.5) {
-      // G3: ambient plus direct sun; direct needs open sky (baked sky light) and no shadow
+      // G3: ambient plus direct sun; direct needs open sky (baked sky light), no shadow, and no cloud (G5)
       #ifdef WATER
-      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, false);
+      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, false) * cloudLit();
       #else
-      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, true);
+      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, true) * cloudLit();
       #endif
       float open = smoothstep(0.6, 0.95, vLight.x);
       float direct = max(ndl, 0.0) * lit * open * uSunAmt;
@@ -231,6 +241,9 @@ const TERRAIN_FS = /* glsl */`
       float rs = max(dot(reflect(-v, nn), uSunDir), 0.0);
       float glit = (pow(rs, 900.0) * 14.0 + pow(rs, 120.0) * 0.8) * detail + pow(rs, 60.0) * 0.35 * (1.0 - detail);
       float spec = glit * uSunAmt * open * (1.0 - 0.85 * uWet) * lit;
+      // G5: the glitter is a mirror image of the sun, so it fades like the sun disc (sky.js), with or
+      // without Shadows. The 25 % floor of cloudLit() left a bright HDR glint under overcast.
+      if (spec > 0.0) spec *= exp(-sunCloud() * 6.0);
       col += vec3(1.0, 0.93, 0.8) * spec * uGlow;
     #endif
     float f = smoothstep(uFogNear, uFogFar, vDist);

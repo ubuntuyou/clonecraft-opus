@@ -5,14 +5,16 @@
  * 0.75 midnight. CONFIG.freezeTime stops the clock. The pause menu sets dayTime and the freeze.
  * The sun elevation drives daylight (4.5/15 .. 1), which scales baked sky
  * light in the terrain shader. The moon lights by night at half the sun's directional strength. The sky is a gradient dome with a sunset glow, a square
- * sun with a soft halo, a square moon, stars, and blocky clouds that drift. Everything in the sky group
- * follows the camera. Fog color is the sky horizon color, or deep blue underwater.
+ * sun with a soft halo, a square moon, stars, and soft clouds that drift (G5). Everything in the sky group
+ * follows the camera. The cloud layer is one flat quad at CLOUD_Y that follows the camera; its
+ * shader reads the shared density field of the `clouds` module, so the clouds stay put in the world. Fog color is the sky horizon color, or deep blue underwater.
  * `weather` follows the sky. It fades k (wet) and storm over 6 s. The sky greys the dome and
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { clamp, CONFIG, CS, glowGain, lerp, mulberry32, SEA, SEED } from './config.js';
+import { clamp, CONFIG, CS, glowGain, lerp, mulberry32 } from './config.js';
+import { CLOUD_GLSL, CLOUD_Y, clouds as cloudField, cloudUniforms as fieldUniforms } from './clouds.js';
 import { terrainUniforms } from './terrain-material.js';
 import { camera, game, player, renderer, scene } from './engine.js';
 import { weather } from './order.js';
@@ -95,65 +97,49 @@ const sky = (() => {
       void main() { gl_FragColor = vec4(1.0, 1.0, 1.0, uOpacity * vFade); }`,
   });
   const stars = new THREE.Points(starGeo, starMat);
-  // Stars draw after the clouds (renderOrder 2). The clouds write depth, so the depth test hides the stars behind them.
-  stars.renderOrder = 2.5; stars.frustumCulled = false;
+  // Stars draw before the clouds (renderOrder 2). The clouds write no depth: their alpha covers the stars.
+  stars.renderOrder = 1.5; stars.frustumCulled = false;
   group.add(stars);
 
-  // blocky clouds: a periodic 64x64 cell mask, cells 12 blocks wide and 4 thick.
-  // Four copies of one tile (2x2) keep the camera at least half a tile from any edge.
-  const CN = 64, CELL = 12, CY = SEA + 64, CT = 4, TILE_W = CN * CELL;
-  const mask = new Uint8Array(CN * CN);
-  {
-    const r = mulberry32(SEED ^ 0x51f15e);
-    const base = new Float32Array(CN * CN).map(() => r());
-    const at = (x, z) => base[((z + CN) % CN) * CN + ((x + CN) % CN)];
-    for (let z = 0; z < CN; z++) for (let x = 0; x < CN; x++) {
-      let s = 0;
-      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) s += at(x + dx, z + dz);
-      mask[z * CN + x] = s / 25 + (r() - 0.5) * 0.12 > 0.54 ? 1 : 0;
-    }
-  }
-  const cloudGeo = (() => {
-    const pos = [], shade = [];
-    const m = (x, z) => mask[((z + CN) % CN) * CN + ((x + CN) % CN)];
-    const quad = (a, b, c, d, s) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); for (let i = 0; i < 6; i++) shade.push(s); };
-    for (let z = 0; z < CN; z++) for (let x = 0; x < CN; x++) {
-      if (!m(x, z)) continue;
-      const x0 = x * CELL, x1 = x0 + CELL, z0 = z * CELL, z1 = z0 + CELL, y0 = 0, y1 = CT;
-      quad([x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], 1);
-      quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], 0.7);
-      if (!m(x + 1, z)) quad([x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1], 0.85);
-      if (!m(x - 1, z)) quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], 0.85);
-      if (!m(x, z + 1)) quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], 0.8);
-      if (!m(x, z - 1)) quad([x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0], 0.8);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('aShade', new THREE.Float32BufferAttribute(shade, 1));
-    return g;
-  })();
+  // G5 clouds: one flat quad at CLOUD_Y, moved under the camera each frame. It writes no depth.
+  //   density d: the shared field at this point; ds: the field toward the light (self-shadow).
+  //   From below, thick parts are darker (their own depth blocks the light). Thin parts near the
+  //   light glow (forward scatter). Opacity grows with the slant path through the layer.
+  //   The colour stays at or below 0.9, so white clouds do not bloom.
   const cloudUniforms = {
-    uColor: { value: new THREE.Color(1, 1, 1) }, uFogColor: terrainUniforms.uFogColor,
-    uNear: { value: 150 }, uFar: { value: 500 },
+    ...fieldUniforms,
+    uColor: { value: new THREE.Color(1, 1, 1) }, uAmb: { value: new THREE.Color() }, uFogColor: terrainUniforms.uFogColor,
+    uNear: { value: 350 }, uFar: { value: 1000 }, uLightDir: terrainUniforms.uSunDir, uLightAmt: { value: 1 },
   };
   const cloudMat = new THREE.ShaderMaterial({
-    uniforms: cloudUniforms, transparent: true, depthWrite: true,
-    vertexShader: `attribute float aShade; varying float vShade; varying float vDist;
-      void main() { vShade = aShade; vec4 mv = modelViewMatrix * vec4(position, 1.0); vDist = length(mv.xyz); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform vec3 uColor; uniform vec3 uFogColor; uniform float uNear; uniform float uFar;
-      varying float vShade; varying float vDist;
-      void main() { float f = smoothstep(uNear, uFar, vDist);
-        gl_FragColor = vec4(mix(uColor * vShade, uFogColor, f), 0.82 * (1.0 - f * f)); }`,
+    uniforms: cloudUniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide,   // seen from below and above
+    vertexShader: `varying vec3 vWorld;
+      void main() { vec4 wp = modelMatrix * vec4(position, 1.0); vWorld = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragmentShader: `uniform vec3 uColor; uniform vec3 uAmb; uniform vec3 uFogColor; uniform float uNear; uniform float uFar;
+      uniform vec3 uLightDir; uniform float uLightAmt;
+      varying vec3 vWorld;
+      ${CLOUD_GLSL}
+      void main() {
+        float d = cloudDensity(vWorld.xz);
+        if (d < 0.004) discard;
+        vec3 v = vWorld - cameraPosition; float dist = length(v); vec3 vd = v / dist;
+        float ds = cloudDensity(vWorld.xz + uLightDir.xz / max(uLightDir.y, 0.15) * 8.0);
+        float under = step(cameraPosition.y, CLOUD_Y);
+        // Squared densities: thin puffs stay evenly bright, so a small puff does not read as a ring.
+        float sunlit = exp(-(ds * ds * 1.4 + d * d * mix(0.35, 1.7, under)));
+        float mu = max(dot(vd, uLightDir), 0.0);
+        float silver = (pow(mu, 10.0) * 1.4 + pow(mu, 3.0) * 0.2) * (1.0 - d) * under;
+        // 0.24: light scattered many times inside the cloud, so even a thick base stays mid-grey
+        vec3 c = uAmb * (1.0 - 0.25 * d * under) + uColor * (0.24 + sunlit * 0.62 + silver) * uLightAmt;
+        c = min(c, vec3(0.9));
+        float a = 1.0 - exp(-d * 3.6 / max(abs(vd.y), 0.06));
+        float f = smoothstep(uNear, uFar, dist);
+        gl_FragColor = vec4(mix(c, uFogColor, f), a * (1.0 - f * f));
+      }`,
   });
-  const clouds = new THREE.Group();
-  for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(cloudGeo, cloudMat);
-    m.position.set((i & 1) * TILE_W, 0, (i >> 1) * TILE_W);
-    m.frustumCulled = false; m.renderOrder = 2;
-    clouds.add(m);
-  }
+  const clouds = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), cloudMat);
+  clouds.frustumCulled = false; clouds.renderOrder = 2;
   scene.add(clouds);
-  let drift = 0;
 
   const C = (r, g, b) => new THREE.Color(r, g, b);
   const DAY_TOP = C(0.42, 0.62, 1.0), DAY_HOR = C(0.72, 0.84, 1.0);
@@ -162,6 +148,14 @@ const sky = (() => {
   const WATER_FOG = C(0.06, 0.16, 0.42), LAVA_FOG = C(0.85, 0.3, 0.04);
   const tmp = new THREE.Color(), sunDir = new THREE.Vector3(), tmpV = new THREE.Vector3();
   const NIGHT_DAYLIGHT = 4.5 / 15;   // moonlit sky light; mobs still spawn in the open (round(15 * 0.3) = 5 <= 7)
+
+  // cloud cover (0..1) on the ray from the camera along (dx, dy, dz): the same density and fade as the layer
+  function cloudOn(dx, dy, dz) {
+    const p = camera.position;
+    if (dy < 0.02 || p.y >= CLOUD_Y || player.headInWater || player.headInLava) return 0;
+    const t = (CLOUD_Y - p.y) / dy, f = THREE.MathUtils.smoothstep(t, cloudUniforms.uNear.value, cloudUniforms.uFar.value);
+    return cloudField.densityAt(p.x + dx * t, p.z + dz * t) * (1 - f * f);
+  }
 
   function update(dt) {
     if (game.simulating() && !CONFIG.freezeTime) game.dayTime = (game.dayTime + dt / CONFIG.dayLength) % 1;
@@ -189,12 +183,15 @@ const sky = (() => {
     sun.position.copy(sunDir).multiplyScalar(700); sun.lookAt(camera.position);
     halo.position.copy(sunDir).multiplyScalar(690); halo.lookAt(camera.position);
     const facing = Math.max(0, camera.getWorldDirection(tmpV).dot(sunDir));
-    halo.material.opacity = THREE.MathUtils.smoothstep(elev, -0.1, 0.1) * (0.45 + 0.55 * facing * facing) * (player.headInWater || player.headInLava ? 0 : 1) * (1 - wk);
+    // The sun is 4× white in HDR, so the few percent that a thick cloud lets through would show a grey
+    // square. The cloud density on the ray to the sun (or moon) hides it. Thin cloud keeps a glow (halo).
+    const sunCloud = cloudOn(sunDir.x, sunDir.y, sunDir.z), moonCloud = cloudOn(-sunDir.x, -sunDir.y, -sunDir.z);
+    halo.material.opacity = THREE.MathUtils.smoothstep(elev, -0.1, 0.1) * (0.45 + 0.55 * facing * facing) * (player.headInWater || player.headInLava ? 0 : 1) * (1 - wk) * Math.exp(-sunCloud * 1.5);
     moon.position.copy(sunDir).multiplyScalar(-700); moon.lookAt(camera.position);
-    sun.material.opacity = THREE.MathUtils.smoothstep(elev, -0.15, 0.05) * (1 - wk);
+    sun.material.opacity = THREE.MathUtils.smoothstep(elev, -0.15, 0.05) * (1 - wk) * Math.exp(-sunCloud * 6);
     sun.material.color.setScalar(glowGain * glowGain);      // 4 in HDR: a white-hot disc with a wide bloom
     moon.material.color.setScalar(glowGain);
-    moon.material.opacity = THREE.MathUtils.smoothstep(-elev, -0.15, 0.05) * (1 - 0.9 * day) * (1 - wk);   // faint by day, as in Fable
+    moon.material.opacity = THREE.MathUtils.smoothstep(-elev, -0.15, 0.05) * (1 - 0.9 * day) * (1 - wk) * Math.exp(-moonCloud * 6);   // faint by day, as in Fable
     starMat.uniforms.uOpacity.value = clamp(1 - day * 1.6, 0, 1) * (1 - wk);
     starMat.uniforms.uSize.value = 2.2 * renderer.getPixelRatio();
     stars.visible = starMat.uniforms.uOpacity.value > 0.01;
@@ -232,19 +229,24 @@ const sky = (() => {
     scene.fog.near = terrainUniforms.uFogNear.value; scene.fog.far = terrainUniforms.uFogFar.value;
     renderer.setClearColor(fog);
 
-    // clouds drift along +X; the periodic tile keeps the camera near its middle
-    drift += dt * 1.6;
-    const cp = camera.position;
-    clouds.position.set(
-      drift + Math.floor((cp.x - drift - TILE_W / 2) / TILE_W) * TILE_W, CY,
-      Math.floor((cp.z - TILE_W / 2) / TILE_W) * TILE_W);
+    // clouds: the wind and the coverage live in the `clouds` module; the quad follows the camera
+    cloudField.advance(dt, wk, weather.storm);
     const cb = 0.12 + 0.88 * day;
     cloudUniforms.uColor.value.setRGB(cb, cb, cb * 1.02).lerp(C(1, 0.75, 0.6), dusk * 0.35 * day)
       .lerp(tmp.setRGB(0.42, 0.44, 0.47).multiplyScalar(cb), 0.85 * wk);   // grey rain clouds
-    cloudUniforms.uFar.value = Math.min(far * 2.6, TILE_W / 2); cloudUniforms.uNear.value = cloudUniforms.uFar.value * 0.4;
+    // ambient: the sky colour seen from inside a cloud, greyed; rain greys it more
+    cloudUniforms.uAmb.value.copy(uniforms.uTop.value).lerp(uniforms.uHorizon.value, 0.5).multiplyScalar(0.55)
+      .lerp(tmp.setScalar(cb * 0.42), 0.5 + 0.3 * wk);
+    cloudUniforms.uLightAmt.value = (elev >= 0 ? 1 : 0.35) * (1 - 0.6 * wk);
+    // The layer reaches 1000 blocks at every render distance, so clouds reach down near the horizon.
+    // The terrain fog does not hide them: real clouds show above the haze.
+    cloudUniforms.uFar.value = 1000; cloudUniforms.uNear.value = 350;
+    clouds.position.set(camera.position.x, CLOUD_Y, camera.position.z);
+    clouds.scale.set(cloudUniforms.uFar.value, 1, cloudUniforms.uFar.value);
     clouds.visible = !player.headInWater && !player.headInLava;
   }
-  return { update, sunDir };
+  // cloudNear, cloudFar: the cloud fade distances (uniform objects), for the light-shaft mask
+  return { update, sunDir, cloudNear: cloudUniforms.uNear, cloudFar: cloudUniforms.uFar };
 })();
 
 export { sky };

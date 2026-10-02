@@ -5,7 +5,7 @@
 //   bloom:  bright pass into a 5-level mip chain (1/2 .. 1/32), 4-tap box downsample,
 //           9-tap tent upsample added back up the chain.
 //   shafts: a quarter-size mask of open sky around the sun (or moon), from the depth
-//           texture (terrain opens with fog, clouds above the world top open 30%), then two radial
+//           texture (terrain opens with fog; a cloud between the eye and the pixel closes it by up to 75%), then two radial
 //           blur passes toward the light's screen position. Shafts fade out when the light
 //           is off-screen, below the horizon, or the head is underwater.
 // The composite adds both, rolls off the brightest channel above 0.9 (the hue stays), and dithers. The held item renders

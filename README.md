@@ -92,7 +92,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 - Building blocks: stone bricks (4 stone make 4), sandstone (4 sand make 1), and chiseled sandstone (2 sandstone). Mossy cobblestone and mossy bricks come from structures. The furnace cracks stone bricks.
 - Dropped items fly to the player from about 3 blocks. Items the player throws must be walked to.
 - Health, fall damage, swimming, death, and respawn. Water and lava cancel fall damage. Lava burns and slows. Drowning does not exist.
-- A 15-minute day/night cycle with sun, moon, stars, and clouds. The pause menu sets the time of day and can freeze it.
+- A 15-minute day/night cycle with sun, moon, stars, and soft drifting clouds that cast shadows and thicken in rain. The pause menu sets the time of day and can freeze it.
 - Sun and moon light with dynamic shadows. Terrain, trees, mobs, and vehicles cast shadows, and leaves let light dapple through. Shadows move with the time of day and fade in rain.
 - Water with moving waves, sky reflection, and a glittering sun (or moon) path. Sunlight makes moving caustics on blocks under shallow water.
 - A torch held in the selected hotbar slot lights the area around the player. The light does not pass through walls.

@@ -7,6 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Realistic clouds (SPEC_graphics.md, G5): one soft layer at y 192 replaces the blocky clouds.
+  - Clouds have varied shapes, wispy edges, and gaps of open sky. They drift east and change shape slowly.
+  - The sun lights them: grey bases, bright thin edges, a warm tint at dusk, and dark grey at night.
+  - Rain thickens the layer toward overcast, and a storm closes it. Clear weather brings the gaps back.
+  - Clouds cast soft moving shadows on the terrain and the water. The shadows remove direct light only and follow the Shadows box. Caustics fade under them.
+  - Clouds hide the stars and dim the light shafts. Thick cloud hides the sun and moon and removes the sun glitter on the water.
+  - White clouds do not bloom. The layer shows from above and in the menu panorama.
 - Render scale: a pause-menu slider from 50 % to 100 % sets the share of the window's pixels the game draws. The browser stretches the smaller image to fill the window. At 3240×2025 over shallow water with shadows and bloom, 75 % gives 60 fps against 49 fps at 100 %. The setting saves with the others.
 - Fireflies: they come out at dusk over grass blocks in the plains, forest, and rainforest biomes, also under the trees. Each one hovers 0.3 to 3.5 blocks above the grass, drifts around its home point, and blinks on its own rhythm with a bloom halo. They fade in from about 17:46 to 18:23, stay through the night, and fade out from about 05:37 to 06:14. Rain and storms send them away. The save holds no firefly state.
 - Temple trap warning: a dry rattle over a low falling tone plays once when the player comes within 3 blocks of a set trap plate, or up to 14 blocks above it. The top of a temple shaft is in range, so the warning plays before the drop. It plays again after the player leaves and returns. A mined plate or a fired trap gives no warning.
