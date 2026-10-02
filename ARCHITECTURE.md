@@ -1,6 +1,6 @@
 # Architecture
 
-Clonecraft ships as one HTML file with one module script. The source is 43 ES modules in `src/`. `npm run build` writes them into the root `index.html` (D36). The code keeps its numbered sections 1–18 as banners in the modules. The living header in `src/order.js` maps the sections to the modules. This document records the decisions and the seams.
+Clonecraft ships as one HTML file with one module script. The source is 44 ES modules in `src/`. `npm run build` writes them into the root `index.html` (D36). The code keeps its numbered sections 1–18 as banners in the modules. The living header in `src/order.js` maps the sections to the modules. This document records the decisions and the seams.
 
 ## Decisions
 
@@ -232,6 +232,13 @@ An imported binding is read-only. A `let` that another module writes gets a one-
 ### D42. Text proved the split; tests guard it now
 
 The split was mechanical. `tools/split.js` cut the old script into modules, and `tools/parity.js` proved the built script equal to the old script plus the setters. Both tools were removed when the spec closed (commit history keeps them). The git tag `baseline-single-file` keeps the old file. From now on, `npm run check` guards the build: depcheck, the Node tests (worldgen golden hashes, block ids, recipes), and the fresh-build comparison.
+
+### D43. Fireflies are ambient, not entities
+
+`fireflies` is one `THREE.Points` pool of 140 around the camera, like the weather pools. Fireflies are not mobs: they have no AI, no collision box, and no save state. A new night spawns fresh ones.
+One level gates them all: night (from the sun height) times dry weather (`1 - weather.k`). The pool draws only when the level is above 0.01.
+A firefly lives over a grass block in the plains, forest, or rainforest biome. `ground(x, z)` scans down through air, plants, leaves, and logs, so a forest floor counts and a canopy top does not. Every move is checked against the ground of the new column, so a firefly never drifts over a step, a non-grass block, or another biome.
+The points use additive blending and HDR vertex colors. A flash peaks at 4, above the bloom threshold of 1, so the bloom pass draws its halo. The faint glow between flashes stays under the threshold.
 
 ### D12. Procedural audio and particles
 

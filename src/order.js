@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 43 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 44 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -59,7 +59,7 @@
  *      import), homes
  *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): rain or snow by biome and height
  *      pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
- *      the clock)
+ *      the clock); fireflies (dusk to dawn over grass in plains, forest, and rainforest)
  *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,
  *      G3), held-light (a held torch flood-fills light into a 32^3 texture, G4), post (bloom,
  *      light shafts), main (frame loop, window.clonecraft)
@@ -116,6 +116,7 @@ export { persist } from './persist.js';
 export { homes, homesEl, homesKey, openHomes, setHomes } from './homes.js';
 import './sky.js';
 export { weather } from './weather.js';
+import './fireflies.js';
 import './boot.js';
 import './shadows.js';
 export { heldLight } from './held-light.js';

@@ -67,6 +67,8 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `lootChest()` marks the position in `looted` before it returns. A test that calls it directly consumes that chest's loot.
 - In the Node walk checks, leaves are passable but not standable, and a log is not a floor. Leaf ids are 11 and 75..86.
 - Rain lowers `game.daylight` to 0.75 and a storm to 0.55. Every light test that multiplies by `daylight` sees it. A spider in daytime rain sees sky light 11 and chases. No hostile spawns by day in a storm: 15 × 0.55 rounds to 8.
+- Fireflies are on the test handle: `fireflies.list()` gives each live firefly with its home and brightness, and `fireflies.ground(x, z)` gives the grass y under the canopy or -1. Firefly records are `Float64Array` on purpose: a 32-bit store can round a checked move across a block edge.
+- Night Playwright tests: set `player.invuln`. Night mobs kill the player, and a loop that forces the `playing` state hides `player.dead`.
 - `weather.set(kind, 0)` picks a random duration. Use a tiny positive time (1e-6) to force the next change.
 - `weather.strike()` near the player hurts the player. Tests that strike near the player reset `player.health` after.
 - A bolt shows for 0.3 s. Take its screenshot in the same `browser_run_code_unsafe` call as the strike.

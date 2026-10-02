@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Fireflies: they come out at dusk over grass blocks in the plains, forest, and rainforest biomes, also under the trees. Each one hovers 0.3 to 3.5 blocks above the grass, drifts around its home point, and blinks on its own rhythm with a bloom halo. They fade in from about 17:46 to 18:23, stay through the night, and fade out from about 05:37 to 06:14. Rain and storms send them away. The save holds no firefly state.
 - Temple trap warning: a dry rattle over a low falling tone plays once when the player comes within 3 blocks of a set trap plate, or up to 14 blocks above it. The top of a temple shaft is in range, so the warning plays before the drop. It plays again after the player leaves and returns. A mined plate or a fired trap gives no warning.
 - Ladders: 7 sticks in an H craft 3. A ladder hangs on the clicked wall face and drops when its wall breaks. It is a 3D model: two rails and four rungs.
 - Climbable leaves: the player passes through leaves at 60 % speed. Inside leaves or on a ladder, Space climbs, Shift climbs down, and no key holds on. The top leaf of a canopy holds a walking player; Shift or a fall faster than 10 m/s drops into it, and the climb catches the fall without damage. Mobs, arrows, and items still collide with leaves.

@@ -26,7 +26,7 @@ The acceptance criteria come from `SPEC_modules.md`. `[x]` means I observed it. 
 - [x] T7: `tools/parity.js` passes PA1, PA2, and PA3. The 9 setters and the 11 write sites are the only edits. (Also PAGE. 8,689 non-blank lines. A planted `REACH = 6` in `src/config.js` fails PA2.)
 - [x] T8: `tools/depcheck.js` passes: every import obeys D39; every free name in a module is an import or a listed host global; `worldgen.js` has zero imports; the nine modules do not reach `order.js`; `order.js` lists each module once; no module imports `main.js`.
 - [x] T9: `tools/depcheck.js` fails on a planted break of each rule. Each plant is removed after the check. (`tests/depcheck.test.js`: 12 of 12. Each plant goes into a temporary copy of `src/`.)
-- [x] `src/` holds `order.js` and the 43 modules of the module map, in the load order of the map.
+- [x] `src/` holds `order.js` and the 43 modules of the module map, in the load order of the map. (2026-10-01: the fireflies feature adds a 44th module, `fireflies.js`, listed in the map after `weather`.)
 - [x] `tools/split.js` wrote every module. No module holds a hand edit. (A second run of `tools/split.js` gives the same hash of `src/*.js`.)
 - [x] T10: dev mode (`npm run dev`) loads in Chromium with 0 console errors. A world starts. (Port 5281, seed 12345, 4 workers, 0 console messages.)
 - [x] T11: the built file passes T4, T5, and T6 again. (Over `http://` and `file://`: 4 workers, `fallback` false, 0 console messages.)

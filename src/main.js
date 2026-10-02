@@ -40,6 +40,7 @@ import { persist, validSave } from './persist.js';
 import { closeHomes, goHome, homes, openHomes, setHome } from './homes.js';
 import { sky } from './sky.js';
 import { weather } from './weather.js';
+import { fireflies } from './fireflies.js';
 import { camDir, last, loadBar, loadText, onLoaded, setLast } from './boot.js';
 import { shadows } from './shadows.js';
 import { heldLight } from './held-light.js';
@@ -80,6 +81,7 @@ function frame(now) {
   }
   updateCamera(dt);
   weather.update(sim ? dt : 0);
+  fireflies.update(sim ? dt : 0);
   sky.update(sim ? dt : 0);
   viewModel.update(dt);
   hud.update(dt);
@@ -116,7 +118,7 @@ window.clonecraft = {
   projectiles, bow, armorId, ARMOR_TIERS, blockDrop, validSave, spawnHostiles, RECIPES, lineOfSight,
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
-  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, heldLight, shadows,
+  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, heldLight, shadows,
 };
 
 requestAnimationFrame(frame);
