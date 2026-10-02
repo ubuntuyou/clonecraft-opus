@@ -272,6 +272,7 @@ const CONFIG = {
   renderDistance: 8, fov: 75, sensitivity: 1, volume: 0.6,
   shadows: true,               // sun and moon shadows (pause menu "Shadows")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
+  renderScale: 1,              // share of the window's pixels drawn, 0.5..1 (pause menu "Render scale")
   dayLength: 900,              // seconds for a full day/night cycle
   freezeTime: false,           // true stops the day/night cycle (pause menu "Freeze time")
   doorCloseDelay: 5,           // seconds before an open door closes by itself
@@ -282,6 +283,7 @@ try {
   const saved = JSON.parse(localStorage.getItem('clonecraft.settings') || '{}');
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
   for (const k of ['freezeTime', 'shadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
+  if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
 } catch (e) { /* storage blocked: keep defaults */ }
 if (urlParams.has('fx')) { const fx = parseInt(urlParams.get('fx'), 10) || 0; CONFIG.shadows = !!(fx & 1); CONFIG.bloom = !!(fx & 2); }   // 1 shadows, 2 bloom + shafts, 3 both
@@ -289,7 +291,7 @@ if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseI
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
-    shadows: CONFIG.shadows, bloom: CONFIG.bloom, freezeTime: CONFIG.freezeTime })); } catch (e) {}
+    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, freezeTime: CONFIG.freezeTime })); } catch (e) {}
 }
 
 const ckey = (cx, cz) => (((cx + 32768) & 0xffff) * 65536) + ((cz + 32768) & 0xffff);
@@ -3894,7 +3896,10 @@ const waterMaterial = new THREE.ShaderMaterial({
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+// Drawing-buffer pixels per CSS pixel: the device ratio (capped at 1.5) times the render scale setting.
+// The canvas CSS fills the window, so the browser stretches a smaller buffer to fit.
+const viewPixelRatio = () => Math.min(devicePixelRatio || 1, 1.5) * CONFIG.renderScale;
+renderer.setPixelRatio(viewPixelRatio());
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.autoClear = false;
 renderer.info.autoReset = false;   // the main loop resets it once per frame (two render passes)
@@ -8050,6 +8055,8 @@ bindSetting('setRd', 'valRd', 'renderDistance', (v) => `${v} chunks`);
 bindSetting('setFov', 'valFov', 'fov', (v) => `${v}°`);
 bindSetting('setSens', 'valSens', 'sensitivity', (v) => `${(+v).toFixed(2)}×`);
 bindSetting('setVol', 'valVol', 'volume', (v) => `${Math.round(v * 100)}%`, (v) => audio.setVolume(v));
+// The window resize handler (main.js) applies the new pixel ratio and resizes the post-processing targets.
+bindSetting('setScale', 'valScale', 'renderScale', (v) => `${Math.round(v * 100)}%`, () => dispatchEvent(new Event('resize')));
 for (const [id, key] of [['setShadows', 'shadows'], ['setBloom', 'bloom']]) {
   const el = $(id);
   el.checked = CONFIG[key];
@@ -9454,7 +9461,8 @@ function frame(now) {
   }
 }
 
-addEventListener('resize', () => {
+addEventListener('resize', () => {   // also fired by the render scale slider
+  renderer.setPixelRatio(viewPixelRatio());
   renderer.setSize(innerWidth, innerHeight, false);
   post.resize();
   camera.aspect = vmCamera.aspect = innerWidth / innerHeight;
@@ -9537,6 +9545,7 @@ requestAnimationFrame(frame);</script>
       <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
       <label for="setVol">Volume</label><input id="setVol" type="range" min="0" max="1" step="0.05"><span id="valVol"></span>
       <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
+      <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
       <label for="setTime">Time of day</label><input id="setTime" type="range" min="0" max="24" step="0.25"><span id="valTime"></span>
       <label for="setFreeze">Freeze time</label><label class="chk"><input id="setFreeze" type="checkbox"></label><span id="valFreeze"></span>
     </div>

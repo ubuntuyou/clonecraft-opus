@@ -8,7 +8,7 @@ import {
 import { BIOME } from './biomes.js';
 import { tileCount } from './atlas.js';
 import { WG } from './gen-service.js';
-import { camera, game, input, player, renderer, world } from './engine.js';
+import { camera, game, input, player, renderer, viewPixelRatio, world } from './engine.js';
 import { damagePlayer, respawn, updateCamera, updatePlayer } from './player.js';
 import { inCobweb } from './collision.js';
 import {
@@ -96,7 +96,8 @@ function frame(now) {
   }
 }
 
-addEventListener('resize', () => {
+addEventListener('resize', () => {   // also fired by the render scale slider
+  renderer.setPixelRatio(viewPixelRatio());
   renderer.setSize(innerWidth, innerHeight, false);
   post.resize();
   camera.aspect = vmCamera.aspect = innerWidth / innerHeight;

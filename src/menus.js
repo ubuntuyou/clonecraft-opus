@@ -63,6 +63,8 @@ bindSetting('setRd', 'valRd', 'renderDistance', (v) => `${v} chunks`);
 bindSetting('setFov', 'valFov', 'fov', (v) => `${v}°`);
 bindSetting('setSens', 'valSens', 'sensitivity', (v) => `${(+v).toFixed(2)}×`);
 bindSetting('setVol', 'valVol', 'volume', (v) => `${Math.round(v * 100)}%`, (v) => audio.setVolume(v));
+// The window resize handler (main.js) applies the new pixel ratio and resizes the post-processing targets.
+bindSetting('setScale', 'valScale', 'renderScale', (v) => `${Math.round(v * 100)}%`, () => dispatchEvent(new Event('resize')));
 for (const [id, key] of [['setShadows', 'shadows'], ['setBloom', 'bloom']]) {
   const el = $(id);
   el.checked = CONFIG[key];

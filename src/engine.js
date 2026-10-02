@@ -14,7 +14,10 @@ import { World } from './world.js';
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+// Drawing-buffer pixels per CSS pixel: the device ratio (capped at 1.5) times the render scale setting.
+// The canvas CSS fills the window, so the browser stretches a smaller buffer to fit.
+const viewPixelRatio = () => Math.min(devicePixelRatio || 1, 1.5) * CONFIG.renderScale;
+renderer.setPixelRatio(viewPixelRatio());
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.autoClear = false;
 renderer.info.autoReset = false;   // the main loop resets it once per frame (two render passes)
@@ -46,4 +49,4 @@ const player = {
 };
 const input = { keys: new Set(), mouseL: false, mouseR: false, lastWTap: 0, wSprint: false, rightRepeat: 0 };
 
-export { camera, canvas, game, input, player, renderer, scene, world };
+export { camera, canvas, game, input, player, renderer, scene, viewPixelRatio, world };
