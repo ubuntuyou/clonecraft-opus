@@ -7,9 +7,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Sunset cloud colors (SPEC_graphics.md, G5): at sunrise and sunset, clouds take color by their place in the sky.
+  - Clouds low and toward the sun are gold and orange. Clouds to the side are pink. Clouds away from the sun are purple to blue-grey.
+  - A low sun lights the cloud bases from below.
+  - An afterglow moves the colors from orange and pink to purple and blue after sunset. Sunrise runs the same steps in reverse.
+  - Rain mutes the colors. A storm removes them.
 - Realistic clouds (SPEC_graphics.md, G5): one soft layer at y 192 replaces the blocky clouds.
   - Clouds have varied shapes, wispy edges, and gaps of open sky. They drift east and change shape slowly.
-  - The sun lights them: grey bases, bright thin edges, a warm tint at dusk, and dark grey at night.
+  - The sun lights them: grey bases, bright thin edges, and dark grey at night.
   - Rain thickens the layer toward overcast, and a storm closes it. Clear weather brings the gaps back.
   - Clouds cast soft moving shadows on the terrain and the water. The shadows remove direct light only and follow the Shadows box. Caustics fade under them.
   - Clouds hide the stars and dim the light shafts. Thick cloud hides the sun and moon and removes the sun glitter on the water.

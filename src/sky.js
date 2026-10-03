@@ -5,7 +5,8 @@
  * 0.75 midnight. CONFIG.freezeTime stops the clock. The pause menu sets dayTime and the freeze.
  * The sun elevation drives daylight (4.5/15 .. 1), which scales baked sky
  * light in the terrain shader. The moon lights by night at half the sun's directional strength. The sky is a gradient dome with a sunset glow, a square
- * sun with a soft halo, a square moon, stars, and soft clouds that drift (G5). Everything in the sky group
+ * sun with a soft halo, a square moon, stars, and soft clouds that drift (G5). Near sunrise and sunset the clouds
+ * take a gold-orange-pink-purple-blue palette by their angle to the sun. Everything in the sky group
  * follows the camera. The cloud layer is one flat quad at CLOUD_Y that follows the camera; its
  * shader reads the shared density field of the `clouds` module, so the clouds stay put in the world. Fog color is the sky horizon color, or deep blue underwater.
  * `weather` follows the sky. It fades k (wet) and storm over 6 s. The sky greys the dome and
@@ -105,20 +106,31 @@ const sky = (() => {
   //   density d: the shared field at this point; ds: the field toward the light (self-shadow).
   //   From below, thick parts are darker (their own depth blocks the light). Thin parts near the
   //   light glow (forward scatter). Opacity grows with the slant path through the layer.
+  //   Sunset colours (uSunset > 0): the palette position k runs from gold (toward the sun) through orange,
+  //   pink, and purple to blue-grey (away from the sun, higher up, later in the afterglow: uShift).
+  //   A low sun lights the bases from below, so thick parts keep a floor of light.
   //   The colour stays at or below 0.9, so white clouds do not bloom.
   const cloudUniforms = {
     ...fieldUniforms,
     uColor: { value: new THREE.Color(1, 1, 1) }, uAmb: { value: new THREE.Color() }, uFogColor: terrainUniforms.uFogColor,
     uNear: { value: 350 }, uFar: { value: 1000 }, uLightDir: terrainUniforms.uSunDir, uLightAmt: { value: 1 },
+    uSun: { value: new THREE.Vector3(1, 0, 0) }, uSunset: { value: 0 }, uShift: { value: 0 },
   };
   const cloudMat = new THREE.ShaderMaterial({
     uniforms: cloudUniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide,   // seen from below and above
     vertexShader: `varying vec3 vWorld;
       void main() { vec4 wp = modelMatrix * vec4(position, 1.0); vWorld = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `uniform vec3 uColor; uniform vec3 uAmb; uniform vec3 uFogColor; uniform float uNear; uniform float uFar;
-      uniform vec3 uLightDir; uniform float uLightAmt;
+      uniform vec3 uLightDir; uniform float uLightAmt; uniform vec3 uSun; uniform float uSunset; uniform float uShift;
       varying vec3 vWorld;
       ${CLOUD_GLSL}
+      // k 0 gold, 0.25 orange, 0.5 pink, 0.75 purple, 1 blue-grey
+      vec3 sunsetTint(float k) {
+        vec3 c = mix(vec3(1.0, 0.70, 0.34), vec3(1.0, 0.46, 0.20), smoothstep(0.0, 0.25, k));
+        c = mix(c, vec3(0.96, 0.42, 0.54), smoothstep(0.2, 0.5, k));
+        c = mix(c, vec3(0.56, 0.34, 0.68), smoothstep(0.45, 0.75, k));
+        return mix(c, vec3(0.30, 0.34, 0.54), smoothstep(0.7, 1.0, k));
+      }
       void main() {
         float d = cloudDensity(vWorld.xz);
         if (d < 0.004) discard;
@@ -131,10 +143,18 @@ const sky = (() => {
         float silver = (pow(mu, 10.0) * 1.4 + pow(mu, 3.0) * 0.2) * (1.0 - d) * under;
         // 0.24: light scattered many times inside the cloud, so even a thick base stays mid-grey
         vec3 c = uAmb * (1.0 - 0.25 * d * under) + uColor * (0.24 + sunlit * 0.62 + silver) * uLightAmt;
+        if (uSunset > 0.0) {
+          float ms = dot(vd, uSun);
+          float k = clamp((1.0 - ms) * 0.5 + 0.25 * max(vd.y, 0.0) + uShift, 0.0, 1.0);
+          float base = max(sunlit, 0.72 - 0.3 * d);               // light from below on the bases
+          float glow = pow(max(ms, 0.0), 10.0) * (1.0 - d) * under; // thin edges toward the sun
+          vec3 t = sunsetTint(k) * (0.38 + 0.55 * base + glow) * (1.0 - 0.9 * uShift);
+          c = mix(c, uAmb * 0.6 + t, uSunset);
+        }
         c = min(c, vec3(0.9));
         float a = 1.0 - exp(-d * 3.6 / max(abs(vd.y), 0.06));
         float f = smoothstep(uNear, uFar, dist);
-        gl_FragColor = vec4(mix(c, uFogColor, f), a * (1.0 - f * f));
+        gl_FragColor = vec4(mix(c, uFogColor, f * (1.0 - 0.7 * uSunset)), a * (1.0 - f * f));
       }`,
   });
   const clouds = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), cloudMat);
@@ -232,12 +252,17 @@ const sky = (() => {
     // clouds: the wind and the coverage live in the `clouds` module; the quad follows the camera
     cloudField.advance(dt, wk, weather.storm);
     const cb = 0.12 + 0.88 * day;
-    cloudUniforms.uColor.value.setRGB(cb, cb, cb * 1.02).lerp(C(1, 0.75, 0.6), dusk * 0.35 * day)
+    cloudUniforms.uColor.value.setRGB(cb, cb, cb * 1.02)
       .lerp(tmp.setRGB(0.42, 0.44, 0.47).multiplyScalar(cb), 0.85 * wk);   // grey rain clouds
     // ambient: the sky colour seen from inside a cloud, greyed; rain greys it more
     cloudUniforms.uAmb.value.copy(uniforms.uTop.value).lerp(uniforms.uHorizon.value, 0.5).multiplyScalar(0.55)
       .lerp(tmp.setScalar(cb * 0.42), 0.5 + 0.3 * wk);
     cloudUniforms.uLightAmt.value = (elev >= 0 ? 1 : 0.35) * (1 - 0.6 * wk);
+    // sunset colours: rise below elevation 0.32, full near the horizon, gone by -0.22; rain mutes, a storm removes
+    const ss = THREE.MathUtils.smoothstep;
+    cloudUniforms.uSun.value.copy(sunDir);
+    cloudUniforms.uSunset.value = (1 - ss(elev, 0.06, 0.32)) * ss(elev, -0.22, -0.06) * (1 - 0.75 * wk) * (1 - weather.storm);
+    cloudUniforms.uShift.value = (1 - ss(elev, -0.18, 0.04)) * 0.6;   // the afterglow moves toward purple and blue
     // The layer reaches 1000 blocks at every render distance, so clouds reach down near the horizon.
     // The terrain fog does not hide them: real clouds show above the haze.
     cloudUniforms.uFar.value = 1000; cloudUniforms.uNear.value = 350;
