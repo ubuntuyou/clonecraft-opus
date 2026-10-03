@@ -135,6 +135,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- Dungeons now have 2 to 4 rooms at different levels (SPEC_expansion.md, O2). Each room lies 5 to 9 blocks lower than the room before it. A cobblestone staircase or a ladder shaft joins each pair of rooms. One room holds the spawner; every room holds a chest. Dungeons in existing worlds regenerate in the new shape where the player has not edited them.
 - Source layout (SPEC_modules.md): the source is now 43 ES modules in `src/`. Vite 7 and vite-plugin-singlefile build them into the root `index.html`, which still ships as one file. The game plays the same; a save from the single-file version loads unchanged.
 - Build and checks: `npm run dev` serves `src/` with live reload. `npm run build` writes the root `index.html`. `npm test` runs Node tests for world generation (golden chunk hashes), block and item ids, and crafting. `npm run check` runs the dependency check, the tests, and a fresh build, and fails when the root `index.html` is stale.
 - Pause menu: the settings rows sit closer together (30 px apart, was 56 px). The desktop menu no longer uses the 44 px touch targets. Effects is now two check boxes, "Shadows" and "Bloom + shafts", which work on their own. An old Effects value of 1 or 2 turns both on. The `fx` URL parameter is now a bit mask: 1 shadows, 2 bloom and shafts, 3 both.
@@ -174,6 +175,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- A dungeon floor no longer hangs in mid-air in a cave. A room is built only where every cell under its floor is solid.
 - Weather no longer speckles a slope with patches of snow amid rain. Outside snowy biomes, the drop's height decides the kind: snow above y 158, rain below.
 - The sun, moon, and sun halo turned toward the world origin instead of the player, so they looked squished (or vanished) far from spawn.
 - Caustics raced across the floor as the sun moved. The pattern now shifts by the water depth, not by the block's height in the world.

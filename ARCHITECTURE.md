@@ -166,7 +166,7 @@ A rider sits in the vehicle: `player.vehicle` skips the player's own movement, a
 ### D28. Structures stamp inside one chunk, and loot fills on first touch
 
 The worker stamps dungeons, temples, towers, and mineshafts after terrain and caves. A stamp writes only cells inside its own chunk. Each placement decision comes from a world hash and from `column()`, which is a pure function of world coordinates. So each neighbour chunk makes the same decision on its own, and no structure has a seam at a chunk border.
-A dungeon, a temple, or a tower fits inside one chunk. A mineshaft plan belongs to a 96-block grid cell. Each chunk that a corridor crosses stamps its own part of the corridor.
+A dungeon, a temple, or a tower fits inside one chunk. A dungeon plan is pure per chunk and plan number. The stamp tests up to 3 plans against the terrain and builds no room over an open cell, so no floor hangs in a cave. A mineshaft plan belongs to a 96-block grid cell. Each chunk that a corridor crosses stamps its own part of the corridor.
 A structure must be reachable. A temple reads the ground outside its 4 doors from the column margin and rejects a site that its door steps cannot join. A tower stays in the chunk centre, so its door ramp fits.
 A stamp reports each chest and spawner as a chunk feature `{kind, x, y, z, type}`. The block grid holds no loot. `lootChest()` rolls the loot the first time the game opens, breaks, or explodes a generated chest. The roll uses the seed and the position. `looted` holds the filled positions and goes into the save, so a position never fills twice.
 `spawners` reads the spawner features of the loaded chunks near the player. A feature counts only while its block is still `B.SPAWNER`, so a mined spawner stops with no extra state.

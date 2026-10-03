@@ -1858,6 +1858,7 @@ function mobTexture(base, variance, painter, w = 16, h = 16) {
  * The game serializes it with Function.prototype.toString() into Blob Web Workers, and
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
  * generateChunk(cx, cz) is a pure function of (SEED, cx, cz).
+ * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
   const { CS, H, SEA, B, BIOME } = K;
@@ -2182,30 +2183,183 @@ function WorldGenModule(SEED, K) {
     }
   }
 
-  // Dungeon: a 7 x 7 x 5 room of cobblestone and mossy cobblestone at y 14..93, 1 chunk in 12, with the
-  // terrain at least 4 blocks above its roof. The shell replaces only solid cells, so a room that meets
-  // a cave stays open to it. A spawner stands in the centre and 1..2 chests stand at the wall middles.
-  function stampDungeon(cx, cz, S) {
-    const r = mulberry32(hash3(SEED ^ 0x0d0e, cx, cz));
-    if (r() >= 1 / 12) return;
-    const ox = 1 + Math.floor(r() * 8), oz = 1 + Math.floor(r() * 8), y0 = 14 + Math.floor(r() * 80);
-    for (let dz = 0; dz < 7; dz++) for (let dx = 0; dx < 7; dx++) if (S.col(ox + dx, oz + dz).h < y0 + 8) return;
-    for (let dy = 0; dy < 5; dy++) for (let dz = 0; dz < 7; dz++) for (let dx = 0; dx < 7; dx++) {
-      const lx = ox + dx, lz = oz + dz, y = y0 + dy;
-      const shell = dy === 0 || dy === 4 || dx === 0 || dx === 6 || dz === 0 || dz === 6;
-      if (!shell) { S.set(lx, y, lz, B.AIR); continue; }
-      if (dy > 0 && isSoft(S.get(lx, y, lz))) continue;
-      const moss = hashF(S.x0 + lx, y, (S.z0 + lz) ^ 0xd6) < (dy === 0 ? 0.6 : 0.35);
-      S.set(lx, y, lz, moss ? B.MOSSY_COBBLE : B.COBBLE);
+  // Dungeon (multi-room, 2026-10-02): 2..4 rooms of cobblestone and mossy cobblestone inside one chunk,
+  // at y 14..93, 1 chunk in 12. Terms used below:
+  //   - room: a box in chunk-local cells. p = [x, z] is its low corner, s = [w, d] its size (5..9),
+  //     y its floor layer. The shell is 5 tall, so the interior is 3 tall.
+  //   - link: the way from a room down to the next room, 5..9 blocks lower. A staircase leaves the
+  //     upper room by a wall door and comes into the lower room through its roof. A ladder shaft
+  //     drops from a hole in the upper room's floor and hangs on a wall line that both rooms share.
+  //   - busy: interior columns that a link uses (stairs, landing, ladder, the cell in front of a door
+  //     or a ladder). No other link, chest, or spawner takes a busy column. No link takes a centre,
+  //     so any room can hold the spawner.
+  // dungeonPlan(cx, cz, a) is pure (seed, chunk, plan number). stampDungeon tests plans against the terrain.
+  const DG_Y0 = 14, DG_Y1 = 93;
+  const centreOf = (R) => [R.p[0] + (R.s[0] >> 1), R.p[1] + (R.s[1] >> 1)];
+  const colKey = (x, z) => x * 16 + z;
+  // A staircase from room A down `drop` blocks, or null when no direction fits the chunk.
+  // Step 0 is a stair in A's wall at A's floor layer, under a door 2 cells tall. Step i (1..drop-1) is a
+  // stair at y A.y - i with 3 air cells above it. Step `drop` is the landing on the lower room's floor.
+  // Each step is half a block twice, so nobody jumps. The last 4 steps lie in the lower room's interior,
+  // along its wall.
+  function stairLink(A, drop, ri, busy) {
+    const d0 = ri(0, 3);
+    for (let t = 0; t < 4; t++) {
+      const dir = (d0 + t) & 3, ax = dir & 1, cr = 1 - ax, sg = dir < 2 ? 1 : -1;
+      const at = (u, v) => (ax ? [v, u] : [u, v]);   // (along, across) to [lx, lz]
+      const u0 = sg > 0 ? A.p[ax] + A.s[ax] - 1 : A.p[ax];   // the door, in A's wall
+      const uEnd = u0 + sg * drop, uIn = u0 + sg * (drop - 3);
+      const lo = Math.min(uEnd, uIn), hi = Math.max(uEnd, uIn);
+      const wB = ri(6, 9), bLo = Math.max(0, hi - wB + 2), bHi = Math.min(CS - wB, lo - 1);
+      const c = ri(A.p[cr] + 1, A.p[cr] + A.s[cr] - 2), dB = ri(5, 9);
+      const across = [c - 1, c - dB + 2].filter((v) => v >= 0 && v <= CS - dB);
+      if (bLo > bHi || !across.length) continue;
+      const R = { p: [0, 0], s: [0, 0], y: A.y - drop };
+      R.p[ax] = ri(bLo, bHi); R.s[ax] = wB; R.p[cr] = across[ri(0, across.length - 1)]; R.s[cr] = dB;
+      const front = at(u0 - sg, c), ca = centreOf(A), cb = centreOf(R);
+      if (busy.has(colKey(...front)) || (front[0] === ca[0] && front[1] === ca[1])) continue;
+      const cells = [], top = [front], bottom = [], stair = B.STAIRS_COBBLE + ((dir + 2) & 3);
+      const inB = (u) => u > R.p[ax] && u < R.p[ax] + wB - 1;
+      const [ox, oz] = at(u0, c);   // the door: a stair in A's floor layer, then 2 air cells
+      cells.push([ox, A.y, oz, stair], [ox, A.y + 1, oz, B.AIR], [ox, A.y + 2, oz, B.AIR]);
+      let hitsCentre = false;
+      for (let i = 1; i <= drop; i++) {
+        const u = u0 + sg * i, [x, z] = at(u, c), ys = A.y - i;
+        if (i < drop) cells.push([x, ys, z, stair]);
+        for (let y = ys + 1; y <= ys + 3; y++) cells.push([x, y, z, B.AIR]);
+        if (i >= drop - 4 && inB(u)) {
+          bottom.push([x, z]);
+          if (x === cb[0] && z === cb[1]) hitsCentre = true;
+          for (let y = R.y + 1; y < Math.min(ys, R.y + 4); y++) cells.push([x, y, z, B.COBBLE]);   // a solid base
+        }
+      }
+      // The room cell beside the landing stays free: the landing can sit in a corner of the lower room.
+      const side = at(uEnd, c + (R.p[cr] === c - 1 ? 1 : -1));
+      bottom.push(side);
+      if (side[0] === cb[0] && side[1] === cb[1]) hitsCentre = true;
+      if (hitsCentre) continue;
+      return { kind: 'stairs', room: R, cells, top, bottom };
     }
-    S.set(ox + 3, y0 + 1, oz + 3, B.SPAWNER);
-    S.feature('spawner', ox + 3, y0 + 1, oz + 3, SPAWNER_MOBS[Math.floor(r() * SPAWNER_MOBS.length)]);
-    const spots = [[1, 3, 0], [5, 3, 2], [3, 1, 1], [3, 5, 3]], n = r() < 0.5 ? 1 : 2, first = Math.floor(r() * 4);
-    for (let k = 0; k < n; k++) {
-      const [dx, dz, f] = spots[(first + k * 2) & 3];
-      S.set(ox + dx, y0 + 1, oz + dz, B.CHEST + f);
-      S.feature('chest', ox + dx, y0 + 1, oz + dz, 'dungeon');
+    return null;
+  }
+  // A ladder shaft from room A down `drop` blocks. The lower room shares A's wall line on one side, so
+  // the ladder hangs on a wall from the lower floor up into A. Null when every column is busy.
+  function ladderLink(A, drop, ri, busy) {
+    const d0 = ri(0, 3);
+    for (let t = 0; t < 4; t++) {
+      const side = (d0 + t) & 3, ax = side & 1, cr = 1 - ax, sg = side < 2 ? 1 : -1;
+      const at = (u, v) => (ax ? [v, u] : [u, v]);
+      const wall = sg > 0 ? A.p[ax] + A.s[ax] - 1 : A.p[ax], col = wall - sg;
+      const wB = ri(5, Math.min(9, sg > 0 ? wall + 1 : CS - wall)), dB = ri(5, 9);
+      const c0 = A.p[cr] + 1, cn = A.s[cr] - 2, k0 = ri(0, cn - 1), ca = centreOf(A);
+      for (let k = 0; k < cn; k++) {
+        const c = c0 + ((k0 + k) % cn), here = at(col, c), front = at(col - sg, c);
+        if (busy.has(colKey(...here)) || busy.has(colKey(...front))) continue;
+        if ((here[0] === ca[0] && here[1] === ca[1]) || (front[0] === ca[0] && front[1] === ca[1])) continue;
+        const R = { p: [0, 0], s: [0, 0], y: A.y - drop };
+        R.p[ax] = sg > 0 ? wall - wB + 1 : wall; R.s[ax] = wB;
+        R.p[cr] = ri(Math.max(0, c - dB + 2), Math.min(c - 1, CS - dB)); R.s[cr] = dB;
+        const cb = centreOf(R);
+        if ((here[0] === cb[0] && here[1] === cb[1]) || (front[0] === cb[0] && front[1] === cb[1])) continue;
+        const cells = [], [wx, wz] = at(wall, c), ladder = B.LADDER + ((side + 2) & 3);
+        for (let y = R.y + 1; y <= A.y + 2; y++) cells.push([wx, y, wz, B.COBBLE], [here[0], y, here[1], ladder]);
+        return { kind: 'ladder', room: R, cells, top: [here, front], bottom: [here, front] };
+      }
     }
+    return null;
+  }
+  // Plan `a` (0..DG_PLANS-1) of chunk (cx, cz), or null when the chunk does not try a dungeon. A link is
+  // a staircase with p 0.7 when one fits, else a ladder shaft (stairs fit less often, so links end up
+  // about 40 % stairs).
+  const DG_PLANS = 3;
+  function dungeonPlan(cx, cz, a = 0) {
+    if (hashF(SEED ^ 0x0d0e, cx, cz) >= 1 / 12) return null;
+    const r = mulberry32(hash3((SEED ^ 0x0d0e) + 7919 * (a + 1), cx, cz));
+    const ri = (lo, hi) => lo + Math.floor(r() * (hi - lo + 1));   // a whole number in lo..hi
+    const n = ri(2, 4), drops = [];
+    for (let k = 1; k < n; k++) drops.push(ri(5, 9));
+    const fall = drops.reduce((sum, v) => sum + v, 0), w = ri(5, 9), d = ri(5, 9);
+    const rooms = [{ p: [ri(0, CS - w), ri(0, CS - d)], s: [w, d], y: ri(DG_Y0 + fall, DG_Y1) }], links = [];
+    let busy = new Set();
+    for (let k = 1; k < n; k++) {
+      const A = rooms[k - 1], drop = drops[k - 1];
+      const link = (r() < 0.7 && stairLink(A, drop, ri, busy)) || ladderLink(A, drop, ri, busy);
+      if (!link) break;
+      rooms.push(link.room); links.push(link);
+      busy = new Set(link.bottom.map(([x, z]) => colKey(x, z)));
+    }
+    return { rooms, links };
+  }
+  // Tests DG_PLANS plans and stamps the first one that keeps the most rooms (3 plans keep the dungeon
+  // count near the old count of dungeons on solid ground). A plan keeps its rooms down to the first room
+  // that fails: an open cell under its floor (O3, so no floor hangs in a cave), under 4 blocks of
+  // terrain above its roof, or a link cell under 4 blocks of terrain. Fewer than 2 rooms: no dungeon. Walls and roofs replace only solid cells, so a room that
+  // meets a cave stays open to it. One room holds the spawner and 1..2 chests; the others hold 1 chest.
+  // `info`, when given, receives the stamped plan (tests).
+  function stampDungeon(cx, cz, S, info) {
+    if (!dungeonPlan(cx, cz)) return;
+    const roomOk = (R) => {
+      for (let z = R.p[1]; z < R.p[1] + R.s[1]; z++) for (let x = R.p[0]; x < R.p[0] + R.s[0]; x++) {
+        if (S.col(x, z).h < R.y + 8 || isSoft(S.get(x, R.y - 1, z))) return false;
+      }
+      return true;
+    };
+    const linkOk = (L) => L.cells.every(([x, y, z]) => S.col(x, z).h >= y + 4);
+    const fit = (P) => { let k = 0; while (k < P.rooms.length && roomOk(P.rooms[k]) && (k === 0 || linkOk(P.links[k - 1]))) k++; return k; };
+    let plan = null, kept = 0;   // the first plan that keeps the most rooms
+    for (let a = 0; a < DG_PLANS && kept < 4; a++) { const P = dungeonPlan(cx, cz, a), k = fit(P); if (k > kept) { plan = P; kept = k; } }
+    if (kept < 2) return;
+    const rooms = plan.rooms.slice(0, kept), links = plan.links.slice(0, kept - 1);
+    const cob = (x, y, z, p) => (hashF(S.x0 + x, y, (S.z0 + z) ^ 0xd6) < p ? B.MOSSY_COBBLE : B.COBBLE);
+    for (const R of rooms) {
+      const [x0, z0] = R.p, [w, d] = R.s;
+      for (let dy = 0; dy < 5; dy++) for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) {
+        const x = x0 + dx, z = z0 + dz, y = R.y + dy;
+        if (dy > 0 && dy < 4 && dx > 0 && dx < w - 1 && dz > 0 && dz < d - 1) { S.set(x, y, z, B.AIR); continue; }
+        if (dy > 0 && isSoft(S.get(x, y, z))) continue;
+        S.set(x, y, z, cob(x, y, z, dy === 0 ? 0.6 : 0.35));
+      }
+    }
+    for (const L of links) for (const [x, y, z, id] of L.cells) S.set(x, y, z, id === B.COBBLE ? cob(x, y, z, 0.35) : id);
+    const r = mulberry32(hash3(SEED ^ 0x0d0f, cx, cz)), si = Math.floor(r() * kept);
+    for (let k = 0; k < kept; k++) {
+      const R = rooms[k], [mx, mz] = centreOf(R), busy = new Set(), y = R.y + 1;
+      const [x0, z0] = R.p, x1 = x0 + R.s[0] - 2, z1 = z0 + R.s[1] - 2;   // interior x0+1..x1, z0+1..z1
+      for (const L of [links[k - 1] && links[k - 1].bottom, links[k] && links[k].top]) if (L) for (const [x, z] of L) busy.add(colKey(x, z));
+      if (k === si) {
+        S.set(mx, y, mz, B.SPAWNER);
+        S.feature('spawner', mx, y, mz, SPAWNER_MOBS[Math.floor(r() * SPAWNER_MOBS.length)]);
+      }
+      // True when the free interior floor cells (2 cells of headroom) form one 4-connected area. Only air
+      // and ladders are open here: the interior holds air, link cells, chests, and the spawner.
+      const open = (id) => id === B.AIR || (id >= B.LADDER && id < B.LADDER + 4);
+      const free = (x, z) => x > x0 && x <= x1 && z > z0 && z <= z1 && open(S.get(x, y, z)) && open(S.get(x, y + 1, z));
+      const joined = () => {
+        let start = null, n = 0;
+        for (let z = z0 + 1; z <= z1; z++) for (let x = x0 + 1; x <= x1; x++) if (free(x, z)) { n++; start = start || [x, z]; }
+        const seen = new Set(start ? [colKey(...start)] : []), q = start ? [start] : [];
+        while (q.length) {
+          const [x, z] = q.pop();
+          for (const [dx, dz] of D4) if (free(x + dx, z + dz) && !seen.has(colKey(x + dx, z + dz))) { seen.add(colKey(x + dx, z + dz)); q.push([x + dx, z + dz]); }
+        }
+        return seen.size === n;
+      };
+      // Wall middles first (a second chest prefers the opposite wall), then the other cells along the
+      // walls. A chest faces into the room and takes a spot only when the floor stays joined.
+      const wallMid = [[x0 + 1, mz, 0], [x1, mz, 2], [mx, z0 + 1, 1], [mx, z1, 3]];
+      const n = k === si && r() < 0.5 ? 2 : 1, first = Math.floor(r() * 4), spots = [0, 2, 1, 3].map((o) => wallMid[(first + o) & 3]);
+      for (let x = x0 + 1; x <= x1; x++) spots.push([x, z0 + 1, 1], [x, z1, 3]);
+      for (let z = z0 + 2; z < z1; z++) spots.push([x0 + 1, z, 0], [x1, z, 2]);
+      let placed = 0;
+      for (const [x, z, f] of spots) {
+        if (placed === n || busy.has(colKey(x, z)) || !free(x, z)) continue;
+        S.set(x, y, z, B.CHEST + f);
+        if (!joined()) { S.set(x, y, z, B.AIR); continue; }
+        S.feature('chest', x, y, z, 'dungeon');
+        placed++;
+      }
+    }
+    if (info) info.dungeon = { rooms, links, spawnerRoom: si };
   }
 
   // Desert temple: a 15 x 15 stepped sandstone pyramid at lx, lz 0..14, on ground that varies by 4 blocks
@@ -2312,7 +2466,8 @@ function WorldGenModule(SEED, K) {
     S.feature('chest', chx, yF + 1, chz, 'tower');
   }
 
-  function generateChunk(cx, cz) {
+  // `info` (optional, tests only) receives debug data: info.dungeon is the stamped dungeon plan.
+  function generateChunk(cx, cz, info) {
     const x0 = cx * CS, z0 = cz * CS;
     const blocks = new Uint8Array(CS * CS * H);
     const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
@@ -2595,7 +2750,7 @@ function WorldGenModule(SEED, K) {
     // 9. structures, deepest first, so a surface ruin wins over a corridor below it
     const features = [], S = structCtx(x0, z0, blocks, col, features);
     stampMineshafts(S);
-    stampDungeon(cx, cz, S);
+    stampDungeon(cx, cz, S, info);
     stampTemple(cx, cz, S);
     stampTower(cx, cz, S);
 
@@ -2608,7 +2763,7 @@ function WorldGenModule(SEED, K) {
     return { blocks, biomes, heights, features };
   }
 
-  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan };
+  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan };
 }
 
 const GEN_CONSTS = { CS, H, SEA, B, BIOME };

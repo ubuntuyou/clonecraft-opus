@@ -2,6 +2,7 @@
 
 Status: approved by Joe on 2026-09-28 ("Spec and gate o1-o6 in whatever order you want. Then start").
 Gate: `GATE_game.md` (was `GATE.md`), sections "Batch 13" to "Batch 18".
+Multi-room dungeons: requested by Joe on 2026-10-02. Joe found dungeon floors that float in caves with no walls. Joe chose option O3 (a room with open cells under its floor is not built) and asked for "multiple rooms at different levels somewhat random". Joe's choices: stairs and ladders mixed at random, a spawner in one room only, 2 to 4 rooms inside one chunk. Gate: `GATE_game.md`, section "Multi-room dungeons".
 
 ## Part 1: General
 
@@ -98,7 +99,25 @@ Six feature groups give the player goals past rubies, diamonds, and TNT.
 
 #### O2: structures and loot
 
-- Dungeon: a 7×7×5 room of cobblestone and mossy cobblestone below y 110, inside one chunk. A spawner sits in the centre. 1–2 chests stand against walls. About 1 chunk in 12 holds a dungeon, and only where the room meets a cave or stays underground.
+- Dungeon: a 7×7×5 room of cobblestone and mossy cobblestone below y 110, inside one chunk. A spawner sits in the centre. 1–2 chests stand against walls. About 1 chunk in 12 holds a dungeon, and only where the room meets a cave or stays underground. (Superseded 2026-10-02 by the multi-room dungeon below.)
+- Multi-room dungeon (2026-10-02): 2 to 4 rooms of cobblestone and mossy cobblestone, inside one chunk, at y 14 to 93.
+  - Each room is 5 to 9 blocks wide on each side and 5 blocks tall (3 blocks of headroom). Sizes and places are random per dungeon.
+  - The rooms stand at different levels. Each room lies 5 to 9 blocks lower than the room before it.
+  - A link joins each room to the next lower room. A link is either a 1-wide cobblestone staircase or a ladder shaft, picked at random.
+  - A staircase leaves the upper room through a door, goes down 1 block per step, and comes into the lower room through its roof.
+  - A ladder shaft goes down from a hole in the upper room's floor, through the lower room's roof, to its floor. The ladder hangs on the wall.
+  - A player walks from the top room to every room and back up without digging.
+  - One room, picked at random, holds the spawner in its centre and 1–2 chests. Every other room holds 1 chest.
+  - A room is not built when any cell under its floor is open (air, water, or lava). The dungeon then ends at the room above it. A dungeon with fewer than 2 rooms is not built. So no dungeon floor hangs in a cave.
+  - Walls and roofs that meet a cave stay open to the cave, as before.
+  - Every room keeps the depth rule: the terrain stands at least 4 blocks above its roof.
+  - About 1 chunk in 12 tries a dungeon, as before.
+  - Technical notes:
+    - `dungeonPlan(cx, cz, a)` is pure (seed, chunk, plan number). `stampDungeon` tests `DG_PLANS` (3) plans against the terrain and stamps the plan that keeps the most rooms.
+    - A link is a staircase with p 0.7 when one fits, else a ladder shaft.
+    - A staircase starts with a door stair in the upper room's wall at its floor layer. Each step rises half a block twice, so the walk up needs no jump.
+    - The room cell beside a staircase landing stays free of furniture.
+    - A chest goes only where it keeps the room's free floor connected. The candidates are the wall middles first, then the other wall cells.
 - Desert temple: a 15×15 sandstone pyramid with chiseled sandstone trim, on desert ground. A shaft in the centre leads to a room with 4 chests. The centre floor cell is chiseled sandstone with 9 TNT under it. A step onto chiseled sandstone that has TNT directly below lights that TNT (4 s fuse). About 1 desert chunk in 40.
 - Ruined tower: a broken 5×5 round tower of stone bricks, mossy bricks, and cracked bricks, 8–14 blocks tall, in plains, forest, or highlands. A chest stands at the top floor. About 1 chunk in 50.
 - Mineshaft: corridors 3 wide and 3 tall at y 60–100. Log and plank supports stand every 4 blocks. Rails lie on 60% of the floor. Cobwebs hang in corners. A chest stands in 1 corridor segment in 6. Corridors run along lines from anchors on a 96-block grid, so each chunk computes its own part of the same lines.
