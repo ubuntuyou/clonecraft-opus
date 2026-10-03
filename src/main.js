@@ -18,6 +18,7 @@ import {
 import { liquids } from './liquids.js';
 import { leafDecay } from './leaf-decay.js';
 import { farming } from './farming.js';
+import { grass } from './grass.js';
 import { updateInteraction } from './targeting.js';
 import { drops, spawnDrop, updateDrops } from './drops.js';
 import { viewModel, vmCamera, vmScene } from './held-item.js';
@@ -74,6 +75,7 @@ function frame(now) {
     liquids.update(dt);
     leafDecay.update();
     farming.update();
+    grass.update(dt);
     updateFurnaces(dt);
     updateTnt(dt);
     updateDoors();
@@ -115,7 +117,7 @@ window.clonecraft = {
   B, I, BIOME, WG, Mob, spawnDrop, explode, setState, openInventory, closeInventory, respawn, damagePlayer,
   breakBlock, placeBlock, raycast, primaryClick, input, hud, mining, viewModel, useItem, selectSlot,
   BLOCKS, ITEMS, TIERS, LIQ_KIND, LIQ_LEVEL, toolId, liquids, tileEntities, tileEntity, updateFurnaces, ui,
-  toggleDoor, doorTimers, persist, SAVE_KEY, leafDecay, farming, matchRecipe, get tileCount() { return tileCount; }, openHomes, closeHomes, setHome, goHome, get homes() { return homes; },
+  toggleDoor, doorTimers, persist, SAVE_KEY, leafDecay, farming, grass, matchRecipe, get tileCount() { return tileCount; }, openHomes, closeHomes, setHome, goHome, get homes() { return homes; },
   breakTime, canHarvest, SMELT, FUEL, primeTnt, primedTnt, get target() { return target; },
   projectiles, bow, armorId, ARMOR_TIERS, blockDrop, validSave, spawnHostiles, RECIPES, lineOfSight,
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },

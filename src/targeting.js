@@ -10,9 +10,12 @@ import {
 import { liquids } from './liquids.js';
 import { leafDecay } from './leaf-decay.js';
 import { farming } from './farming.js';
+import { grass } from './grass.js';
 import { viewModel, inv, vehicles, particles, audio, hud } from './order.js';
 
-world.onEdit = (x, y, z, old, id) => { liquids.wake(x, y, z); leafDecay.onEdit(x, y, z, old, id); farming.onEdit(x, y, z, old, id); };
+world.onEdit = (x, y, z, old, id) => {
+  liquids.wake(x, y, z); leafDecay.onEdit(x, y, z, old, id); farming.onEdit(x, y, z, old, id); grass.onEdit(x, y, z, old, id);
+};
 
 // ---- selection outline and crack overlay -------------------------------------------
 const selectionBox = new THREE.LineSegments(

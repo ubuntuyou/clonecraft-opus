@@ -3,6 +3,7 @@
 Status: approved by Joe on 2026-09-28 ("Spec and gate o1-o6 in whatever order you want. Then start").
 Gate: `GATE_game.md` (was `GATE.md`), sections "Batch 13" to "Batch 18".
 Multi-room dungeons: requested by Joe on 2026-10-02. Joe found dungeon floors that float in caves with no walls. Joe chose option O3 (a room with open cells under its floor is not built) and asked for "multiple rooms at different levels somewhat random". Joe's choices: stairs and ladders mixed at random, a spawner in one room only, 2 to 4 rooms inside one chunk. Gate: `GATE_game.md`, section "Multi-room dungeons".
+Grass spread: requested by Joe on 2026-10-03 ("spec and build grass spreading"). rsh picked the rules, the rate, and the tick radius. Gate: `GATE_game.md`, section "Grass spread".
 
 ## Part 1: General
 
@@ -54,6 +55,25 @@ Six feature groups give the player goals past rubies, diamonds, and TNT.
 - Bone meal: 1 bone crafts 3 bone meal. A right click on a sapling or a crop with bone meal advances it one stage (a sapling has 2 stages). The click shows green particles.
 - Buckets: 3 steel in a V craft 1 bucket. A right click on a water or lava source picks it up. A full bucket places a source on the clicked face and returns an empty bucket. A lava bucket burns in a furnace for 1000 s and leaves a bucket.
 - Golden apple: only in loot. It heals 10 HP and gives 20 s of regeneration at 1 HP per s.
+- Grass spread (2026-10-03): grass grows back over exposed dirt, and covered grass turns to dirt.
+  - A random tick picks random dirt and grass cells in the loaded chunks near the player. Each such cell gets a random tick on average every 40 s (`grass.every`).
+  - Only chunks that are lit and within 8 chunks of the player's chunk tick. A smaller render distance shrinks this radius to the render distance.
+  - Dirt rule: a ticked dirt block becomes a grass block when all of these hold:
+    - The cell above is not opaque and holds no liquid. Air, plants, torches, glass, leaves, and saplings pass.
+    - The cell above has light 9 or more in any channel (sky, block, or crystal). Sky light counts at its full value, so spread goes on at night under open sky.
+    - A grass block lies within 1 block horizontally (diagonals included) and from 1 block below to 3 blocks above the dirt. This is Minecraft's spread box seen from the dirt.
+  - Grass rule: a ticked grass block becomes dirt when the cell above is opaque or holds a liquid.
+  - Darkness alone does not kill grass.
+  - A cell in an unloaded chunk never counts as grass, cover, or light. The tick does not act on it.
+  - Ticks run only while the game simulates (`game.simulating()`), as liquids, crops, and furnaces do. The pause screen, the settings menu, and loading stop them. The inventory and homes screens do not, because the world keeps running behind them.
+  - A change is a normal `world.setBlock` edit. The save keeps it with the other edits. The save gets no new field.
+  - Generated terrain holds few cells that the rules change: 0.4 to 1.4 per chunk on seeds 12345, 4242, and 31337 (measured 2026-10-03). Saves therefore grow only where the player digs.
+  - Technical notes:
+    - `grass` (`src/grass.js`) owns the tick. `grass.update(dt)` runs in the frame loop after `farming.update()`.
+    - Each chunk keeps a candidate list of its dirt and grass cells (ARCHITECTURE.md, D45). The chunk scans its blocks for the list on its first tick, at most 4 chunks per frame. `world.onEdit` adds new dirt and grass cells. A sampled cell that is no longer dirt or grass leaves the list.
+    - Each chunk takes `dt × (list length) / grass.every` samples from its list, with the fraction carried to the next frame.
+    - `grass.tick(x, y, z)` applies the rules to one cell at once and returns the new id, or 0 when nothing changes. Tests use it.
+    - The changes of one frame go through one `world.beginBatch()` and `endBatch()`, so each touched chunk remeshes once.
 
 #### O1: armor, mobs, and the bow
 
@@ -147,6 +167,7 @@ All code is in `index.html`. (Superseded 2026-10-01 by SPEC_modules.md: the sour
 | Tiles for new blocks and items | 3 (atlas), `ITEM_PIX` |
 | Structures, `growTree` | 4 (`WorldGenModule`) |
 | Farmland, crops, saplings, rails, cobwebs, spawners | `world` random ticks and `interact` |
+| Grass spread (2026-10-03) | `src/grass.js`, called from `src/main.js` |
 | Armor, damage kinds, bow charge | player section |
 | Projectiles | new section beside mobs |
 | New mobs | `MOB_TYPES`, `MOB_TEXTURES` |

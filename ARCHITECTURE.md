@@ -247,6 +247,12 @@ The layer is one flat quad at y 192 with no depth write, not a volume. It costs 
 `clouds.densityAt(x, z)` is the same function on the CPU. `sky` uses it to fade the sun and moon, and tests use it to check the field without reading pixels.
 The cloud shadow multiplies only the direct-light term `lit`, so caves and block shadows do not change. It follows the Shadows box. The water glitter and the sun disc fade by the cloud with or without the box, because they are images of the sun, not shadows.
 
+### D45. Grass spread samples a candidate list, not the chunk
+
+Grass spread uses random ticks, as Minecraft does: each dirt or grass cell gets a tick on average every 40 s. The first build sampled random cells of the whole chunk array. About 99 % of those reads hit air or stone, and each read missed the cache. That cost 0.30 ms per frame at render distance 8.
+So `grass` keeps one candidate list per chunk: the local indices of its dirt and grass cells. A chunk scans its blocks once, on its first tick, at most 4 chunks per frame. `world.onEdit` adds each new dirt or grass cell to the list. A bitset keeps a cell in the list once. A sampled cell that is no longer dirt or grass leaves the list, so removal costs nothing at edit time.
+The lists live in a `WeakMap` keyed by chunk, so an unloaded chunk drops its list with no hook. The tick saves nothing: a change is a normal `setBlock` edit. The cost fell to 0.13 ms per frame at render distance 8.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -259,7 +265,7 @@ The cloud shadow multiplies only the direct-light term `lit`, so caves and block
 | `GenService` to world | A request gives `{blocks, biomes, heights}` typed arrays and a `features` list (chests, spawners) for one chunk. |
 | world to mobs | `onChunkLoaded(chunk)` and `onChunkUnloaded(chunk)` hooks. |
 | block edits | `world.setBlock(x, y, z, id)` is the only write path. `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
-| world to liquids, leaves, and farming | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, and `farming.onEdit()`. |
+| world to liquids, leaves, farming, and grass | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, `farming.onEdit()`, and `grass.onEdit()`. |
 | containers | `tileEntity(x, y, z)` returns or creates the furnace or chest state. `openInventory(mode, target)` opens its screen. |
 | save | `persist.save()` writes the save. `persist.apply(SAVE)` restores it at boot. |
 | light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |

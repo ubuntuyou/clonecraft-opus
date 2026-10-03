@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 45 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 46 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -44,7 +44,8 @@
  *      cells (CLIMB).
  *  11. Raycasting and block editing: interact (DDA, mining, doors; rails: railPlan() picks
  *      the shape and railJoin() re-shapes a neighbour), liquids, leaf-decay, farming
- *      (saplings, farmland, crops, bone meal, buckets), targeting (world.onEdit wiring,
+ *      (saplings, farmland, crops, bone meal, buckets), grass (random ticks: grass spreads to lit
+ *      dirt, covered grass turns to dirt), targeting (world.onEdit wiring,
  *      selection box, crack overlay), drops
  *  12. Held item view model: held-item (the bow pulls back while it draws)
  *  13. Inventory and crafting: inventory, crafting, craft-grid, tile-entities (furnaces,
@@ -70,7 +71,7 @@
  *  - Block variants (furnace, chest, wall torch, and stair facing, door states, liquid levels, placed leaves, rail shapes) are separate ids;
  *    baseOf(id) gives the block that the item places and the break drops.
  *  - Every setBlock calls world.onEdit. It wakes nearby liquids, queues leaf-decay checks, and
- *    registers saplings, crops, and farmland with `farming`.
+ *    registers saplings, crops, and farmland with `farming`, and new dirt and grass with `grass`.
  *  - A chunk is meshed only when it and all 8 neighbours are lit (smooth light reads 1 cell
  *    across every border).
  *  - Block edits go through world.setBlock(): it stores the override, relights, and remeshes.
@@ -97,6 +98,7 @@ export { bow, primaryClick, useItem } from './interact.js';
 import './liquids.js';
 import './leaf-decay.js';
 export { farming } from './farming.js';
+import './grass.js';
 import './targeting.js';
 export { spawnDrop } from './drops.js';
 export { makeItemMesh, viewModel } from './held-item.js';

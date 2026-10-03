@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Grass spread (SPEC_expansion.md, "Grass spread"): grass grows back over exposed dirt, and covered grass turns to dirt.
+  - Lit dirt next to grass (1 block to the side, from 1 below to 3 above) turns to grass after about 40 s on average. Sky light counts at night.
+  - Grass under an opaque block, water, or lava turns to dirt. Darkness alone does not kill grass.
+  - A dug patch greens from its edge inward. Dry farmland that turned to dirt grows grass again.
+  - Only chunks within 8 chunks of the player tick. Pause and the settings menu stop the ticks. The changes save as normal edits.
 - Sunset cloud colors (SPEC_graphics.md, G5): at sunrise and sunset, clouds take color by their place in the sky.
   - Clouds low and toward the sun are gold and orange. Clouds to the side are pink. Clouds away from the sun are purple to blue-grey.
   - A low sun lights the cloud bases from below.

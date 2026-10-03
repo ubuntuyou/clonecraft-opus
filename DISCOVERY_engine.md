@@ -7,7 +7,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - Chunk index: `lidx(x, y, z) = (y << 8) | (z << 4) | x`. Local x and z are 0..15. y is 0..175 (`H` 176).
 - `getBlock()` returns `UNLOADED` (255) outside loaded chunks. Treat `UNLOADED` as "do not act", never as air.
 - The world meshes a chunk only when the chunk and all 8 neighbours are lit.
-- `world.setBlock()` is the only write path for blocks. Wrap many edits in `beginBatch()` and `endBatch()`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, and registers farming cells. `beginBatch()` does not nest: an inner `endBatch()` ends the outer batch. Check `world.batch` first (see `batched()` in `farming`).
+- `world.setBlock()` is the only write path for blocks. Wrap many edits in `beginBatch()` and `endBatch()`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, registers farming cells, and adds new dirt and grass to the grass candidate lists. `beginBatch()` does not nest: an inner `endBatch()` ends the outer batch. Check `world.batch` first (see `batched()` in `farming`).
 - Use `baseOf(id)`, not `BLOCKS[id].base`, when `id` can be `UNLOADED`. `BLOCKS[255]` is undefined.
 - `setState()` is the only function that shows or hides screens.
 - `WorldGenModule()` must read no outside state. The worker runs its source text. `src/worldgen.js` therefore has no imports; `tools/depcheck.js` fails on one.
@@ -142,6 +142,10 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - TNT: `primedTnt` (`src/explosions.js`; "x,y,z" to fuse state) lives outside the save. `updateTnt()` drops an entry when its cell is no longer TNT, so any break defuses it. Tests read `c.primedTnt`.
 - Leaf decay: `leafDecay` (`src/leaf-decay.js`; queue, reach 6). F3 shows "Leaves queued". A decay calls `breakBlock()` silently and wakes nothing.
 - Farming: `farming` (`src/farming.js`) holds one registry (Map "x,y,z" to `[x, y, z, due, n]`) for saplings, unripe crops, and farmland. `due` is in `game.clock`. `n` is the sapling stage or the dry seconds of a farmland. `farming.save()` stores the remaining time, so the save is clock-free. `farming.boost()` is bone meal. `farming.toDirt()` also breaks the crop above. Tests read `c.farming.save()` for stages and timers.
+- Grass spread: `grass` (`src/grass.js`) keeps one candidate list per chunk (D45). Test handles: `c.grass.tick(x, y, z)` applies the rules to one cell now. `c.grass.every` (default 40) sets the mean seconds per tick; restore it after a sped-up test. `c.grass.ticked` counts the chunks the last update ticked. `c.grass.candidates(x, z)` gives the list length of that chunk, or -1 before its first scan.
+- Grass tests: build the test cells above the terrain (for example y 168) or check the sky light first. At y 152 near spawn on seed 12345 the cells sit inside a hill, and sky light is 0. `getSky` returns 15 for a chunk that is not lit, so read light only in lit chunks.
+- Each grass change is a normal `setBlock`: relight plus remesh, 3–13 ms. A grass change therefore costs the same frame time as a player edit.
+- Test saves: `config.js` reads the save once at module load, and the page saves on `visibilitychange`. To start a fresh world, set `c.persist.save = () => {}`, remove the save key, then reload.
 - `raycast(..., sources = true)` also stops at liquid sources (level 8). Only the empty bucket uses it. Flow cells stay transparent to the ray.
 - A food with `regen` (golden apple) sets `player.regenLeft` and can be eaten at full health. `FUEL_LEFT` names the item a fuel leaves behind (lava bucket to bucket).
 - Pickup: `PICKUP_RANGE` 3.3 for all drops. A drop from `dropStack()` has `thrown` set and uses `THROWN_PICKUP_RANGE` 1.8, so a Q throw does not return to a still player.

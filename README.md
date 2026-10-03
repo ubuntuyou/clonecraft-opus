@@ -70,6 +70,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 - Ladders: 7 sticks craft 3. A ladder hangs on a wall and is climbed like leaves; walking into the wall also climbs.
 - Leaf decay: when a tree loses its logs, its leaves fall within a few seconds and sometimes drop a stick. Placed leaves never decay.
 - Farming: saplings from every leaf color regrow trees. A hoe tills farmland, and seeds from tall grass grow wheat for bread. Farmland near water is wet and grows crops twice as fast. Bone meal speeds up a sapling or a crop.
+- Grass spread: grass grows back over lit dirt next to it, so a dug patch greens from its edge inward. Grass under a block or water turns to dirt.
 - Buckets carry water and lava. Apples fall from leaves. A golden apple heals and regenerates.
 - Sky light, torch light, and turquoise crystal light with smooth lighting and ambient occlusion. Torches emit light 15 and stand on the ground or hang on walls. Crystals emit light 12.
 - Tool tiers: wood, stone, copper, steel, gold, ruby, and diamond. Coal ore needs a wooden pickaxe, copper and iron ore need stone, gold and ruby ore need steel, diamond ore needs ruby, and obsidian needs diamond. A weaker pickaxe does not break the ore, and a message names the pickaxe it needs.
