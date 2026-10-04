@@ -141,7 +141,8 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 - Numbers rsh chose in Phase 6 (Joe has not reviewed them):
   - Pillars are 3×3 voidstone columns. On seed 1234 the pylons sit at y 107..112. A pylon has hardness 0.
   - The boss roams within 38 blocks of the center. It slams when the player is within 5 blocks, then waits 2.5 s before the next slam. The warning lifts it 1.6 blocks.
-  - The slam hits only a player whose feet are below the floor + 3. A player who hovers higher takes no slam damage.
+  - The slam starts only when the player's feet are below the floor + 3.
+  - The slam damage travels as a shockwave (Joe, 2026-10-04). The ring grows on the floor from r 1.2 to r 4 at 6 blocks/s. It hits a player whose feet are below the floor + 0.6 as its edge passes. A jump over the edge dodges it.
   - A shard flies straight at 15 blocks per s.
   - The exit portal opening is 3 wide and 4 tall, along x, in the plane z = 0 at the center. When the boss dies within 3 blocks of that plane, the loot lands 3.5 blocks in front of it (+z), so no drop sits in the pane.
 

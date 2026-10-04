@@ -296,7 +296,7 @@ The return link is one saved cell: `portals.crystalBack`, the foot of the last o
 A pylon is a plain block (`B.PYLON`) that worldgen places (`WG.PYLONS`). A broken pylon is a block override, so it stays broken with no extra state. The phase is derived each frame from the standing pylons and the HP, never stored. A pylon cell in an unloaded chunk counts as standing.
 The save holds one field for the fight: `realm.boss.defeated`. `boss.update` spawns the boss only while it is false. The exit portal is ordinary edits (`buildExitPortal`), so the save keeps it. The HP is not saved. Leaving the realm clears `mobs[]`, so every visit starts a full fight.
 The kill sets `victoryPending`. The victory screen waits until the state is 'playing' and the player is alive, so it never covers the death screen or the inventory.
-The slam and the shard fan are separate timers. The fan and summon timers run during a slam, so a slam never delays them.
+The slam and the shard fan are separate timers. The fan and summon timers run during a slam, so a slam never delays them. The slam shockwave is boss state (`col.wave`), not a particle. The sparks are drawn at the hit edge every frame, so the visible ring and the damage cannot drift apart.
 
 ### D50. Ember fortresses sit on a 96-block grid with parity offsets
 

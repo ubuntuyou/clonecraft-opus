@@ -146,6 +146,8 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
   Note (Phase 6): Playwright: hits leave 300 HP while pylons stand. The shield flash shows, and the toast shows once. Fans of 3 come every 3 s. A shard deals 4 to a player with no armor and 0.8 to a player in full diamond armor, so armor applies.
 - [x] Phase 2: with all pylons gone, the boss hunts at speed 2.5. The slam warns for 0.8 s, then deals 8 within 4 blocks with knockback.
   Note (Phase 6): Playwright: the speed peaks at 2.5. The slam warns for 0.82 s, deals 8 at 3 blocks with strong knockback, and 0 at 6 blocks. Fix in QA: the slam hits only a player near the floor.
+- [x] The slam damage travels with the visible ring (Joe, 2026-10-04). The ring grows on the floor from the boss's rim to 4 blocks. It hits a player on the floor as its edge passes, so the hit comes later at a larger distance. A jump timed over the edge avoids it. A player at 5 blocks takes nothing.
+  Note (2026-10-04): Playwright, distances from the wave center. At 1.0 the hit comes at 0 ms. At 2.4 it comes at 220 ms (r 2.5). At 3.29 it comes at 349 ms. A jump at impact from 2.4 takes no hit; the feet are 1.16 above the floor as the edge passes. At 4.39 nothing hits; the wave stops at r 4. With no armor the hit deals 8. A screenshot at r 2.2 shows the spark ring on the floor at the hit edge.
 - [x] Phase 3: at 50 % HP, speed 3.5, a 5-shard fan every 3 s, and 2 Shardlings every 12 s, never more than 4 alive.
   Note (Phase 6): Playwright: the speed is 3.5. 5-shard fans come every 3.0 s through 8 slams. Summons of 2 come at 12 s and 24 s, with a cap of 4. Fix in QA: the fan and summon timers now run during a slam.
 - [x] Shardling: 8 HP, speed 4, a hit of 3, drops a crystal 1 time in 2.

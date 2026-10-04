@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 - Prism Colossus (SPEC_realms.md, Phase 6): a boss fight on the Crystal Realm arena.
   - 6 voidstone pillars ring the arena. A Resonance Pylon on each top gives crystal light 15 and a beam to the boss. Any hit or an arrow breaks a pylon. It drops nothing.
   - The boss wakes within 32 blocks of the center. A boss bar shows its HP and hides at 64 blocks.
-  - Phase 1: the pylons shield it, and it fires 3-shard fans. Phase 2: it hunts and slams for 8 within 4 blocks. Phase 3, at 50 % HP: it is faster, fires 5-shard fans, and summons Shardlings.
+  - Phase 1: the pylons shield it, and it fires 3-shard fans. Phase 2: it hunts and slams. A shockwave ring runs out 4 blocks along the floor and deals 8 as it passes; a jump dodges it. Phase 3, at 50 % HP: it is faster, fires 5-shard fans, and summons Shardlings.
   - Shardling: a small crystal mob with 8 HP that drops a crystal 1 time in 2.
   - A player death or leaving the realm resets the fight. Broken pylons stay broken.
   - The kill drops the Prism Heart, 8..16 crystals, and 2..4 Emberite Ingots. A lit exit portal appears at the center and leads home like the arrival portal.

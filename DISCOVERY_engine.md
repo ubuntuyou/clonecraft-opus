@@ -120,7 +120,8 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - Mouse look and canvas clicks need the state 'playing' and pointer lock. Every travel and the inventory screen drop the lock, but the state returns to 'playing'. Click the canvas center to relock before you send K or mouse motion.
 - A count-1 inventory slot shows no text. Do not select slots by their text.
 - A block placement goes to the face the ray hits. A ray into a hole below grade hits the face in front of the hole. Look down into the hole from above.
-- The slam hits only a player whose feet are below the floor + 3 (y 100). A QA script that hovers at feet y 101.5 fights the boss without slam damage.
+- The slam starts only when the player's feet are below the floor + 3 (y 100). A QA script that hovers at feet y 101.5 fights the boss without slams.
+- The slam damage is a shockwave (`col.wave`). It hits only feet below the floor + 0.6 (y 97.6), once, as its edge passes. Measure a QA distance from `col.wave.x/z`, not from the boss: the boss drifts toward the player before the slam.
 
 ## Pointers
 

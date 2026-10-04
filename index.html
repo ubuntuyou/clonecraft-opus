@@ -10410,7 +10410,8 @@ const portals = (() => {
  *    below (hunts at 3.5, slams, 5-shard fan every 3 s, 2 Shardlings every 12 s, 4 alive at most).
  *    At SLEEP_R or more from the center, it returns to HOME and sleeps again. It keeps its HP.
  *  - 'slam': it rises for SLAM_WARN s over a particle ring of radius SLAM_R on the floor, then
- *    drops and hits the player within SLAM_R.
+ *    drops. A shockwave ring then runs out along the floor to SLAM_R (shockwave()). It hits a
+ *    player on the floor as its edge passes, so a jump over the edge avoids it.
  *  - 'dying': it spins and cracks for DEATH_T s, then shatters, drops its loot, and builds the
  *    exit portal (built lit) at the arena center.
  * A fight resets on the player's death (full HP, Shardlings gone, sleep, the toast may show again).
@@ -10426,6 +10427,9 @@ const HOVER = 2;                             // the boss floats this many blocks
 const HOME = new THREE.Vector3(0.5, FLOOR + HOVER, 0.5);
 const WAKE_R = 32, SLEEP_R = 64, ROAM_R = 38;
 const SHARD_DMG = 4, SLAM_DMG = 8, SLAM_R = 4, SLAM_NEAR = 5, SLAM_WARN = 0.8, SLAM_CD = 2.5, SLAM_RISE = 1.6;
+// The slam shockwave: a ring on the floor that grows from the boss's rim (WAVE_R0) to SLAM_R at
+// WAVE_SPEED blocks per s. It hits a player whose feet are below FLOOR + WAVE_H as its edge passes.
+const WAVE_R0 = 1.2, WAVE_SPEED = 6, WAVE_H = 0.6;
 const FAN = { 1: [3, 3], 2: [3, 4], 3: [5, 3] };   // phase -> [shards per fan, seconds between fans]
 const SPEED = { 2: 2.5, 3: 3.5 };
 const SUMMON_T = 12, SUMMON_N = 2, SHARDLINGS_MAX = 4;
@@ -10444,6 +10448,7 @@ class Colossus extends Mob {
     this.state = 'sleep';
     this.toasted = false;                       // "The pylons shield it" shows once per fight
     this.fanT = 3; this.summonT = SUMMON_T; this.slamT = 0; this.slamCD = 0; this.shieldT = 0; this.crackT = 0;
+    this.wave = null;                            // the live slam shockwave, or null
     this.yaw = Math.PI;                          // it faces the arrival portal (+z)
     this.phase = 1;
     // the shield: a faint turquoise shell while a pylon stands; it flashes when a hit lands
@@ -10458,7 +10463,7 @@ class Colossus extends Mob {
   // Resets the fight: full HP, sleep at HOME, the toast may show again.
   reset() {
     this.hp = this.def.hp; boss.hp = null; this.state = 'sleep'; this.toasted = false;
-    this.fanT = 3; this.summonT = SUMMON_T; this.slamCD = 0;
+    this.fanT = 3; this.summonT = SUMMON_T; this.slamCD = 0; this.wave = null;
     this.pos.copy(HOME); this.vel.set(0, 0, 0);
   }
 
@@ -10504,20 +10509,37 @@ class Colossus extends Mob {
     if (n > 0) audio.enchant(0.6);
   }
 
+  // The slam lands. The damage is the shockwave (shockwave()), which starts at the boss's rim now.
   slam() {
-    const p = player, dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
-    for (let i = 0; i < 40; i++) {
-      const a = i / 40 * Math.PI * 2;
-      particles.crystalSpark(this.pos.x + Math.sin(a) * 1.2, FLOOR + 0.2, this.pos.z + Math.cos(a) * 1.2, Math.sin(a) * 9, 1.5, Math.cos(a) * 9, 0.5, 0.14);
-    }
+    particles.crystalBurst(this.pos.x, FLOOR + 0.3, this.pos.z, 24, 3);
     audio.explode(this.pos.x, FLOOR, this.pos.z);
-    if (p.dead || Math.hypot(dx, dz) > SLAM_R || p.pos.y > FLOOR + 3 || p.pos.y < FLOOR - 2) return;
-    const h0 = p.health, inv0 = p.invuln;
-    damagePlayer(SLAM_DMG, this.def.kill, this.pos, 'slam');
-    if (p.health < h0 || (p.dead && inv0 <= 0)) {   // a strong knockback on top of damagePlayer's push
-      const d = Math.hypot(dx, dz) || 1;
-      p.vel.x += dx / d * 9; p.vel.z += dz / d * 9; p.vel.y = Math.max(p.vel.y, 9);
+    this.wave = { x: this.pos.x, z: this.pos.z, prev: -1, r: WAVE_R0, hit: false };
+    this.shockwave(0);
+  }
+
+  // The shockwave ring. Its sparks are drawn at the hit edge each frame, so the ring the player sees
+  // is the ring that hits. It hits once, when the edge passes a player on the floor. A jump over the
+  // edge, or a step outside SLAM_R, avoids it.
+  shockwave(dt) {
+    const w = this.wave, p = player;
+    if (dt > 0) { w.prev = w.r; w.r = Math.min(SLAM_R, w.r + WAVE_SPEED * dt); }
+    const n = Math.ceil(w.r * 7);
+    for (let i = 0; i < n; i++) {
+      const a = (i + Math.random()) / n * Math.PI * 2;
+      particles.crystalSpark(w.x + Math.sin(a) * w.r, FLOOR + 0.15, w.z + Math.cos(a) * w.r, 0, randRange(0.6, 1.8), 0, 0.2, 0.13);
     }
+    const dx = p.pos.x - w.x, dz = p.pos.z - w.z, d = Math.hypot(dx, dz);
+    const onFloor = p.pos.y < FLOOR + WAVE_H && p.pos.y > FLOOR - 2;
+    if (!w.hit && !p.dead && onFloor && d > w.prev && d <= w.r) {
+      w.hit = true;
+      const h0 = p.health, inv0 = p.invuln;
+      damagePlayer(SLAM_DMG, this.def.kill, this.pos, 'slam');
+      if (p.health < h0 || (p.dead && inv0 <= 0)) {   // a strong knockback on top of damagePlayer's push
+        const k = d || 1;
+        p.vel.x += dx / k * 9; p.vel.z += dz / k * 9; p.vel.y = Math.max(p.vel.y, 9);
+      }
+    }
+    if (w.r >= SLAM_R) this.wave = null;
   }
 
   update(dt) {
@@ -10531,6 +10553,7 @@ class Colossus extends Mob {
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z, dist = Math.hypot(dx, dz);
     let ty = HOME.y, mx = 0, mz = 0, speed = 0, face = null;
 
+    if (this.wave) { if (this.state === 'dying') this.wave = null; else this.shockwave(dt); }
     if (this.state === 'dying') return this.dying(dt);
     if (this.state === 'sleep') {
       if (!p.dead && fromCenter < WAKE_R) this.state = 'fight';
