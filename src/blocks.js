@@ -277,8 +277,9 @@ for (let lvl = 1; lvl <= 8; lvl++) {
 }
 
 // ---- Items ----------------------------------------------------------------------
-// Block items share their block id (0..99, and TNT at 110). Other items use ids >= 100. Tool ids are
-// 200 + 10 * kind + tier (tier 1..7).
+// Block items share their block id. A block id is one byte (0..254; 255 is UNLOADED), because a chunk
+// stores one byte per cell. Other items use the free byte ids and every id from 256 up. Tool ids are
+// 200 + 10 * kind + tier (tier 1..7). Armor ids are 300 + 4 * tier + piece (SPEC_realms, Phase 0).
 const I = {
   STICK: 100, COAL: 101, RAW_IRON: 102, STEEL: 103, RAW_COPPER: 104, COPPER: 105, RAW_GOLD: 106, GOLD: 107,
   RUBY: 108, DIAMOND: 109,
@@ -357,7 +358,7 @@ defItem(I.MAGMA_CORE, { name: 'Magma Core' });
 defItem(I.BOAT, { name: 'Boat', kind: 'vehicle', vehicle: 'boat', maxStack: 1 });
 defItem(I.MINECART, { name: 'Minecart', kind: 'vehicle', vehicle: 'cart', maxStack: 1 });
 defItem(I.COMPASS, { name: 'Compass', maxStack: 1 });
-// Armor: id = 176 + 4 * tier + piece. `pts` lists the points per piece (helmet, chest, legs, boots).
+// Armor: id = 300 + 4 * tier + piece. `pts` lists the points per piece (helmet, chest, legs, boots).
 const ARMOR_TIERS = [
   { name: 'Leather', mat: 'leather', item: I.LEATHER, pts: [1, 3, 2, 1], factor: 5 },
   { name: 'Copper', mat: 'copper', item: I.COPPER, pts: [2, 5, 4, 1], factor: 11 },
@@ -370,10 +371,26 @@ const ARMOR_PIECES = [
   { name: 'Chestplate', base: 16, shape: ['M M', 'MMM', 'MMM'] },
   { name: 'Leggings', base: 15, shape: ['MMM', 'M M', 'M M'] },
   { name: 'Boots', base: 13, shape: ['M M', 'M M'] }];
-const armorId = (tier, piece) => 176 + 4 * tier + piece;
+const armorId = (tier, piece) => 300 + 4 * tier + piece;
 ARMOR_TIERS.forEach((t, tier) => ARMOR_PIECES.forEach((p, piece) =>
   defItem(armorId(tier, piece), { name: `${t.name} ${p.name}`, kind: 'armor', maxStack: 1, maxDur: p.base * t.factor,
     armor: { tier, piece, pts: t.pts[piece] } })));
+
+// Save id plan. A save without `ids` is from before SPEC_realms Phase 0 and holds armor at 176..199.
+// migrateIds moves each stack id in that range to id + 124 (the new armor ids 300..323) and sets
+// `ids` to IDS_VERSION. It changes `d` in place and returns it. A save that has `ids` passes through.
+// Stacks live in the inventory slots, the loose stacks, the armor slots, and the tile entity slots.
+const IDS_VERSION = 2;
+function migrateIds(d) {
+  if (!d || typeof d !== 'object' || d.ids !== undefined) return d;
+  const fix = (s) => { if (s && Number.isInteger(s.id) && s.id >= 176 && s.id <= 199) s.id += 124; };
+  const each = (a) => { if (Array.isArray(a)) a.forEach(fix); };
+  if (d.inv) { each(d.inv.slots); each(d.inv.loose); }
+  each(d.armor);
+  if (Array.isArray(d.te)) for (const t of d.te) if (t) each(t.slots);
+  d.ids = IDS_VERSION;
+  return d;
+}
 
 // Enchantments. A stack may carry `ench`: {key: level}, with levels 1..ENCH_MAX and at most ENCH_SLOTS keys.
 // Only items with maxDur fit an enchantment, and a stack with `dur` never merges, so an enchanted stack
@@ -470,9 +487,9 @@ function setEnchantSeed(v) { enchantSeed = v; }
 export {
   altarOffers, ARMOR_PIECES, ARMOR_TIERS, armorId, ATTEN, B, baseOf, blockDrop, BLOCKS, breakTime, CLIMB,
   CRYSTAL_GROW, DIR_FACE, DIR4, EMIT, EMIT_CRY, ENCH, ENCH_MAX, ENCH_SLOTS, enchantable, enchantSeed,
-  enchLevel, FUEL, FUEL_LEFT, GLOWS, I, IS_CROP, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_ORE, IS_RAIL, IS_SAPLING,
+  enchLevel, FUEL, FUEL_LEFT, GLOWS, I, IDS_VERSION, IS_CROP, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_ORE, IS_RAIL, IS_SAPLING,
   IS_STAIR, IS_WATER, ITEMS, LEAF_COLOR, LEAF_DECAYS, LEAF_NATURAL, LIGHT_STOP, LIQ_KIND, LIQ_LEVEL, liquidId,
-  NEEDS_SUPPORT, OPAQUE, pickaxeFor, RAIL_ENDS, railShapeFor, railUp, REPLACEABLE, restack, ROMAN,
+  migrateIds, NEEDS_SUPPORT, OPAQUE, pickaxeFor, RAIL_ENDS, railShapeFor, railUp, REPLACEABLE, restack, ROMAN,
   setEnchantSeed, SHAPE, SHAPE_OF, SKY_FREE, SMELT, SMELT_TIME, SOLID, STAIR_BOXES, STAIR_SIDE, stairKey,
   stairV, STORAGE_DEFS, TARGETABLE, TIERS, TOOL_KINDS, toolId, validEnch, wears,
 };

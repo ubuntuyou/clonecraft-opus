@@ -1,12 +1,13 @@
 // ---- save and load ------------------------------------------------------------------
 // One save per seed in localStorage (SAVE_KEY). It holds the block edits (overridesByChunk),
 // the player, the inventory, furnaces and chests, homes, queued liquid cells, and the time.
+// `ids` names the id plan of the save (IDS_VERSION). migrateIds upgrades an older save at boot and at import.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
 // play, on pause, and when the page hides or closes. An import sets `blocked`, so the
 // page-hide save cannot overwrite the imported save before the reload.
 import { THREE } from './three.js';
 import { CONFIG, CS, SAVE_KEY, SEED, storage, VOL } from './config.js';
-import { B, baseOf, BLOCKS, enchantSeed, ITEMS, setEnchantSeed, validEnch } from './blocks.js';
+import { B, baseOf, BLOCKS, enchantSeed, IDS_VERSION, ITEMS, migrateIds, setEnchantSeed, validEnch } from './blocks.js';
 import { game, player, world } from './engine.js';
 import { doorTimers, torches } from './interact.js';
 import { liquids } from './liquids.js';
@@ -28,7 +29,7 @@ const persist = {
     const out = p.vehicle && !p.dead ? vehicles.exitSpot(p.vehicle) : null;
     const pos = p.dead ? p.spawn : out ? new THREE.Vector3(out.x, out.y, out.z) : p.pos;
     return {
-      v: 1, seed: SEED, dayTime: game.dayTime, clock: game.clock,
+      v: 1, ids: IDS_VERSION, seed: SEED, dayTime: game.dayTime, clock: game.clock,
       player: { pos: pos.toArray(), spawn: p.spawn.toArray(), yaw: p.yaw, pitch: p.pitch, health: p.dead ? p.maxHealth : p.health, flying: p.flying && !p.dead },
       inv: { slots: inv.slots, sel: inv.sel, loose: [...inv.craft, ...inv.altar, inv.cursor].filter(Boolean) },
       armor: inv.armor,
@@ -45,7 +46,9 @@ const persist = {
     return ok;
   },
   // Restores a save at boot, before any chunk arrives (overrides apply as chunks load).
+  // migrateIds first moves the stack ids of a save from before the id plan (SPEC_realms, Phase 0).
   apply(d) {
+    migrateIds(d);
     game.dayTime = d.dayTime; game.clock = d.clock;
     const p = player, P = d.player;
     p.pos.fromArray(P.pos); p.spawn.fromArray(P.spawn); p.yaw = P.yaw; p.pitch = P.pitch;
@@ -91,7 +94,8 @@ $('newWorldBtn').addEventListener('click', (e) => {
 // ---- export and import: the current world as a JSON file ---------------------------------
 // Export downloads the save of the current world. Import checks a file (validSave), writes it
 // under its own seed, and reloads on that seed: SAVE is read only at boot, so a reload is the
-// only way to apply it. An import that meets an existing save for its seed asks first.
+// only way to apply it. migrateIds runs before validSave, so an export from before the id plan
+// imports and is stored with the new ids. An import that meets an existing save for its seed asks first.
 function validSave(d) {
   const num = (x) => typeof x === 'number' && Number.isFinite(x);
   const int = Number.isInteger, arr = Array.isArray;
@@ -99,7 +103,7 @@ function validSave(d) {
   const stack = (s) => s === null || (!!s && int(s.id) && !!ITEMS[s.id] && int(s.count) && s.count > 0 && validEnch(s));
   const optArr = (a) => a === undefined || arr(a);
   const P = d && d.player, V = d && d.inv;
-  return !!d && d.v === 1 && int(d.seed) && (d.seed | 0) === d.seed && num(d.dayTime) && num(d.clock)
+  return !!d && d.v === 1 && d.ids === IDS_VERSION && int(d.seed) && (d.seed | 0) === d.seed && num(d.dayTime) && num(d.clock)
     && !!P && vec(P.pos) && vec(P.spawn) && num(P.yaw) && num(P.pitch) && num(P.health)
     && !!V && arr(V.slots) && V.slots.length <= 36 && V.slots.every(stack) && optArr(V.loose) && (V.loose || []).every((s) => s && stack(s))
     && arr(d.edits) && d.edits.every((e) => arr(e) && int(e[0]) && arr(e[1]) && e[1].length % 2 === 0
@@ -137,7 +141,7 @@ $('importFile').addEventListener('change', async (e) => {
   e.target.value = '';                  // the same file can be picked again
   if (!file) return;
   let d = null;
-  try { d = JSON.parse(await file.text()); } catch (err) { d = null; }
+  try { d = migrateIds(JSON.parse(await file.text())); } catch (err) { d = null; }
   if (!validSave(d)) { alert('This file is not a Clonecraft world save. Nothing changed.'); return; }
   const key = `clonecraft.world.${d.seed}`;
   if (storage.get(key) !== null

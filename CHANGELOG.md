@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ## [Unreleased]
 
+### Changed
+
+- Item ids (SPEC_realms.md, Phase 0): armor ids move from 176..199 to 300..323, so the realm blocks can use the one-byte ids. New item-only ids start at 256.
+  - A save now holds `ids: 2`. An older save or export loads and imports with every armor piece intact: worn, in the inventory, in a chest, or held on the cursor.
+  - An import rejects a save with an unknown `ids` value.
+
 ### Added
 
 - Grass spread (SPEC_expansion.md, "Grass spread"): grass grows back over exposed dirt, and covered grass turns to dirt.

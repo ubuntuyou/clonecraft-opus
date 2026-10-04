@@ -253,6 +253,12 @@ Grass spread uses random ticks, as Minecraft does: each dirt or grass cell gets 
 So `grass` keeps one candidate list per chunk: the local indices of its dirt and grass cells. A chunk scans its blocks once, on its first tick, at most 4 chunks per frame. `world.onEdit` adds each new dirt or grass cell to the list. A bitset keeps a cell in the list once. A sampled cell that is no longer dirt or grass leaves the list, so removal costs nothing at edit time.
 The lists live in a `WeakMap` keyed by chunk, so an unloaded chunk drops its list with no hook. The tick saves nothing: a change is a normal `setBlock` edit. The cost fell to 0.13 ms per frame at render distance 8.
 
+### D46. Block ids stay one byte; items take ids from 256 up
+
+A chunk stores one byte per cell, and 255 is `UNLOADED`. So a block id is 0..254, and the property tables (`OPAQUE`, `SOLID`, `EMIT`, and the others) are `Uint8Array(256)`. Only 6 byte ids were free before the realms (SPEC_realms). A 16-bit chunk would double the memory of every chunk and the worker transfers, so it was rejected.
+Items have no such limit. `ITEMS` is a plain array, and no stack path indexes a byte table with an item id. So item-only ids move above 255 when blocks need the byte range. Armor moved from 176..199 to 300..323, and the realm blocks take 176..186. New item-only ids start at 256.
+The save carries `ids` (`IDS_VERSION`, now 2). `migrateIds` in `blocks.js` upgrades a save without `ids`: it adds 124 to each stack id in 176..199 in the inventory, the loose stacks, the armor slots, and the tile entity slots. Edits need no change, because no block ever used those ids. `persist.apply` runs it at boot, and the import runs it before `validSave`. `validSave` accepts only `ids === IDS_VERSION`, so a save from a newer id plan fails the import instead of loading wrong items. `migrateIds` is pure, so a Node test runs it on a real save from the build before the change (`tests/fixtures/save-before-ids2.json`).
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.

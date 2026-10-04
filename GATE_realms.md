@@ -4,12 +4,14 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 0: id plan
 
-- [ ] Armor ids are 300..323. `armorId(tier, piece)` returns 300 + 4 × tier + piece. (Node test.)
-- [ ] `migrateIds` maps every stack id in 176..199 to id + 124 in the inventory, the loose stacks, the armor slots, and every chest and furnace. A save with `ids: 2` passes through unchanged. (Node test on a built old save.)
-- [ ] An old save from HEAD before Phase 0 loads in Chromium with its worn armor, armor in the inventory, armor in a chest, its edits, and its homes. Armor points and durability match the old save.
-- [ ] An old export file imports and loads the same way.
+- [x] Armor ids are 300..323. `armorId(tier, piece)` returns 300 + 4 × tier + piece. (Node test.)
+- [x] `migrateIds` maps every stack id in 176..199 to id + 124 in the inventory, the loose stacks, the armor slots, and every chest and furnace. A save with `ids: 2` passes through unchanged. (Node test on a built old save.)
+- [x] An old save from HEAD before Phase 0 loads in Chromium with its worn armor, armor in the inventory, armor in a chest, its edits, and its homes. Armor points and durability match the old save.
+- [x] An old export file imports and loads the same way.
 - [ ] An item with an id of 256 or more survives every stack path: pick up, hotbar, held view model, icon, tooltip, split, drop, chest, furnace fuel and output, trash and undo, craft result, death drop, save, export, and import.
+  Note (Phase 0): armor ids 300..323 passed pick up, hotbar, held view model, icon, tooltip, move, armor slot, chest, trash and undo, craft result (recipe in the table grid), Q drop, death drop, save, export, and import. Split and furnace fuel and output need a stackable, burnable, or smeltable id of 256 or more. None exists before Phase 4 (Raw Emberite, Ember Dust, Emberite Ingot), so this item stays open until Phase 4 checks those paths.
 - [ ] Ids 176..186 are blocks and fit in a chunk byte. No B id and I id overlap. (Node test.)
+  Note (Phase 0): the Node tests prove every block id is below 255, ids 176..199 are free, and B and I do not overlap. The blocks 176..186 arrive in Phases 2, 3, 5, and 6. This item closes when the last of them exists.
 
 ## Phase 1: realm core
 

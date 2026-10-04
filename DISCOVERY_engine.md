@@ -10,6 +10,8 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `world.setBlock()` is the only write path for blocks. Wrap many edits in `beginBatch()` and `endBatch()`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, registers farming cells, and adds new dirt and grass to the grass candidate lists. `beginBatch()` does not nest: an inner `endBatch()` ends the outer batch. Check `world.batch` first (see `batched()` in `farming`).
 - Use `baseOf(id)`, not `BLOCKS[id].base`, when `id` can be `UNLOADED`. `BLOCKS[255]` is undefined.
 - `setState()` is the only function that shows or hides screens.
+- A block id is 0..254. An item-only id may be 256 or more (D46). Never index a `Uint8Array(256)` block table with an item id: it returns `undefined`, and arithmetic on it gives `NaN`. Look up `ITEMS[id]` first.
+- A change to a saved id needs a new `IDS_VERSION` and a step in `migrateIds`. Keep the old save in `tests/fixtures/` as the test input.
 - `WorldGenModule()` must read no outside state. The worker runs its source text. `src/worldgen.js` therefore has no imports; `tools/depcheck.js` fails on one.
 - A structure stamp writes only cells inside its own chunk (`structCtx` drops the others). Every placement decision uses a world hash or `column()`, never the chunk's own blocks, so neighbour chunks agree (D28).
 - A structure must stay reachable on foot. After a stamp change, run the walk check (see Pointers).
