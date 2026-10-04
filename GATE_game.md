@@ -732,3 +732,30 @@ Joe asked for grass that spreads. Spec: `SPEC_expansion.md`, "Grass spread". rsh
   - Verified 2026-10-03 on the candidate-list code: 0.134 ms at render distance 8 and 0.234 ms at 16. The first version cost 0.304 ms at 8 and failed; D45 records the fix. Frames with a grass edit also pay the normal `setBlock` cost (3–13 ms).
 - [x] Chromium: 0 console errors, 0 warnings. `npm run check` exits 0.
   - Verified 2026-10-03: the console showed 0 errors and 0 warnings over the whole session. `npm run check` exited 0 (depcheck pass, 30 tests pass, build equal).
+
+## Settings screen and anti-aliasing (Joe, 2026-10-04 11:39 CT)
+
+Joe asked for a Settings button on the pause menu, with the configurable settings moved into it, and an anti-aliasing setting. rsh picked the layout, the groups, the anti-aliasing modes, and the default (Off, the current look). The pause menu keeps the compact desktop rows (Joe, 2026-09-29).
+
+- [x] The pause menu shows a Settings button beside Resume. The title menu shows it beside Play, also while the world loads. The main view holds no setting rows.
+  - 2026-10-04, Playwright 1280×720: the title, loading (Play disabled), and pause views show the button. Settings opened in the 'loading' state.
+- [x] Settings opens a settings view in the same panel. It holds every former row: render distance, field of view, render scale, shadows, bloom + shafts, mouse sensitivity, volume, time of day, and freeze time, plus anti-aliasing. Group headings order the rows: Graphics, Controls, Sound, World.
+  - 2026-10-04: screenshot of the settings view shows all 10 rows under the 4 groups.
+- [x] Done returns to the main view. Esc in the settings view returns to the main view and does not resume the game. Esc in the main view still resumes. This holds on the pause menu and on the title menu.
+  - 2026-10-04: Esc in the settings view kept 'loading', 'menu', and 'paused'. A second Esc on the pause menu resumed. Focus returns to the Settings button.
+- [x] A resume from the settings view (a click beside the panel) and a new pause show the main view, not the settings view.
+  - 2026-10-04: the click resumed play, and the next pause showed the main view.
+- [x] Every moved setting still works: each control changes its value and its effect, saves to `clonecraft.settings`, and survives a reload. The time-of-day slider shows the current clock each time the settings view opens.
+  - 2026-10-04: all 9 moved settings plus anti-aliasing applied, saved, and reloaded (camera.fov 90, pixel ratio 0.75, dayTime 0.25 frozen).
+- [x] The anti-aliasing slider offers Off, FXAA, MSAA 2×, MSAA 4×, and MSAA 8×. The MSAA steps stop at the most samples the GPU allows for the scene target; WebGL 1 gets Off and FXAA only. The choice saves and survives a reload. A settings save with no anti-aliasing value loads as Off.
+  - 2026-10-04: this GPU allows 4 samples, so `post.aaModes` is [0, 1, 2, 4]. A save with `aa: 8` loads as MSAA 4×. A save with no `aa` loads as Off.
+- [x] Each mode renders with bloom on and with bloom off. Off shows hard stair-step edges. FXAA and MSAA show blended edge pixels on a block silhouette against the sky. (Screenshot crops and an edge-pixel count per mode.)
+  - 2026-10-04, blended edge pixels of 300 (bloom on / off): Off 0 / 0, FXAA 213 / 221, MSAA 2× 147 / 147, MSAA 4× 209 / 209. `gl.getError()` 0 in all 8 renders.
+- [x] Light shafts still render with MSAA, so the depth texture resolves.
+  - 2026-10-04: at sunrise, facing the sun, Off and MSAA 4× show the same glow and shafts (mean difference 1.5/255). A 4-sample depth texture reads back geometry (33 % of pixels).
+- [x] Twenty mode switches leave the texture count in `renderer.info.memory` where it started. `gl.getError()` returns 0.
+  - 2026-10-04: bloom on 35 → 35. Bloom off 33 → 33 → 33 (two runs of 20). `gl.getError()` 0. A first switch from a bloom-on start frees the unused scene target (35 → 33); the count never grows.
+- [x] The settings view text is at least 14 px and readable on a white sky and a night sky (R2). The view fits in a 1280×720 window, or it scrolls to Done.
+  - 2026-10-04: the smallest text is 14 px (group headings). Noon and night screenshots read clearly on the dark panel. The panel fits: scrollHeight 543 = clientHeight 543.
+- [x] Chromium: 0 console errors and 0 warnings. `npm run check` exits 0.
+  - 2026-10-04: the Playwright session log holds 0 errors and 0 warnings. `npm run check` exits 0: depcheck passes, 63/63 tests pass, and index.html equals a fresh build.

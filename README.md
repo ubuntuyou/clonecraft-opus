@@ -103,7 +103,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 - Export World downloads the current world as a JSON file. Import World opens a world from such a file. If that seed already has a save, the game asks before it replaces the save.
 - Procedural WebAudio sound effects and point particles.
 - Bloom on the sun, moon, torch flames, and water glint. Light shafts from the sun or moon through gaps in leaves, terrain, and clouds.
-- Settings for render distance, field of view, mouse sensitivity, volume, shadows, bloom and light shafts, render scale, the time of day, and freeze time. The browser keeps them in `localStorage`.
+- A Settings screen, opened from the title or pause menu, for render distance, field of view, render scale, anti-aliasing (Off, FXAA, or MSAA up to the GPU limit), shadows, bloom and light shafts, mouse sensitivity, volume, the time of day, and freeze time. The browser keeps them in `localStorage`.
 
 ## Test handle
 

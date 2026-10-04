@@ -122,6 +122,9 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - A block placement goes to the face the ray hits. A ray into a hole below grade hits the face in front of the hole. Look down into the hole from above.
 - The slam starts only when the player's feet are below the floor + 3 (y 100). A QA script that hovers at feet y 101.5 fights the boss without slams.
 - The slam damage is a shockwave (`col.wave`). It hits only feet below the floor + 0.6 (y 97.6), once, as its edge passes. Measure a QA distance from `col.wave.x/z`, not from the boss: the boss drifts toward the player before the slam.
+- The settings view is not a game state. Code that must know whether it is open reads `#settingsView.hidden`. Esc in that view goes to a capture listener in `menus.js`, which stops the event before `player.js` resumes the game.
+- `post.aaModes` depends on the GPU (here [0, 1, 2, 4]). A QA script must not expect MSAA 8×. `CONFIG.aa` keeps the saved value; `post.aaMode()` gives the mode that runs.
+- With bloom off and AA off, `post` draws to the canvas and leaves `sceneRT` alone. So `renderer.info.memory.textures` drops by 2 when a samples change frees the unused `sceneRT`. Compare texture counts from a steady state.
 
 ## Pointers
 

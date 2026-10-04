@@ -48,7 +48,7 @@ The world sorts requests by distance and view direction.
 
 ### D8. Two render passes, with post-processing on the world pass
 
-The loop calls `post.render()` for the world, clears depth, then renders the held item (`vmScene`, `vmCamera`). The held item never clips into walls. It also never blooms or catches light shafts.
+The loop calls `post.render()` for the world, clears depth, then renders the held item (`vmScene`, `vmCamera`). The held item never clips into walls. It also never blooms, catches light shafts, or gets anti-aliasing.
 `renderer.info.autoReset` is off, so the debug screen counts all passes.
 
 ### D13. Post-processing is one module with one entry point
@@ -199,7 +199,7 @@ Moonlight is the night floor of `game.clearDaylight` (4.5/15) plus the moon's di
 
 ### D35. Shadows and bloom are separate settings
 
-The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the depth pass redraws the scene), so `CONFIG.shadows` and `CONFIG.bloom` are separate booleans. `shadows.render` reads only `CONFIG.shadows`; `post` reads only `CONFIG.bloom`. Light shafts stay with bloom because they need `sceneRT` and the composite pass. The pause menu is for a desktop mouse, so its rows are compact and do not use the 44 px touch targets (Joe, 2026-09-29).
+The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the depth pass redraws the scene), so `CONFIG.shadows` and `CONFIG.bloom` are separate booleans. `shadows.render` reads only `CONFIG.shadows`; `post` reads `CONFIG.bloom` and `CONFIG.aa` (D54). Light shafts stay with bloom because they need `sceneRT` and the composite pass. The settings view is for a desktop mouse, so its rows are compact and do not use the 44 px touch targets (Joe, 2026-09-29).
 
 ### D34. Leaves pass the player through one collision table
 
@@ -297,6 +297,14 @@ A pylon is a plain block (`B.PYLON`) that worldgen places (`WG.PYLONS`). A broke
 The save holds one field for the fight: `realm.boss.defeated`. `boss.update` spawns the boss only while it is false. The exit portal is ordinary edits (`buildExitPortal`), so the save keeps it. The HP is not saved. Leaving the realm clears `mobs[]`, so every visit starts a full fight.
 The kill sets `victoryPending`. The victory screen waits until the state is 'playing' and the player is alive, so it never covers the death screen or the inventory.
 The slam and the shard fan are separate timers. The fan and summon timers run during a slam, so a slam never delays them. The slam shockwave is boss state (`col.wave`), not a particle. The sparks are drawn at the hit edge every frame, so the visible ring and the damage cannot drift apart.
+
+### D54. Anti-aliasing lives in `post`; settings are a view, not a state
+
+The renderer is created with `antialias: false`, and a context attribute cannot change at runtime. So `post` does all anti-aliasing, and `CONFIG.aa` picks the mode: 0 off, 1 FXAA, 2/4/8 MSAA samples.
+MSAA sets `sceneRT.samples`. A change of the count disposes `sceneRT`, and the next render rebuilds it. Three r160 resolves both color and depth after the render, so the light-shaft mask still reads a plain depth texture.
+`post.aaModes` lists the modes this GPU can run. The MSAA cap comes from the sample limit of the scene target format; WebGL 1 gets Off and FXAA only. `post.aaMode()` clamps a saved mode down to that list, so a save from a stronger GPU still loads.
+FXAA is the last full-screen pass and works in gamma space (D5). With bloom on, the composite writes to an 8-bit `ldrRT`, then FXAA draws to the canvas. With bloom off and AA on, the world renders into `sceneRT`, then FXAA or a copy draws it. With bloom off and AA off, the world draws straight to the canvas, as before.
+The overlay panel has two views: the main view and the settings view. The views are not game states, so no state check changes. A capture keydown listener in `menus.js` takes Esc while the settings view is open, before the Esc resume in `player.js`. Any state that hides the overlay resets the panel to the main view.
 
 ### D50. Ember fortresses sit on a 96-block grid with parity offsets
 

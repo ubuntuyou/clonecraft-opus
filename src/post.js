@@ -2,6 +2,11 @@
 // `post` renders the scene into an offscreen target, then adds bloom (a 5-level blur chain)
 // and light shafts toward the sun or the moon. It uses half-float targets when the GPU has
 // them. glowGain sets the bloom strength; post writes it through setGlowGain().
+// Anti-aliasing (CONFIG.aa): 0 off, 1 FXAA, 2/4/8 MSAA samples. The canvas is created
+// without antialias, and a WebGL context cannot change that later. So MSAA multisamples
+// sceneRT (three resolves color and depth after each render), and FXAA is the last pass.
+// With bloom off and AA off, the scene draws straight to the canvas, as before.
+// `aaModes` lists the modes this GPU can run; aaMode() maps CONFIG.aa onto it.
 import { THREE } from './three.js';
 import { CONFIG, glowGain, setGlowGain } from './config.js';
 import { CLOUD_GLSL, cloudUniforms } from './clouds.js';
@@ -23,6 +28,19 @@ const post = (() => {
   };
   const sceneRT = makeRT(true), mips = [], shaftA = makeRT(false), shaftB = makeRT(false);
   for (let i = 0; i < LEVELS; i++) mips.push(makeRT(false));
+  // The composite writes here when FXAA follows it: 8 bits, because the composite output is final LDR.
+  const ldrRT = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false });
+
+  // MSAA needs WebGL 2. The sample cap is per format, so ask for the scene target's format.
+  const msaaMax = (() => {
+    if (!renderer.capabilities.isWebGL2) return 0;
+    const gl = renderer.getContext();
+    try { return Math.max(0, ...(gl.getInternalformatParameter(gl.RENDERBUFFER, hdr ? gl.RGBA16F : gl.RGBA8, gl.SAMPLES) || [])); }
+    catch (e) { return 0; }
+  })();
+  const aaModes = [0, 1, 2, 4, 8].filter((m) => m < 2 || m <= msaaMax);
+  // The mode to run: the largest available mode at or below CONFIG.aa.
+  const aaMode = () => aaModes.reduce((best, m) => (m <= CONFIG.aa ? m : best), 0);
 
   // one full-screen triangle
   const tri = new THREE.BufferGeometry();
@@ -116,12 +134,47 @@ const post = (() => {
       float n = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
       gl_FragColor = vec4(c + (n - 0.5) / 255.0, 1.0);
     }`);
+  // FXAA (the compact Lottes/Geeks3D form): blend along the local edge direction when the edge
+  // contrast is high enough. The input is clamped to 0..1, because the canvas clamps anyway.
+  const fxaa = material({ tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } }, `
+    uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
+    vec3 s(vec2 uv) { return min(texture2D(tSrc, uv).rgb, vec3(1.0)); }
+    void main() {
+      const vec3 L = vec3(0.299, 0.587, 0.114);
+      vec3 m = s(vUv);
+      // "north" is -y here, as in the source formula; the direction math below depends on it
+      float nw = dot(s(vUv + vec2(-1.0, -1.0) * uTexel), L), ne = dot(s(vUv + vec2(1.0, -1.0) * uTexel), L);
+      float sw = dot(s(vUv + vec2(-1.0, 1.0) * uTexel), L), se = dot(s(vUv + vec2(1.0, 1.0) * uTexel), L);
+      float lm = dot(m, L);
+      float lo = min(lm, min(min(nw, ne), min(sw, se))), hi = max(lm, max(max(nw, ne), max(sw, se)));
+      vec2 dir = vec2(-((nw + ne) - (sw + se)), (nw + sw) - (ne + se));
+      float reduce = max((nw + ne + sw + se) * (0.25 / 8.0), 1.0 / 128.0);
+      dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + reduce), -8.0, 8.0) * uTexel;
+      vec3 a = 0.5 * (s(vUv + dir * (1.0 / 3.0 - 0.5)) + s(vUv + dir * (2.0 / 3.0 - 0.5)));
+      vec3 b = a * 0.5 + 0.25 * (s(vUv - dir * 0.5) + s(vUv + dir * 0.5));
+      float lb = dot(b, L);
+      gl_FragColor = vec4(lb < lo || lb > hi ? a : b, 1.0);
+    }`);
+  const copy = material({ tSrc: { value: null } }, `
+    uniform sampler2D tSrc; varying vec2 vUv;
+    void main() { gl_FragColor = vec4(texture2D(tSrc, vUv).rgb, 1.0); }`);
+  // Draws `src` to the canvas: through FXAA when the mode is 1, else as a plain copy.
+  function present(src, mode) {
+    if (mode === 1) { fxaa.uniforms.tSrc.value = src.texture; fxaa.uniforms.uTexel.value.set(1 / src.width, 1 / src.height); pass(fxaa, null); }
+    else { copy.uniforms.tSrc.value = src.texture; pass(copy, null); }
+  }
+  // A new sample count needs new framebuffers: dispose() frees them, and the next render rebuilds them.
+  function setSamples(n) {
+    if (sceneRT.samples === n) return;
+    sceneRT.samples = n;
+    sceneRT.dispose();
+  }
 
   const size = new THREE.Vector2();
   function resize() {
     renderer.getDrawingBufferSize(size);
     const w = Math.max(1, size.x), h = Math.max(1, size.y);
-    sceneRT.setSize(w, h);
+    sceneRT.setSize(w, h); ldrRT.setSize(w, h);
     for (let i = 0; i < LEVELS; i++) mips[i].setSize(Math.max(1, w >> (i + 1)), Math.max(1, h >> (i + 1)));
     shaftA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2)); shaftB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
     mask.uniforms.uAspect.value = w / h;
@@ -157,7 +210,9 @@ const post = (() => {
   function render() {
     setGlowGain(CONFIG.bloom && hdr ? 2 : 1);
     terrainUniforms.uGlow.value = glowGain;
-    if (!CONFIG.bloom) {
+    const aa = aaMode();
+    setSamples(aa >= 2 ? aa : 0);
+    if (!CONFIG.bloom && aa === 0) {
       renderer.setRenderTarget(null);
       renderer.clear();
       renderer.render(scene, camera);
@@ -166,6 +221,7 @@ const post = (() => {
     renderer.setRenderTarget(sceneRT);
     renderer.clear();
     renderer.render(scene, camera);
+    if (!CONFIG.bloom) { present(sceneRT, aa); return; }
 
     // bloom chain
     bright.uniforms.tSrc.value = sceneRT.texture;
@@ -194,9 +250,10 @@ const post = (() => {
       pass(radial, shaftB);
       composite.uniforms.tShaft.value = shaftB.texture;
     }
-    pass(composite, null);
+    if (aa === 1) { pass(composite, ldrRT); present(ldrRT, 1); }
+    else pass(composite, null);
   }
-  return { render, resize, hdr };
+  return { render, resize, hdr, aaModes, aaMode };
 })();
 
 export { post };

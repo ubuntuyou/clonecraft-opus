@@ -13,6 +13,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Settings screen: a Settings button beside Play or Resume opens the settings in the same panel. The rows are grouped under Graphics, Controls, Sound, and World. Done or Esc returns to the menu.
+- Anti-aliasing setting: Off (the default), FXAA, or MSAA 2×, 4×, or 8×. MSAA stops at the most samples the GPU allows. Each mode works with bloom on or off.
 - Prism Colossus (SPEC_realms.md, Phase 6): a boss fight on the Crystal Realm arena.
   - 6 voidstone pillars ring the arena. A Resonance Pylon on each top gives crystal light 15 and a beam to the boss. Any hit or an arrow breaks a pylon. It drops nothing.
   - The boss wakes within 32 blocks of the center. A boss bar shows its HP and hides at 64 blocks.

@@ -63,6 +63,7 @@ const CONFIG = {
   shadows: true,               // sun and moon shadows (pause menu "Shadows")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
   renderScale: 1,              // share of the window's pixels drawn, 0.5..1 (pause menu "Render scale")
+  aa: 0,                       // anti-aliasing: 0 off, 1 FXAA, 2/4/8 MSAA samples (settings "Anti-aliasing"; post.js)
   dayLength: 900,              // seconds for a full day/night cycle
   freezeTime: false,           // true stops the day/night cycle (pause menu "Freeze time")
   doorCloseDelay: 5,           // seconds before an open door closes by itself
@@ -74,6 +75,7 @@ try {
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
   for (const k of ['freezeTime', 'shadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
   if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
+  if ([0, 1, 2, 4, 8].includes(saved.aa)) CONFIG.aa = saved.aa;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
 } catch (e) { /* storage blocked: keep defaults */ }
 if (urlParams.has('fx')) { const fx = parseInt(urlParams.get('fx'), 10) || 0; CONFIG.shadows = !!(fx & 1); CONFIG.bloom = !!(fx & 2); }   // 1 shadows, 2 bloom + shafts, 3 both
@@ -81,7 +83,7 @@ if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseI
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
-    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, freezeTime: CONFIG.freezeTime })); } catch (e) {}
+    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, aa: CONFIG.aa, freezeTime: CONFIG.freezeTime })); } catch (e) {}
 }
 
 const ckey = (cx, cz) => (((cx + 32768) & 0xffff) * 65536) + ((cz + 32768) & 0xffff);

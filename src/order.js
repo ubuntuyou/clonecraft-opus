@@ -134,4 +134,4 @@ import './ash.js';
 import './boot.js';
 import './shadows.js';
 export { heldLight } from './held-light.js';
-import './post.js';
+export { post } from './post.js';

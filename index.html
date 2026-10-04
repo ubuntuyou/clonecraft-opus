@@ -118,6 +118,9 @@
   .settings .chks { display: flex; gap: 20px; }
   .settings .chk { display: flex; align-items: center; gap: 8px; min-height: 26px; justify-self: start; cursor: pointer; }   /* the label text is part of the hit area */
   .settings input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: #8b8b8b; cursor: pointer; }
+  .settings .group { grid-column: 1 / -1; margin-top: 8px; font-weight: bold; color: #ffff55; text-shadow: 1px 1px 0 #3f3f00; }   /* the .controls key color */
+  .settings .group:first-child { margin-top: 0; }
+  .heading { font-size: 28px; font-weight: 900; letter-spacing: 2px; margin: 2px 0 10px; text-shadow: 2px 2px 0 #3f3f3f; }
   .btn { display: inline-block; min-width: 220px; min-height: 44px; padding: 9px 16px; margin: 6px; font: inherit; font-size: 16px; color: #fff;
     background: #707070; border: 2px solid #000; box-shadow: inset 2px 2px 0 #aaa, inset -2px -2px 0 #4a4a4a;
     text-shadow: 2px 2px 0 #3f3f3f; cursor: pointer; transition: background .12s, transform .12s; }
@@ -308,6 +311,7 @@ const CONFIG = {
   shadows: true,               // sun and moon shadows (pause menu "Shadows")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
   renderScale: 1,              // share of the window's pixels drawn, 0.5..1 (pause menu "Render scale")
+  aa: 0,                       // anti-aliasing: 0 off, 1 FXAA, 2/4/8 MSAA samples (settings "Anti-aliasing"; post.js)
   dayLength: 900,              // seconds for a full day/night cycle
   freezeTime: false,           // true stops the day/night cycle (pause menu "Freeze time")
   doorCloseDelay: 5,           // seconds before an open door closes by itself
@@ -319,6 +323,7 @@ try {
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
   for (const k of ['freezeTime', 'shadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
   if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
+  if ([0, 1, 2, 4, 8].includes(saved.aa)) CONFIG.aa = saved.aa;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
 } catch (e) { /* storage blocked: keep defaults */ }
 if (urlParams.has('fx')) { const fx = parseInt(urlParams.get('fx'), 10) || 0; CONFIG.shadows = !!(fx & 1); CONFIG.bloom = !!(fx & 2); }   // 1 shadows, 2 bloom + shafts, 3 both
@@ -326,7 +331,7 @@ if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseI
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
-    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, freezeTime: CONFIG.freezeTime })); } catch (e) {}
+    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, aa: CONFIG.aa, freezeTime: CONFIG.freezeTime })); } catch (e) {}
 }
 
 const ckey = (cx, cz) => (((cx + 32768) & 0xffff) * 65536) + ((cz + 32768) & 0xffff);
@@ -9639,14 +9644,22 @@ const hud = {
 hud.build();
 
 // ---- menus and settings -------------------------------------------------------------
+// The overlay panel (#menuPanel) serves the title menu, the loading screen, and the pause menu.
+// It has two views: the main view (#mainView) and the settings view (#settingsView). The
+// views are not game states: the state stays 'loading', 'menu', or 'paused'. Esc in the
+// settings view returns to the main view (a capture listener runs before player.js's Esc).
+// Any state that hides the overlay also resets the panel to the main view.
 
 const overlayEl = $('overlay'), deathEl = $('death'), travelEl$1 = $('travel'), victoryEl = $('victory'), playBtn = $('playBtn');
+const panelEl = $('menuPanel'), mainView = $('mainView'), settingsView = $('settingsView');
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 $('seedText').textContent = `Seed ${SEED} · the world saves itself · ?seed=${SEED} reopens it`;
 
 function setState(s) {
   game.state = s;
-  overlayEl.classList.toggle('show', s === 'loading' || s === 'menu' || s === 'paused');
+  const overlay = s === 'loading' || s === 'menu' || s === 'paused';
+  overlayEl.classList.toggle('show', overlay);
+  if (!overlay) showSettings(false);
   invEl.classList.toggle('show', s === 'inventory');
   homesEl.classList.toggle('show', s === 'homes');
   deathEl.classList.toggle('show', s === 'dead');
@@ -9694,6 +9707,22 @@ function showVictory() {
 }
 $('victoryBtn').addEventListener('click', () => resumeGame(false));
 
+// Switches the panel between the main view (false) and the settings view (true).
+function showSettings(on) {
+  if (settingsView.hidden === !on) return;
+  mainView.hidden = on; settingsView.hidden = !on;
+  panelEl.scrollTop = 0;
+  if (on) { syncTimeSetting(); syncAA(); $('settingsDone').focus(); }
+  else if (overlayEl.classList.contains('show')) $('settingsBtn').focus();
+}
+$('settingsBtn').addEventListener('click', () => showSettings(true));
+$('settingsDone').addEventListener('click', () => showSettings(false));
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape' || settingsView.hidden) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!e.repeat) showSettings(false);
+}, true);
+
 function bindSetting(id, valId, key, fmt, apply) {
   const el = $(id), val = $(valId);
   el.value = CONFIG[key]; val.textContent = fmt(CONFIG[key]);
@@ -9709,6 +9738,20 @@ bindSetting('setSens', 'valSens', 'sensitivity', (v) => `${(+v).toFixed(2)}×`);
 bindSetting('setVol', 'valVol', 'volume', (v) => `${Math.round(v * 100)}%`, (v) => audio.setVolume(v));
 // The window resize handler (main.js) applies the new pixel ratio and resizes the post-processing targets.
 bindSetting('setScale', 'valScale', 'renderScale', (v) => `${Math.round(v * 100)}%`, () => dispatchEvent(new Event('resize')));
+// Anti-aliasing: the slider steps through post.aaModes (the modes this GPU can run).
+// post loads after this module, so the slider syncs when the settings view opens.
+const aaEl = $('setAA'), aaVal = $('valAA');
+const aaText = (m) => (m === 0 ? 'Off' : m === 1 ? 'FXAA' : `MSAA ${m}×`);
+function syncAA() {
+  aaEl.max = post.aaModes.length - 1;
+  aaEl.value = post.aaModes.indexOf(post.aaMode());
+  aaVal.textContent = aaText(post.aaMode());
+}
+aaEl.addEventListener('input', () => {
+  CONFIG.aa = post.aaModes[+aaEl.value];
+  aaVal.textContent = aaText(CONFIG.aa);
+  saveSettings();
+});
 for (const [id, key] of [['setShadows', 'shadows'], ['setBloom', 'bloom']]) {
   const el = $(id);
   el.checked = CONFIG[key];
@@ -11782,6 +11825,11 @@ const heldLight = (() => {
 // `post` renders the scene into an offscreen target, then adds bloom (a 5-level blur chain)
 // and light shafts toward the sun or the moon. It uses half-float targets when the GPU has
 // them. glowGain sets the bloom strength; post writes it through setGlowGain().
+// Anti-aliasing (CONFIG.aa): 0 off, 1 FXAA, 2/4/8 MSAA samples. The canvas is created
+// without antialias, and a WebGL context cannot change that later. So MSAA multisamples
+// sceneRT (three resolves color and depth after each render), and FXAA is the last pass.
+// With bloom off and AA off, the scene draws straight to the canvas, as before.
+// `aaModes` lists the modes this GPU can run; aaMode() maps CONFIG.aa onto it.
 
 const post = (() => {
   const hdr = renderer.capabilities.isWebGL2 &&
@@ -11796,6 +11844,19 @@ const post = (() => {
   };
   const sceneRT = makeRT(true), mips = [], shaftA = makeRT(false), shaftB = makeRT(false);
   for (let i = 0; i < LEVELS; i++) mips.push(makeRT(false));
+  // The composite writes here when FXAA follows it: 8 bits, because the composite output is final LDR.
+  const ldrRT = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false });
+
+  // MSAA needs WebGL 2. The sample cap is per format, so ask for the scene target's format.
+  const msaaMax = (() => {
+    if (!renderer.capabilities.isWebGL2) return 0;
+    const gl = renderer.getContext();
+    try { return Math.max(0, ...(gl.getInternalformatParameter(gl.RENDERBUFFER, hdr ? gl.RGBA16F : gl.RGBA8, gl.SAMPLES) || [])); }
+    catch (e) { return 0; }
+  })();
+  const aaModes = [0, 1, 2, 4, 8].filter((m) => m < 2 || m <= msaaMax);
+  // The mode to run: the largest available mode at or below CONFIG.aa.
+  const aaMode = () => aaModes.reduce((best, m) => (m <= CONFIG.aa ? m : best), 0);
 
   // one full-screen triangle
   const tri = new THREE.BufferGeometry();
@@ -11889,12 +11950,47 @@ const post = (() => {
       float n = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
       gl_FragColor = vec4(c + (n - 0.5) / 255.0, 1.0);
     }`);
+  // FXAA (the compact Lottes/Geeks3D form): blend along the local edge direction when the edge
+  // contrast is high enough. The input is clamped to 0..1, because the canvas clamps anyway.
+  const fxaa = material({ tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } }, `
+    uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
+    vec3 s(vec2 uv) { return min(texture2D(tSrc, uv).rgb, vec3(1.0)); }
+    void main() {
+      const vec3 L = vec3(0.299, 0.587, 0.114);
+      vec3 m = s(vUv);
+      // "north" is -y here, as in the source formula; the direction math below depends on it
+      float nw = dot(s(vUv + vec2(-1.0, -1.0) * uTexel), L), ne = dot(s(vUv + vec2(1.0, -1.0) * uTexel), L);
+      float sw = dot(s(vUv + vec2(-1.0, 1.0) * uTexel), L), se = dot(s(vUv + vec2(1.0, 1.0) * uTexel), L);
+      float lm = dot(m, L);
+      float lo = min(lm, min(min(nw, ne), min(sw, se))), hi = max(lm, max(max(nw, ne), max(sw, se)));
+      vec2 dir = vec2(-((nw + ne) - (sw + se)), (nw + sw) - (ne + se));
+      float reduce = max((nw + ne + sw + se) * (0.25 / 8.0), 1.0 / 128.0);
+      dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + reduce), -8.0, 8.0) * uTexel;
+      vec3 a = 0.5 * (s(vUv + dir * (1.0 / 3.0 - 0.5)) + s(vUv + dir * (2.0 / 3.0 - 0.5)));
+      vec3 b = a * 0.5 + 0.25 * (s(vUv - dir * 0.5) + s(vUv + dir * 0.5));
+      float lb = dot(b, L);
+      gl_FragColor = vec4(lb < lo || lb > hi ? a : b, 1.0);
+    }`);
+  const copy = material({ tSrc: { value: null } }, `
+    uniform sampler2D tSrc; varying vec2 vUv;
+    void main() { gl_FragColor = vec4(texture2D(tSrc, vUv).rgb, 1.0); }`);
+  // Draws `src` to the canvas: through FXAA when the mode is 1, else as a plain copy.
+  function present(src, mode) {
+    if (mode === 1) { fxaa.uniforms.tSrc.value = src.texture; fxaa.uniforms.uTexel.value.set(1 / src.width, 1 / src.height); pass(fxaa, null); }
+    else { copy.uniforms.tSrc.value = src.texture; pass(copy, null); }
+  }
+  // A new sample count needs new framebuffers: dispose() frees them, and the next render rebuilds them.
+  function setSamples(n) {
+    if (sceneRT.samples === n) return;
+    sceneRT.samples = n;
+    sceneRT.dispose();
+  }
 
   const size = new THREE.Vector2();
   function resize() {
     renderer.getDrawingBufferSize(size);
     const w = Math.max(1, size.x), h = Math.max(1, size.y);
-    sceneRT.setSize(w, h);
+    sceneRT.setSize(w, h); ldrRT.setSize(w, h);
     for (let i = 0; i < LEVELS; i++) mips[i].setSize(Math.max(1, w >> (i + 1)), Math.max(1, h >> (i + 1)));
     shaftA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2)); shaftB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
     mask.uniforms.uAspect.value = w / h;
@@ -11930,7 +12026,9 @@ const post = (() => {
   function render() {
     setGlowGain(CONFIG.bloom && hdr ? 2 : 1);
     terrainUniforms.uGlow.value = glowGain;
-    if (!CONFIG.bloom) {
+    const aa = aaMode();
+    setSamples(aa >= 2 ? aa : 0);
+    if (!CONFIG.bloom && aa === 0) {
       renderer.setRenderTarget(null);
       renderer.clear();
       renderer.render(scene, camera);
@@ -11939,6 +12037,7 @@ const post = (() => {
     renderer.setRenderTarget(sceneRT);
     renderer.clear();
     renderer.render(scene, camera);
+    if (!CONFIG.bloom) { present(sceneRT, aa); return; }
 
     // bloom chain
     bright.uniforms.tSrc.value = sceneRT.texture;
@@ -11967,9 +12066,10 @@ const post = (() => {
       pass(radial, shaftB);
       composite.uniforms.tShaft.value = shaftB.texture;
     }
-    pass(composite, null);
+    if (aa === 1) { pass(composite, ldrRT); present(ldrRT, 1); }
+    else pass(composite, null);
   }
-  return { render, resize, hdr };
+  return { render, resize, hdr, aaModes, aaMode };
 })();
 
 /* =====================================================================================
@@ -12168,11 +12268,12 @@ requestAnimationFrame(frame);</script>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <div id="overlay" class="screen show">
   <div class="menu" id="menuPanel">
+   <div id="mainView">
     <div class="title">CLONECRAFT</div>
     <div class="subtitle" id="splash">Infinite voxels!</div>
     <div id="loadbar"><i></i></div>
     <div id="loadtext">Generating terrain…</div>
-    <button class="btn" id="playBtn" disabled>Loading…</button>
+    <div><button class="btn" id="playBtn" disabled>Loading…</button><button class="btn" id="settingsBtn">Settings</button></div>
     <div class="controls">
       <b>Click</b><span>Lock the mouse and play</span>
       <b>W A S D</b><span>Move</span>
@@ -12194,22 +12295,33 @@ requestAnimationFrame(frame);</script>
       <b>F3</b><span>Toggle debug details</span>
       <b>Esc</b><span>Pause</span>
     </div>
-    <div class="settings">
-      <label for="setRd">Render distance</label><input id="setRd" type="range" min="3" max="16" step="1"><span id="valRd"></span>
-      <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
-      <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
-      <label for="setVol">Volume</label><input id="setVol" type="range" min="0" max="1" step="0.05"><span id="valVol"></span>
-      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
-      <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
-      <label for="setTime">Time of day</label><input id="setTime" type="range" min="0" max="24" step="0.25"><span id="valTime"></span>
-      <label for="setFreeze">Freeze time</label><label class="chk"><input id="setFreeze" type="checkbox"></label><span id="valFreeze"></span>
-    </div>
     <div class="btnrow">
       <button class="btn" id="newWorldBtn">New World</button>
       <button class="btn" id="exportBtn">Export World</button>
       <button class="btn" id="importBtn">Import World</button>
     </div>
     <div class="hint" id="seedText"></div>
+   </div>
+   <div id="settingsView" hidden>
+    <div class="heading">Settings</div>
+    <div class="settings">
+      <div class="group">Graphics</div>
+      <label for="setRd">Render distance</label><input id="setRd" type="range" min="3" max="16" step="1"><span id="valRd"></span>
+      <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
+      <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
+      <label for="setAA">Anti-aliasing</label><input id="setAA" type="range" min="0" max="4" step="1"><span id="valAA"></span>
+      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
+      <div class="group">Controls</div>
+      <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
+      <div class="group">Sound</div>
+      <label for="setVol">Volume</label><input id="setVol" type="range" min="0" max="1" step="0.05"><span id="valVol"></span>
+      <div class="group">World</div>
+      <label for="setTime">Time of day</label><input id="setTime" type="range" min="0" max="24" step="0.25"><span id="valTime"></span>
+      <label for="setFreeze">Freeze time</label><label class="chk"><input id="setFreeze" type="checkbox"></label><span id="valFreeze"></span>
+    </div>
+    <button class="btn" id="settingsDone">Done</button>
+    <div class="hint">Esc also returns to the menu.</div>
+   </div>
   </div>
 </div>
 

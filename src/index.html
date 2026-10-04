@@ -117,6 +117,9 @@
   .settings .chks { display: flex; gap: 20px; }
   .settings .chk { display: flex; align-items: center; gap: 8px; min-height: 26px; justify-self: start; cursor: pointer; }   /* the label text is part of the hit area */
   .settings input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: #8b8b8b; cursor: pointer; }
+  .settings .group { grid-column: 1 / -1; margin-top: 8px; font-weight: bold; color: #ffff55; text-shadow: 1px 1px 0 #3f3f00; }   /* the .controls key color */
+  .settings .group:first-child { margin-top: 0; }
+  .heading { font-size: 28px; font-weight: 900; letter-spacing: 2px; margin: 2px 0 10px; text-shadow: 2px 2px 0 #3f3f3f; }
   .btn { display: inline-block; min-width: 220px; min-height: 44px; padding: 9px 16px; margin: 6px; font: inherit; font-size: 16px; color: #fff;
     background: #707070; border: 2px solid #000; box-shadow: inset 2px 2px 0 #aaa, inset -2px -2px 0 #4a4a4a;
     text-shadow: 2px 2px 0 #3f3f3f; cursor: pointer; transition: background .12s, transform .12s; }
@@ -262,11 +265,12 @@
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <div id="overlay" class="screen show">
   <div class="menu" id="menuPanel">
+   <div id="mainView">
     <div class="title">CLONECRAFT</div>
     <div class="subtitle" id="splash">Infinite voxels!</div>
     <div id="loadbar"><i></i></div>
     <div id="loadtext">Generating terrain…</div>
-    <button class="btn" id="playBtn" disabled>Loading…</button>
+    <div><button class="btn" id="playBtn" disabled>Loading…</button><button class="btn" id="settingsBtn">Settings</button></div>
     <div class="controls">
       <b>Click</b><span>Lock the mouse and play</span>
       <b>W A S D</b><span>Move</span>
@@ -288,22 +292,33 @@
       <b>F3</b><span>Toggle debug details</span>
       <b>Esc</b><span>Pause</span>
     </div>
-    <div class="settings">
-      <label for="setRd">Render distance</label><input id="setRd" type="range" min="3" max="16" step="1"><span id="valRd"></span>
-      <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
-      <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
-      <label for="setVol">Volume</label><input id="setVol" type="range" min="0" max="1" step="0.05"><span id="valVol"></span>
-      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
-      <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
-      <label for="setTime">Time of day</label><input id="setTime" type="range" min="0" max="24" step="0.25"><span id="valTime"></span>
-      <label for="setFreeze">Freeze time</label><label class="chk"><input id="setFreeze" type="checkbox"></label><span id="valFreeze"></span>
-    </div>
     <div class="btnrow">
       <button class="btn" id="newWorldBtn">New World</button>
       <button class="btn" id="exportBtn">Export World</button>
       <button class="btn" id="importBtn">Import World</button>
     </div>
     <div class="hint" id="seedText"></div>
+   </div>
+   <div id="settingsView" hidden>
+    <div class="heading">Settings</div>
+    <div class="settings">
+      <div class="group">Graphics</div>
+      <label for="setRd">Render distance</label><input id="setRd" type="range" min="3" max="16" step="1"><span id="valRd"></span>
+      <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
+      <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
+      <label for="setAA">Anti-aliasing</label><input id="setAA" type="range" min="0" max="4" step="1"><span id="valAA"></span>
+      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
+      <div class="group">Controls</div>
+      <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
+      <div class="group">Sound</div>
+      <label for="setVol">Volume</label><input id="setVol" type="range" min="0" max="1" step="0.05"><span id="valVol"></span>
+      <div class="group">World</div>
+      <label for="setTime">Time of day</label><input id="setTime" type="range" min="0" max="24" step="0.25"><span id="valTime"></span>
+      <label for="setFreeze">Freeze time</label><label class="chk"><input id="setFreeze" type="checkbox"></label><span id="valFreeze"></span>
+    </div>
+    <button class="btn" id="settingsDone">Done</button>
+    <div class="hint">Esc also returns to the menu.</div>
+   </div>
   </div>
 </div>
 

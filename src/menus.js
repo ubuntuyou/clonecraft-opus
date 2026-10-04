@@ -1,4 +1,9 @@
 // ---- menus and settings -------------------------------------------------------------
+// The overlay panel (#menuPanel) serves the title menu, the loading screen, and the pause menu.
+// It has two views: the main view (#mainView) and the settings view (#settingsView). The
+// views are not game states: the state stays 'loading', 'menu', or 'paused'. Esc in the
+// settings view returns to the main view (a capture listener runs before player.js's Esc).
+// Any state that hides the overlay also resets the panel to the main view.
 import { CONFIG, saveSettings, SEED } from './config.js';
 import { game, input } from './engine.js';
 import { requestLock, respawn, resumeEl, resumeGame, setEscLock, setPausedAt } from './player.js';
@@ -6,15 +11,18 @@ import { resetMining } from './interact.js';
 import { invEl } from './inventory-ui.js';
 import { audio } from './audio.js';
 import { $, hud, SPLASHES } from './hud.js';
-import { persist, homesEl } from './order.js';
+import { persist, homesEl, post } from './order.js';
 
 const overlayEl = $('overlay'), deathEl = $('death'), travelEl = $('travel'), victoryEl = $('victory'), playBtn = $('playBtn');
+const panelEl = $('menuPanel'), mainView = $('mainView'), settingsView = $('settingsView');
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 $('seedText').textContent = `Seed ${SEED} · the world saves itself · ?seed=${SEED} reopens it`;
 
 function setState(s) {
   game.state = s;
-  overlayEl.classList.toggle('show', s === 'loading' || s === 'menu' || s === 'paused');
+  const overlay = s === 'loading' || s === 'menu' || s === 'paused';
+  overlayEl.classList.toggle('show', overlay);
+  if (!overlay) showSettings(false);
   invEl.classList.toggle('show', s === 'inventory');
   homesEl.classList.toggle('show', s === 'homes');
   deathEl.classList.toggle('show', s === 'dead');
@@ -62,6 +70,22 @@ function showVictory() {
 }
 $('victoryBtn').addEventListener('click', () => resumeGame(false));
 
+// Switches the panel between the main view (false) and the settings view (true).
+function showSettings(on) {
+  if (settingsView.hidden === !on) return;
+  mainView.hidden = on; settingsView.hidden = !on;
+  panelEl.scrollTop = 0;
+  if (on) { syncTimeSetting(); syncAA(); $('settingsDone').focus(); }
+  else if (overlayEl.classList.contains('show')) $('settingsBtn').focus();
+}
+$('settingsBtn').addEventListener('click', () => showSettings(true));
+$('settingsDone').addEventListener('click', () => showSettings(false));
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape' || settingsView.hidden) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!e.repeat) showSettings(false);
+}, true);
+
 function bindSetting(id, valId, key, fmt, apply) {
   const el = $(id), val = $(valId);
   el.value = CONFIG[key]; val.textContent = fmt(CONFIG[key]);
@@ -77,6 +101,20 @@ bindSetting('setSens', 'valSens', 'sensitivity', (v) => `${(+v).toFixed(2)}×`);
 bindSetting('setVol', 'valVol', 'volume', (v) => `${Math.round(v * 100)}%`, (v) => audio.setVolume(v));
 // The window resize handler (main.js) applies the new pixel ratio and resizes the post-processing targets.
 bindSetting('setScale', 'valScale', 'renderScale', (v) => `${Math.round(v * 100)}%`, () => dispatchEvent(new Event('resize')));
+// Anti-aliasing: the slider steps through post.aaModes (the modes this GPU can run).
+// post loads after this module, so the slider syncs when the settings view opens.
+const aaEl = $('setAA'), aaVal = $('valAA');
+const aaText = (m) => (m === 0 ? 'Off' : m === 1 ? 'FXAA' : `MSAA ${m}×`);
+function syncAA() {
+  aaEl.max = post.aaModes.length - 1;
+  aaEl.value = post.aaModes.indexOf(post.aaMode());
+  aaVal.textContent = aaText(post.aaMode());
+}
+aaEl.addEventListener('input', () => {
+  CONFIG.aa = post.aaModes[+aaEl.value];
+  aaVal.textContent = aaText(CONFIG.aa);
+  saveSettings();
+});
 for (const [id, key] of [['setShadows', 'shadows'], ['setBloom', 'bloom']]) {
   const el = $(id);
   el.checked = CONFIG[key];
