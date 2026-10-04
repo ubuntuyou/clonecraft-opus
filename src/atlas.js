@@ -404,6 +404,15 @@ paintTile('ember_bricks', (P, rng) => {
     P.set(x, y, c);
   });
 });
+// Ember portal: a spiral of orange and gold bands on deep crimson. The mesher draws the pane with an
+// animated shader swirl; this tile serves break particles and the fallback look.
+paintTile('portal_ember', (P, rng) => {
+  P.fill((x, y) => {
+    const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const band = 0.5 + 0.5 * Math.sin(a * 2 + r * 0.9 + rng() * 0.6);
+    P.set(x, y, mix3([96, 14, 18], [255, 170, 60], clamp(band * band * (1.1 - r / 14), 0, 1)));
+  });
+});
 paintTile('cracked_bricks', (P, rng) => {
   paintBricks(P, rng);
   for (let c = 0; c < 3; c++) {   // cracks: short random walks in dark gray

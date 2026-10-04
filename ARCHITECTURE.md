@@ -273,6 +273,15 @@ State 'travel' stops the simulation while the target loads, as 'loading' does at
 `emberChunk` in `worldgen.js` builds the Ember Realm from a 3D density field: two simplex octaves, a floor height, and a ceiling height. The field is sampled on a 4×4×4 grid and interpolated, so one chunk costs about 1.2 ms. Every ember noise takes its own seed (`SEED ^ 0xe3be5`), never `S()`. So the overworld noise sequence, and its golden hashes, do not change.
 The bedrock roof keeps sky light at 0 in the whole realm. The realm needs a light floor instead, so unlit caves are not black. The floor is `REALMS.ember.ambient` (block light level 9). It applies in two places, and both read the same number. `sky.js` sets the terrain uniform `uAmbient` (curveB of the level, tinted red-orange). `world.brightnessAt` never returns less than the level, so mobs, drops, particles, and the held item match the terrain. `realm.enter` copies the level into `world.ambient`.
 
+### D49. Portal geometry is pure; portal blocks exist only as edits
+
+`portal-frame.js` holds the frame check, the nearest-portal search, and the build plan. It reads blocks through a `get(x, y, z)` argument and has no state, so Node tests run it on a plain map. `portals.js` applies its results to the world: ignition, removal, the travel timer, linking, the hum, and the vignette.
+Generation never makes `PORTAL_EMBER`. So every portal cell is an override, and the link search scans the target realm's stashed override map. It needs no chunk of the target realm. A built portal is ordinary edits, so the save keeps it with no extra field.
+`portals.cells` mirrors the portal cells of the loaded realm for the sparks and the hum. It rebuilds when `world.overrides` changes identity, which happens at a realm switch and at a load.
+Removal runs from `world.onEdit`. An edit that changes a portal cell, or that removes obsidian next to one, floods the connected portal cells to air. Placing a block into the pane works because the pane is replaceable.
+The pane is one double-sided quad in the water pass, so it blends with the transparent geometry and casts no shadow.
+Every 'travel' state disarms the portal: portal travel, respawn, and home travel. The player must step out of the pane before the timer runs again. So an arrival inside a portal never sends the player straight back.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -286,6 +295,7 @@ The bedrock roof keeps sky light at 0 in the whole realm. The realm needs a ligh
 | world to mobs | `onChunkLoaded(chunk)` and `onChunkUnloaded(chunk)` hooks. |
 | block edits | `world.setBlock(x, y, z, id)` is the only write path. `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
 | world to liquids, leaves, farming, and grass | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, `farming.onEdit()`, and `grass.onEdit()`. |
+| block edits to portals | `targeting.js` calls `portals.onEdit(x, y, z, old, id)` after every edit. `interact.js` calls `portals.ignite(x, y, z)` for a Magma Core on obsidian. `portals.update(dt)` runs once per frame (D49). |
 | realms to the scoped modules | `realm.leave()` takes each scoped module's `save()` and clears it. `realm.enter(stash)` calls each `load(d)`. New realm-scoped state joins both. |
 | containers | `tileEntity(x, y, z)` returns or creates the furnace or chest state. `openInventory(mode, target)` opens its screen. |
 | save | `persist.save()` writes the save. `persist.apply(SAVE)` restores it at boot. |

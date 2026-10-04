@@ -37,13 +37,14 @@ test('armor ids are 300..323 and follow 300 + 4 * tier + piece', () => {
   assert.equal(Math.min(...ids), 300);
   assert.equal(Math.max(...ids), 323);
 });
-// Ids 176..186 are the realm blocks; each phase adds its own. 181..199 stay empty until then.
+// Ids 176..186 are the realm blocks; each phase adds its own. 182..199 stay empty until then.
+// The Ember portal block (181) has no item: only ignition makes it.
 test('ids 176..199 hold only the realm blocks and their block items', () => {
-  const realm = [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE, B.EMBER_BRICKS];
+  const realm = [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE, B.EMBER_BRICKS, B.PORTAL_EMBER];
   const used = [];
   for (let id = 176; id <= 199; id++) if (BLOCKS[id] || ITEMS[id]) used.push(id);
   assert.deepEqual(used, realm);
-  for (const id of realm) assert.equal(ITEMS[id].kind, 'block');
+  for (const id of realm) if (id === B.PORTAL_EMBER) assert.equal(ITEMS[id], undefined); else assert.equal(ITEMS[id].kind, 'block');
 });
 
 // SPEC_realms Phase 2 (gate item 4): tool, hardness, and drop of each Ember Realm block.

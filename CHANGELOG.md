@@ -13,6 +13,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Ember portal (SPEC_realms.md, Phase 3): an obsidian frame lit with a Magma Core opens a portal between the overworld and the Ember Realm.
+  - A frame opening is 2..4 wide and 3..5 tall, along x or z. The corners are optional. A Magma Core on an incomplete frame shows "The frame is not complete" and keeps the core.
+  - The pane shows a moving orange swirl and sparks, gives light 11, and hums nearby. The player walks through it, and the crosshair passes through it.
+  - Breaking a frame block, or placing a block into the opening, removes the whole pane.
+  - Standing in the pane for 2.5 s travels. An orange vignette grows during the wait. Stepping out resets the timer. After arrival, the player must step out and back in to travel again.
+  - Linking uses 1:8: overworld (x, z) leads to ember (x/8, z/8). An existing portal within 16 blocks (ember) or 128 blocks (overworld) of the target is reused. Otherwise the game builds a 2×3 portal at the target, on an obsidian platform over open lava.
+  - A rider in a boat or a cart does not travel and sees "Leave the boat to travel" or "Leave the cart to travel".
 - Ember Realm terrain (SPEC_realms.md, Phase 2): the Ember Realm is now a large cave world under a bedrock roof, with a lava sea at y 31 and below.
   - New blocks: Ember Rock, Ash Sand, Ember Lamp, Emberite Ore, and Ember Bricks. New items: Raw Emberite and Ember Dust.
   - Ember Lamps hang from the roof and give light 15. Emberite Ore needs a diamond pickaxe. A vein of 1 to 3 ore forms about once per 2 chunks.

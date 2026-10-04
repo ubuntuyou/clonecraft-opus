@@ -99,7 +99,7 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
   - From the overworld, the target is (x / 8, z / 8) in the Ember Realm. From the Ember Realm, it is (x × 8, z × 8) in the overworld.
   - The target y is the overworld y − 64 (ember side, held to 33..110), or the ember y + 64 (overworld side).
   - The game looks for the nearest portal block of the same kind in the target realm: within 16 blocks horizontally in the Ember Realm, or 128 in the overworld. The player arrives in that portal.
-  - With no portal there, the game builds one: a 2×3 opening in an obsidian frame, at the nearest site within 16 blocks that has a solid floor and air for the frame. With no site, it builds a 3×4 obsidian platform at the target and clears the air above it. A built portal never stands in lava.
+  - With no portal there, the game builds one: a 2×3 opening in an obsidian frame, at the nearest site within 14 blocks that has a solid floor and air for the frame. (14, not 16: 14 × 8 = 112 keeps the return trip within the 128-block overworld link radius.) With no site, it builds a 3×4 obsidian platform at the target and clears the air above it. A built portal never stands in lava.
   - A built portal is a set of normal edits, so the save keeps it.
 
 #### Crystal Realm and the crystal portal

@@ -7,7 +7,7 @@
  *   aLight = (sky, block, ao, face shade), aTint = biome colour for tintable texels.
  * Smooth lighting: each vertex averages the light of the 4 cells around it in front of
  * the face; ambient occlusion comes from the 3 opaque neighbours of that vertex.
- * Two meshes per chunk: opaque/cutout and water (transparent).
+ * Two meshes per chunk: opaque/cutout and water (transparent). Portal panes go in the water mesh.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { ckey, CS, H, mulberry32, UNLOADED } from './config.js';
@@ -66,9 +66,10 @@ const _vx = new Int32Array(12), _vuv = new Int32Array(8), _vl = new Uint8Array(1
 // Wind sway and glow, stored in the aTint alpha: 255 = still, 128 = leaves (half sway),
 // 0 = full sway, 200 = glow (torch: bright texels are emissive), 214 = soft glow (lava, lit
 // furnace: bright texels ignore light but barely bloom), 232 = crystal (every texel glows and
-// keeps its facet shade). Plants sway only at their top vertices, so their base stays in the ground.
-const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5;
-const SWAY_ALPHA = [255, 128, 0, 200, 214, 232];
+// keeps its facet shade), 160 = portal pane (the water pass draws the swirl). Plants sway only at
+// their top vertices, so their base stays in the ground.
+const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6;
+const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160];
 const WET_ALPHA = 246;   // a still face whose neighbour cell is water: the shader draws caustics on it
 let swayMode = SWAY_NONE;
 let wetFace = false;   // emitCubeFace sets it per face
@@ -466,6 +467,17 @@ function buildChunkMesh(world, chunk) {
       part(0, 3, 2, 4, 0, 16, rail); part(0, 3, 12, 14, 0, 16, rail);   // rails stand 3/16 off the wall
       const rung = tileRect(t, 4, 1, 12, 3);
       for (const h of [2, 6, 10, 14]) part(1, 2, 4, 12, h, h + 1, rung);   // rungs sit inside the rails
+    } else if (shape === SHAPE.PORTAL) {
+      // One quad through the cell centre, in the frame plane. The pane spans x when a portal
+      // neighbour lies along x (every opening is at least 2 wide), else z. The material is
+      // double-sided, so one quad shows from both sides.
+      const along = PB[p + 1] === id || PB[p - 1] === id, X = x * 16, Y = y * 16, Z = z * 16;
+      const c = along ? [X, Y, Z + 8, X + 16, Y, Z + 8, X + 16, Y + 16, Z + 8, X, Y + 16, Z + 8]
+        : [X + 8, Y, Z + 16, X + 8, Y, Z, X + 8, Y + 16, Z, X + 8, Y + 16, Z + 16];
+      for (let i = 0; i < 12; i++) _corners[i] = c[i];
+      swayMode = SWAY_PORTAL;
+      emitFlat(wb, _corners, tileRect(FACE_TILE[id * 6], 0, 0, 16, 16), PS[p], PL[p], 0.8, WHITE);
+      swayMode = SWAY_NONE;
     } else if (shape === SHAPE.CRYSTAL) {
       swayMode = SWAY_CRYSTAL; flatCry = 15;
       crystalCluster(ob, x, y, z, id, PS[p], PL[p]);

@@ -23,7 +23,7 @@ import { keyDown } from './player.js';
 import { cellBlockedByEntity, stairBoxesAt } from './collision.js';
 import {
   farming, spawnDrop, viewModel, dropStack, inv, spillTileEntity, openInventory, mobs, vehicles, projectiles,
-  primeTnt, particles, audio, hud, realm,
+  primeTnt, particles, audio, hud, realm, portals,
 } from './order.js';
 
 const SEL_BOX = [];
@@ -437,6 +437,12 @@ function useItem() {
   if (item.kind === 'bucket') { useBucket(item); return; }
   if (item.kind === 'vehicle') { if (vehicles.placeHeld(item)) { inv.consumeHeld(1); interacted(); } return; }
   if (!t) return;
+  if (stack.id === I.MAGMA_CORE) {   // ignites an Ember portal frame (SPEC_realms Phase 3)
+    if (t.id !== B.OBSIDIAN) return;
+    const r = portals.ignite(t.x, t.y, t.z);
+    if (r === 'lit') { inv.consumeHeld(1); interacted(); } else if (r === 'open') hud.toast('The frame is not complete');
+    return;
+  }
   if (item.kind === 'bonemeal') {
     if (farming.boost(t.x, t.y, t.z)) { particles.grow(t.x, t.y, t.z); audio.pop(); inv.consumeHeld(1); interacted(); }
     return;

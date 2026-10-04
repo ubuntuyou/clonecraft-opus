@@ -359,11 +359,12 @@ const B = {
   SANDSTONE: 143, CHISELED_SANDSTONE: 144, SPAWNER: 249,
   // Ember Realm (SPEC_realms, Phase 2)
   EMBER_ROCK: 176, ASH_SAND: 177, EMBER_LAMP: 178, EMBERITE_ORE: 179, EMBER_BRICKS: 180,
+  PORTAL_EMBER: 181,  // the Ember portal pane (Phase 3); src/portals.js lights and removes it
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
 const CRYSTAL_GROW = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 0, -1]];
-const SHAPE = { NONE: 0, CUBE: 1, CROSS: 2, TORCH: 3, WATER: 4, CACTUS: 5, DOOR: 6, CRYSTAL: 7, STAIRS: 8, FARMLAND: 9, CROP: 10, RAIL: 11, LADDER: 12 };
+const SHAPE = { NONE: 0, CUBE: 1, CROSS: 2, TORCH: 3, WATER: 4, CACTUS: 5, DOOR: 6, CRYSTAL: 7, STAIRS: 8, FARMLAND: 9, CROP: 10, RAIL: 11, LADDER: 12, PORTAL: 13 };
 // Horizontal directions used by facing blocks and doors: 0 +X, 1 +Z, 2 -X, 3 -Z.
 const DIR4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const DIR_FACE = [0, 4, 1, 5];          // direction -> FACES index
@@ -536,6 +537,12 @@ defBlock(B.ASH_SAND, { name: 'Ash Sand', tex: all('ash_sand'), hardness: 0.5, to
 defBlock(B.EMBER_LAMP, { name: 'Ember Lamp', tex: all('ember_lamp'), hardness: 0.3, emit: 15, glows: true, sound: 'glass' });
 defBlock(B.EMBER_BRICKS, { name: 'Ember Bricks', tex: all('ember_bricks'), hardness: 2, tool: 'pickaxe' });
 GLOWS[B.EMBERITE_ORE] = 1;
+// The Ember portal pane (Phase 3): light 11, no collision, and the crosshair ray passes through it.
+// A placed block replaces it, which removes the whole opening (portals.onEdit). The mesher takes the
+// pane's axis from its portal neighbours.
+defBlock(B.PORTAL_EMBER, { name: 'Ember Portal', shape: SHAPE.PORTAL, tex: all('portal_ember'), opaque: false, solid: false,
+  skyFree: true, hardness: -1, emit: 11, replaceable: true, drop: null, noItem: true, sound: 'glass' });
+TARGETABLE[B.PORTAL_EMBER] = 0;
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;
@@ -819,6 +826,155 @@ function breakTime(id, stack) {
 }
 
 function setEnchantSeed(v) { enchantSeed = v; }
+
+/* =====================================================================================
+ * PORTAL FRAME — living header (src/portal-frame.js, SPEC_realms Phase 3)
+ * -------------------------------------------------------------------------------------
+ * Pure portal geometry. No module state, no world access: every function reads blocks through
+ * get(x, y, z), so Node tests call it with a plain map. src/portals.js applies the results.
+ *
+ * Frame: a vertical rectangle of obsidian along x or z. The opening is 2..4 wide and 3..5 tall
+ * and holds only air. The sides, the bottom row, and the top row are obsidian. The 4 corner
+ * cells are optional. A frame is { axis, x0, y0, z0, w, h }: axis 'x' spans x (the pane lies in
+ * the plane z = z0), axis 'z' spans z. (x0, y0, z0) is the low corner cell of the opening.
+ *
+ * Build plan: a 2x3 opening in a 4x5 frame. The first choice is the nearest site within
+ * SITE_R blocks horizontally of the target: a full solid floor, air (or a replaceable non-liquid)
+ * for the frame, one clear side to step out, and no lava near it. Without a site, the plan is the
+ * fallback platform: 4 x 3 obsidian at the frame's bottom row, air cleared above it, and every
+ * lava cell next to the structure turned to obsidian. Either way, the portal never touches lava.
+ * ===================================================================================== */
+
+const MIN_W = 2, MAX_W = 4, MIN_H = 3, MAX_H = 5;
+const SITE_R = 14;   // horizontal reach of the site search. The spec says 16; 14 keeps the 1:8 return within 128.
+const SITE_DY = 40;  // vertical reach of the site search, above and below the target
+
+// Cell (u, v) of a frame plane: u along the axis, v up. `d` offsets across the plane.
+const cellOf = (axis, x0, y0, z0, u, v, d = 0) => (axis === 'x' ? [x0 + u, y0 + v, z0 + d] : [x0 + d, y0 + v, z0 + u]);
+
+// True when the frame { axis, x0, y0, z0, w, h } is complete: an air opening in an obsidian ring.
+function frameOk(get, f) {
+  const { axis, x0, y0, z0, w, h } = f;
+  const at = (u, v) => get(...cellOf(axis, x0, y0, z0, u, v));
+  for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) if (at(u, v) !== B.AIR) return false;
+  for (let v = 0; v < h; v++) if (at(-1, v) !== B.OBSIDIAN || at(w, v) !== B.OBSIDIAN) return false;
+  for (let u = 0; u < w; u++) if (at(u, -1) !== B.OBSIDIAN || at(u, h) !== B.OBSIDIAN) return false;
+  return true;
+}
+
+// The complete frame that holds obsidian cell (x, y, z) in its ring (corners count when present),
+// or null. Smaller openings win when the cell belongs to more than one frame.
+function findFrame(get, x, y, z) {
+  if (get(x, y, z) !== B.OBSIDIAN) return null;
+  for (let h = MIN_H; h <= MAX_H; h++) for (let w = MIN_W; w <= MAX_W; w++) for (const axis of ['x', 'z']) {
+    const a = axis === 'x' ? x : z;   // the clicked cell's coordinate along the axis
+    // (u, v) of the clicked cell in the frame: u in -1..w, v in -1..h, on the ring
+    for (let v = -1; v <= h; v++) for (let u = -1; u <= w; u++) {
+      const ring = u === -1 || u === w || v === -1 || v === h;
+      if (!ring) continue;
+      const f = { axis, x0: axis === 'x' ? a - u : x, y0: y - v, z0: axis === 'z' ? a - u : z, w, h };
+      if (f.y0 < 1 || f.y0 + h >= H) continue;
+      if (frameOk(get, f)) return f;
+    }
+  }
+  return null;
+}
+
+// Every opening cell of frame f, as [x, y, z].
+function frameCells(f) {
+  const out = [];
+  for (let v = 0; v < f.h; v++) for (let u = 0; u < f.w; u++) out.push(cellOf(f.axis, f.x0, f.y0, f.z0, u, v));
+  return out;
+}
+
+// The nearest cell of `id` among override entries ([key "x,y,z", id]) within `radius` blocks
+// horizontally of (tx, tz). Ties break by the 3D distance. Returns [x, y, z] or null.
+function nearestPortal(entries, id, tx, ty, tz, radius) {
+  let best = null, bestD = Infinity;
+  for (const [k, v] of entries) {
+    if (v !== id) continue;
+    const [x, y, z] = k.split(',').map(Number);
+    const dh = (x + 0.5 - tx) ** 2 + (z + 0.5 - tz) ** 2;
+    if (dh > radius * radius) continue;
+    const d = dh + (y - ty) ** 2;
+    if (d < bestD) { bestD = d; best = [x, y, z]; }
+  }
+  return best;
+}
+
+// The cell where a traveller stands in the portal that holds cell c: the bottom of c's column.
+function portalFoot(get, c, id) {
+  let [x, y, z] = c;
+  while (y > 0 && get(x, y - 1, z) === id) y--;
+  return [x, y, z];
+}
+
+const free = (id) => id === B.AIR || (REPLACEABLE[id] && !LIQ_KIND[id] && id !== B.PORTAL_EMBER);
+const clear = (id) => id !== UNLOADED && !SOLID[id] && !LIQ_KIND[id];
+
+// True when a 4x5 frame with low outer corner (fx, fy, fz) along `axis` fits: a full floor, free
+// cells for the frame, one clear side, and no lava in the box around it.
+function siteOk(get, axis, fx, fy, fz) {
+  const at = (u, v, d) => get(...cellOf(axis, fx, fy, fz, u, v, d));
+  for (let u = 0; u < 4; u++) { const f = at(u, -1, 0); if (f === UNLOADED || !SOLID[f] || !OPAQUE[f]) return false; }
+  for (let v = 0; v < 5; v++) for (let u = 0; u < 4; u++) if (!free(at(u, v, 0))) return false;
+  const side = (d) => clear(at(1, 1, d)) && clear(at(2, 1, d)) && clear(at(1, 2, d)) && clear(at(2, 2, d));
+  if (!side(1) && !side(-1)) return false;
+  for (let d = -2; d <= 2; d++) for (let v = -1; v <= 5; v++) for (let u = -1; u <= 4; u++) {
+    const id = at(u, v, d);
+    if (LIQ_KIND[id] === 2 || id === UNLOADED) return false;
+  }
+  return true;
+}
+
+// The plan for a new Ember portal near target (tx, ty, tz): { edits: [[x, y, z, id]], stand, frame, platform }.
+// `stand` is the point where the traveller arrives (the middle of the opening's floor).
+function buildPlan(get, tx, ty, tz) {
+  const cx = Math.floor(tx), cy = Math.floor(ty), cz = Math.floor(tz);
+  let best = null, bestD = Infinity;
+  for (let dz = -SITE_R; dz <= SITE_R; dz++) for (let dx = -SITE_R; dx <= SITE_R; dx++) {
+    const dh = dx * dx + dz * dz;
+    if (dh > SITE_R * SITE_R || dh >= bestD) continue;
+    for (let dy = 0; dy <= SITE_DY && dh + dy * dy < bestD; dy++) {
+      for (const sy of dy ? [cy - dy, cy + dy] : [cy]) {   // sy: the opening's floor level
+        if (sy < 2 || sy + 5 >= H || dh + dy * dy >= bestD) continue;
+        for (const axis of ['x', 'z']) {
+          // the opening's 2 floor cells meet at (cx + dx, cz + dz): the frame starts 2 cells before
+          const fx = axis === 'x' ? cx + dx - 2 : cx + dx, fz = axis === 'z' ? cz + dz - 2 : cz + dz;
+          if (siteOk(get, axis, fx, sy - 1, fz)) { best = { axis, fx, fy: sy - 1, fz }; bestD = dh + dy * dy; break; }
+        }
+      }
+    }
+  }
+  const platform = !best;
+  if (platform) best = { axis: 'x', fx: cx - 2, fy: Math.max(1, Math.min(H - 6, cy - 1)), fz: cz };
+  const { axis, fx, fy, fz } = best;
+  const edits = [], seen = new Set();
+  const put = (c, id) => { const k = c.join(','); if (!seen.has(k)) { seen.add(k); edits.push([c[0], c[1], c[2], id]); } };
+  const cell = (u, v, d) => cellOf(axis, fx, fy, fz, u, v, d);
+  if (platform) {
+    // lava next to the structure (platform row, cleared air, frame) turns to obsidian first
+    const inBox = (u, v, d) => u >= 0 && u < 4 && v >= 0 && v < 5 && d >= -1 && d <= 1;
+    for (let d = -2; d <= 2; d++) for (let v = -1; v <= 5; v++) for (let u = -1; u <= 4; u++) {
+      if (inBox(u, v, d)) continue;
+      const touches = inBox(u + 1, v, d) || inBox(u - 1, v, d) || inBox(u, v + 1, d) || inBox(u, v - 1, d) || inBox(u, v, d + 1) || inBox(u, v, d - 1);
+      const c = cell(u, v, d);
+      if (touches && LIQ_KIND[get(...c)] === 2) put(c, B.OBSIDIAN);
+    }
+    for (let d = -1; d <= 1; d++) for (let u = 0; u < 4; u++) {
+      put(cell(u, 0, d), B.OBSIDIAN);
+      if (d) for (let v = 1; v < 5; v++) put(cell(u, v, d), B.AIR);
+    }
+  }
+  for (let v = 0; v < 5; v++) for (let u = 0; u < 4; u++) {
+    const ring = u === 0 || u === 3 || v === 0 || v === 4;
+    put(cell(u, v, 0), ring ? B.OBSIDIAN : B.PORTAL_EMBER);
+  }
+  const frame = { axis, x0: axis === 'x' ? fx + 1 : fx, y0: fy + 1, z0: axis === 'z' ? fz + 1 : fz, w: 2, h: 3 };
+  const s = cell(2, 1, 0);
+  const stand = axis === 'x' ? [s[0], s[1], s[2] + 0.5] : [s[0] + 0.5, s[1], s[2]];
+  return { edits, stand, frame, platform };
+}
 
 /* =====================================================================================
  * === 3. PROCEDURAL TEXTURE ATLAS GENERATION
@@ -1239,6 +1395,15 @@ paintTile('ember_bricks', (P, rng) => {
     else if (ly === 0 || lx === 1) c = [150, 58, 40];
     else if (ly === 6 || lx === 15) c = shade(c, 0.78);
     P.set(x, y, c);
+  });
+});
+// Ember portal: a spiral of orange and gold bands on deep crimson. The mesher draws the pane with an
+// animated shader swirl; this tile serves break particles and the fallback look.
+paintTile('portal_ember', (P, rng) => {
+  P.fill((x, y) => {
+    const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const band = 0.5 + 0.5 * Math.sin(a * 2 + r * 0.9 + rng() * 0.6);
+    P.set(x, y, mix3([96, 14, 18], [255, 170, 60], clamp(band * band * (1.1 - r / 14), 0, 1)));
   });
 });
 paintTile('cracked_bricks', (P, rng) => {
@@ -3549,7 +3714,7 @@ class World {
  *   aLight = (sky, block, ao, face shade), aTint = biome colour for tintable texels.
  * Smooth lighting: each vertex averages the light of the 4 cells around it in front of
  * the face; ambient occlusion comes from the 3 opaque neighbours of that vertex.
- * Two meshes per chunk: opaque/cutout and water (transparent).
+ * Two meshes per chunk: opaque/cutout and water (transparent). Portal panes go in the water mesh.
  * ===================================================================================== */
 
 const PAD = 18, PSY = PAD * PAD, PVOL = PSY * (H + 2);
@@ -3599,9 +3764,10 @@ const _vx = new Int32Array(12), _vuv = new Int32Array(8), _vl = new Uint8Array(1
 // Wind sway and glow, stored in the aTint alpha: 255 = still, 128 = leaves (half sway),
 // 0 = full sway, 200 = glow (torch: bright texels are emissive), 214 = soft glow (lava, lit
 // furnace: bright texels ignore light but barely bloom), 232 = crystal (every texel glows and
-// keeps its facet shade). Plants sway only at their top vertices, so their base stays in the ground.
-const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5;
-const SWAY_ALPHA = [255, 128, 0, 200, 214, 232];
+// keeps its facet shade), 160 = portal pane (the water pass draws the swirl). Plants sway only at
+// their top vertices, so their base stays in the ground.
+const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6;
+const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160];
 const WET_ALPHA = 246;   // a still face whose neighbour cell is water: the shader draws caustics on it
 let swayMode = SWAY_NONE;
 let wetFace = false;   // emitCubeFace sets it per face
@@ -3999,6 +4165,17 @@ function buildChunkMesh(world, chunk) {
       part(0, 3, 2, 4, 0, 16, rail); part(0, 3, 12, 14, 0, 16, rail);   // rails stand 3/16 off the wall
       const rung = tileRect(t, 4, 1, 12, 3);
       for (const h of [2, 6, 10, 14]) part(1, 2, 4, 12, h, h + 1, rung);   // rungs sit inside the rails
+    } else if (shape === SHAPE.PORTAL) {
+      // One quad through the cell centre, in the frame plane. The pane spans x when a portal
+      // neighbour lies along x (every opening is at least 2 wide), else z. The material is
+      // double-sided, so one quad shows from both sides.
+      const along = PB[p + 1] === id || PB[p - 1] === id, X = x * 16, Y = y * 16, Z = z * 16;
+      const c = along ? [X, Y, Z + 8, X + 16, Y, Z + 8, X + 16, Y + 16, Z + 8, X, Y + 16, Z + 8]
+        : [X + 8, Y, Z + 16, X + 8, Y, Z, X + 8, Y + 16, Z, X + 8, Y + 16, Z + 16];
+      for (let i = 0; i < 12; i++) _corners[i] = c[i];
+      swayMode = SWAY_PORTAL;
+      emitFlat(wb, _corners, tileRect(FACE_TILE[id * 6], 0, 0, 16, 16), PS[p], PL[p], 0.8, WHITE);
+      swayMode = SWAY_NONE;
     } else if (shape === SHAPE.CRYSTAL) {
       swayMode = SWAY_CRYSTAL; flatCry = 15;
       crystalCluster(ob, x, y, z, id, PS[p], PL[p]);
@@ -4245,9 +4422,10 @@ const terrainUniforms = {
 const TERRAIN_VS = /* glsl */`
   attribute vec2 aUv; attribute vec4 aLight; attribute vec4 aTint; attribute float aCry;
   varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet;
+  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
   void main() {
+    vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66);                                  // portal pane (alpha 160)
     vUv = aUv / 4096.0; vLight = aLight; vTint = aTint.rgb; vCry = aCry;
     vCrystal = step(0.88, aTint.a) * step(aTint.a, 0.94);                                // crystal faces glow
     vGlow = step(0.7, aTint.a) * step(aTint.a, 0.85) * (aTint.a > 0.82 ? 0.5 : 1.0);   // 1 glow, 0.5 soft glow
@@ -4280,7 +4458,7 @@ const TERRAIN_FS = /* glsl */`
   uniform sampler2D uCaus; uniform sampler2D uRipple;
   uniform highp sampler3D uHeld; uniform vec3 uHeldOrigin; uniform float uHeldOn; uniform float uWet;
   varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet;
+  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   float curve(float l) { return (pow(0.83, (1.0 - l) * 15.0) - 0.0611) / 0.9389; }
   // block light (torches, lava) falls off slower than sky light, so a torch reaches farther
   float curveB(float l) { return (pow(0.85, (1.0 - l) * 15.0) - 0.0874) / 0.9126; }
@@ -4324,9 +4502,29 @@ const TERRAIN_FS = /* glsl */`
     g += h * 0.055 * detail;
     return normalize(vec3(-g.x, 1.0, -g.y));
   }
+  // Phase 3: the Ember portal pane. Two reads of the caustic net, bent by moving sine fields, flow
+  // over a crimson-to-orange band pattern. The pane ignores light (it emits light 11), and its
+  // bright streaks pass 1.0 in HDR, so the bloom pass gives them a halo.
+  vec4 portalPane(vec3 n) {
+    vec2 q = (abs(n.x) > abs(n.z) ? vWorld.zy : vWorld.xy) * 0.9;
+    float t = uTime * 0.6;
+    vec2 w = vec2(sin(q.y * 2.3 + t * 1.3) + sin(q.x * 1.7 - t), cos(q.x * 2.1 - t * 1.1) + sin(q.y * 1.3 + t * 0.7));
+    float a = texture2D(uCaus, q * 0.35 + w * 0.12 + vec2(t * 0.05, -t * 0.08)).r;
+    float b = texture2D(uCaus, q * 0.6 - w * 0.1 + vec2(-t * 0.07, t * 0.04)).r;
+    float s = 0.5 + 0.5 * sin(q.x * 3.0 + q.y * 2.0 + w.x * 2.0 + w.y + t * 2.0);
+    vec3 col = mix(vec3(0.42, 0.03, 0.05), vec3(1.0, 0.36, 0.06), s);
+    col += vec3(1.0, 0.72, 0.3) * (a * 1.3 + b * 0.7) * (0.9 + (uGlow - 1.0) * 0.5);
+    return vec4(col, clamp(0.68 + 0.25 * (a + b), 0.0, 0.95));
+  }
   #endif
   void main() {
     #ifdef WATER
+      if (vPortal > 0.5) {
+        vec4 pc = portalPane(normalize(cross(dFdx(vWorld), dFdy(vWorld))));
+        float pf = smoothstep(uFogNear, uFogFar, vDist);
+        gl_FragColor = vec4(mix(pc.rgb, uFogColor, pf), mix(pc.a, 1.0, pf));
+        return;
+      }
       vec3 col = vec3(0.10, 0.27, 0.42);   // G1: fixed water color, no atlas tile
     #else
       vec4 tex = texture2D(map, vUv);
@@ -5399,6 +5597,12 @@ function useItem() {
   if (item.kind === 'bucket') { useBucket(item); return; }
   if (item.kind === 'vehicle') { if (vehicles.placeHeld(item)) { inv.consumeHeld(1); interacted(); } return; }
   if (!t) return;
+  if (stack.id === I.MAGMA_CORE) {   // ignites an Ember portal frame (SPEC_realms Phase 3)
+    if (t.id !== B.OBSIDIAN) return;
+    const r = portals.ignite(t.x, t.y, t.z);
+    if (r === 'lit') { inv.consumeHeld(1); interacted(); } else if (r === 'open') hud.toast('The frame is not complete');
+    return;
+  }
   if (item.kind === 'bonemeal') {
     if (farming.boost(t.x, t.y, t.z)) { particles.grow(t.x, t.y, t.z); audio.pop(); inv.consumeHeld(1); interacted(); }
     return;
@@ -5902,6 +6106,7 @@ const grass = (() => {
 
 world.onEdit = (x, y, z, old, id) => {
   liquids.wake(x, y, z); leafDecay.onEdit(x, y, z, old, id); farming.onEdit(x, y, z, old, id); grass.onEdit(x, y, z, old, id);
+  portals.onEdit(x, y, z, old, id);
 };
 
 // ---- selection outline and crack overlay -------------------------------------------
@@ -8327,6 +8532,13 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });
     },
+    portal(x, y, z, alongX) {   // a spark drifts off an Ember portal pane (cell x, y, z)
+      const off = randRange(-0.6, 0.6), c = Math.random();
+      emit(x + (alongX ? Math.random() : 0.5 + off * 0.2), y + Math.random(), z + (alongX ? 0.5 + off * 0.2 : Math.random()),
+        alongX ? randRange(-0.15, 0.15) : off, randRange(-0.1, 0.35), alongX ? off : randRange(-0.15, 0.15),
+        { color: c < 0.45 ? [1, 0.5, 0.12] : c < 0.8 ? [1, 0.78, 0.3] : [0.95, 0.22, 0.4], life: randRange(0.8, 1.6),
+          size: randRange(0.04, 0.08), grav: -0.15, drag: 1.2, flags: 6 });
+    },
     tntSpark(x, y, z) {   // sparks and smoke from a burning TNT fuse
       for (let i = 0; i < 3; i++) emit(x, y, z, randRange(-0.8, 0.8), randRange(1, 2.2), randRange(-0.8, 0.8),
         { color: Math.random() < 0.5 ? [1, 0.85, 0.4] : [1, 0.5, 0.12], life: randRange(0.2, 0.4), size: 0.06, grav: 6, drag: 1, flags: 2 });
@@ -9234,6 +9446,193 @@ function defaultTarget(name) {
 }
 
 const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('travelBar').firstChild;
+
+/* =====================================================================================
+ * PORTALS — living header (src/portals.js, SPEC_realms Phase 3)
+ * -------------------------------------------------------------------------------------
+ * The Ember portal at run time. src/portal-frame.js holds the pure geometry (frame check,
+ * nearest portal, build plan); this module applies it to the world.
+ *
+ * Ignition: a Magma Core on a frame block fills the opening with PORTAL_EMBER (interact.js
+ * calls ignite). Removal: world.onEdit reports every edit. An edit that changes a portal cell, or
+ * that removes an obsidian cell next to one, removes every connected portal cell.
+ *
+ * Travel: while the player's body touches a portal cell, the timer runs and an orange
+ * vignette grows. At TRAVEL_T seconds the player travels. A step out resets the timer. Every
+ * travel of any kind (and the load) disarms the portal until the player touches no portal cell. A rider
+ * gets a toast and does not travel.
+ *
+ * Linking: the target point is realms.defaultTarget (1:8, ember y = overworld y - 64, held to
+ * 33..110). The nearest portal cell in the target realm's overrides wins: within 16 blocks
+ * horizontally in the Ember Realm, 128 in the overworld. Portal cells exist only as edits, so the
+ * search needs no chunk. Without one, arrive() builds a portal at the target (buildPlan) once
+ * the chunks there are meshed. A built portal is normal edits, so the save keeps it.
+ *
+ * `cells` mirrors the portal cells of the loaded realm for particles and the hum. It rebuilds
+ * when world.overrides changes identity (a realm switch or a load).
+ * ===================================================================================== */
+
+const TRAVEL_T = 2.5;               // seconds in the portal before travel
+const LINK_R = { ember: 16, overworld: 128 };
+const HUM_R = 12, SPARK_R = 16;     // reach of the hum and of the sparks, in blocks
+const P = B.PORTAL_EMBER;
+const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
+const portals = (() => {
+  const cells = new Set();          // "x,y,z" of every portal cell in the loaded realm
+  let known = null;                 // the override map that `cells` mirrors
+  let t = 0, armed = false, warned = false, removing = false;
+  const get = (x, y, z) => world.getBlock(x, y, z);
+
+  function sync() {
+    if (known === world.overrides) return;
+    known = world.overrides; cells.clear();
+    for (const [k, id] of known) if (id === P) cells.add(k);
+  }
+
+  // Removes every portal cell connected to the cells in `seeds` (6-neighbour flood).
+  function removeFrom(seeds) {
+    const seen = new Set(), q = seeds.filter((c) => get(...c) === P), out = [];
+    for (const c of q) seen.add(c.join(','));
+    while (q.length && out.length < 256) {
+      const c = q.pop(); out.push(c);
+      for (const [dx, dy, dz] of N6) {
+        const n = [c[0] + dx, c[1] + dy, c[2] + dz], k = n.join(',');
+        if (!seen.has(k) && get(...n) === P) { seen.add(k); q.push(n); }
+      }
+    }
+    if (!out.length) return;
+    removing = true;
+    const own = !world.batch;
+    if (own) world.beginBatch();
+    for (const c of out) world.setBlock(c[0], c[1], c[2], B.AIR);
+    if (own) world.endBatch();
+    removing = false;
+    const c = out[0];
+    audio.fizz(c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
+  }
+
+  function onEdit(x, y, z, old, id) {
+    sync();
+    const k = `${x},${y},${z}`;
+    if (id === P) cells.add(k); else if (old === P) cells.delete(k);
+    if (removing) return;
+    if ((old === P && id !== P) || (old === B.OBSIDIAN && id !== B.OBSIDIAN)) removeFrom(N6.map(([dx, dy, dz]) => [x + dx, y + dy, z + dz]));
+  }
+
+  // A Magma Core on obsidian cell (x, y, z): 'lit' when it lights a frame, 'busy' when the cell
+  // already borders a portal, 'open' when no complete frame holds the cell.
+  function ignite(x, y, z) {
+    if (N6.some(([dx, dy, dz]) => get(x + dx, y + dy, z + dz) === P)) return 'busy';
+    const f = findFrame(get, x, y, z);
+    if (!f) return 'open';
+    const own = !world.batch;
+    if (own) world.beginBatch();
+    for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P);
+    if (own) world.endBatch();
+    const [cx, cy, cz] = frameCells(f)[0];
+    audio.noise({ ftype: 'lowpass', f0: 150, f1: 1600, q: 0.8, dur: 1.4, vol: 0.45, attack: 0.25, pos: { x: cx, y: cy, z: cz } });
+    audio.tone({ type: 'sine', f0: 70, f1: 150, dur: 1.4, vol: 0.25, attack: 0.2, pos: { x: cx, y: cy, z: cz } });
+    return 'lit';
+  }
+
+  // True when the player's body box touches a portal cell.
+  function touching() {
+    const p = player.pos, r = 0.3;
+    for (let y = Math.floor(p.y); y <= Math.floor(p.y + 1.79); y++)
+      for (let z = Math.floor(p.z - r); z <= Math.floor(p.z + r); z++)
+        for (let x = Math.floor(p.x - r); x <= Math.floor(p.x + r); x++) if (get(x, y, z) === P) return true;
+    return false;
+  }
+
+  // Starts the travel to the linked realm. Returns the realm.travel result.
+  function go() {
+    const name = realm.current === 'overworld' ? 'ember' : 'overworld';
+    const to = defaultTarget(name), st = realm.stash.get(name);
+    const found = st ? nearestPortal(st.overrides, P, to[0], to[1], to[2], LINK_R[name]) : null;
+    audio.noise({ ftype: 'bandpass', f0: 300, f1: 2400, q: 0.7, dur: 1.2, vol: 0.4, attack: 0.4 });
+    if (found) return realm.travel(name, [found[0] + 0.5, found[1], found[2] + 0.5], () => arriveIn(found));
+    return realm.travel(name, to, build);
+  }
+  // Arrival in an existing portal: the floor of the found cell's column.
+  function arriveIn(c) {
+    if (get(...c) !== P) return null;   // gone: realm.travel stands the player at the target point
+    const f = portalFoot(get, c, P);
+    return [f[0] + 0.5, f[1], f[2] + 0.5];
+  }
+  // Arrival with no portal: builds one at the target (the chunks there are meshed now).
+  function build(to) {
+    const plan = buildPlan(get, to[0], to[1], to[2]);
+    const own = !world.batch;
+    if (own) world.beginBatch();
+    for (const [x, y, z, id] of plan.edits) world.setBlock(x, y, z, id);
+    if (own) world.endBatch();
+    lastBuild = plan;
+    return plan.stand;
+  }
+  let lastBuild = null;
+
+  // The hum: two low detuned oscillators through a lowpass, with a slow tremolo.
+  let hum = null;
+  function humTo(target) {
+    if (!audio.ok()) { if (hum) hum.gain.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.2); return; }
+    if (!hum) {
+      const ctx = audio.ctx, gain = ctx.createGain(), lp = ctx.createBiquadFilter(), trem = ctx.createGain(), lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+      lp.type = 'lowpass'; lp.frequency.value = 320; gain.gain.value = 0; trem.gain.value = 0.75;
+      lfo.frequency.value = 0.7; lfoG.gain.value = 0.25; lfo.connect(lfoG); lfoG.connect(trem.gain); lfo.start();
+      for (const [type, f] of [['sawtooth', 55], ['sawtooth', 55.6], ['sine', 82.5]]) {
+        const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.connect(lp); o.start();
+      }
+      lp.connect(trem); trem.connect(gain); gain.connect(audio.master);
+      hum = { gain };
+    }
+    hum.gain.gain.setTargetAtTime(target, audio.ctx.currentTime, 0.3);
+  }
+
+  const vignette = document.createElement('div');
+  vignette.style.cssText = 'position:fixed;inset:0;opacity:0;pointer-events:none;z-index:3';
+  document.body.appendChild(vignette);
+  let shown = -1;
+  function showVignette(k) {
+    const q = Math.round(k * 50) / 50;
+    if (q === shown) return;
+    shown = q;
+    vignette.style.opacity = String(Math.min(1, q * 1.2));
+    vignette.style.background = `radial-gradient(ellipse at center, rgba(255,120,30,0) ${Math.round(62 - 42 * q)}%, rgba(255,86,20,0.5) ${Math.round(88 - 28 * q)}%, rgba(110,8,12,0.92) 100%)`;
+  }
+
+  // Each frame (main.js). dt is 0 while the simulation stops: the timer and the arming hold.
+  function update(dt) {
+    sync();
+    // Every travel disarms (portal, respawn, or home), so no arrival in a portal re-triggers.
+    if (!dt || game.state === 'travel') { humTo(0); if (game.state === 'travel') { t = 0; armed = false; showVignette(0); } return; }
+    if (player.dead || !touching()) { if (!player.dead) armed = true; t = 0; warned = false; }
+    else if (player.vehicle) {
+      t = 0;
+      if (!warned) { hud.toast(`Leave the ${player.vehicle.kind === 'boat' ? 'boat' : 'cart'} to travel`); warned = true; }
+    } else if (armed && (t += dt) >= TRAVEL_T) { t = 0; armed = false; go(); }
+    showVignette(t / TRAVEL_T);
+    // sparks near the player, and the hum by the distance to the nearest portal cell
+    const px = player.pos.x, py = player.pos.y + 1, pz = player.pos.z;
+    let near = Infinity;
+    for (const k of cells) {
+      const [x, y, z] = k.split(',').map(Number);
+      const d = Math.hypot(x + 0.5 - px, y + 0.5 - py, z + 0.5 - pz);
+      if (d < near) near = d;
+      if (d < SPARK_R && Math.random() < dt * 2.5) particles.portal(x, y, z, get(x + 1, y, z) === P || get(x - 1, y, z) === P);
+    }
+    humTo(near < HUM_R ? 0.16 * (1 - near / HUM_R) ** 2 : 0);
+  }
+
+  return {
+    ignite, onEdit, update, touching, go,
+    get t() { return t; }, get armed() { return armed; }, get cells() { sync(); return cells; },
+    get humGain() { return hum ? hum.gain.gain.value : 0; },   // for tests: the hum's current volume
+    get vignette() { return Number(vignette.style.opacity); },
+    get lastBuild() { return lastBuild; },
+    TRAVEL_T,
+  };
+})();
 
 /* =====================================================================================
  * === 17. DAY/NIGHT CYCLE AND SKY
@@ -10449,7 +10848,7 @@ const post = (() => {
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 47 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 49 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -10461,14 +10860,14 @@ const post = (() => {
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
+ *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
  *    and crafting never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
  *   1. Constants and configuration: config
  *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
- *      dur and ench)
+ *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan)
  *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
  *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
  *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
@@ -10506,7 +10905,8 @@ const post = (() => {
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes, realms (the realm table, travel, the stash of the realms that are
- *      not current, the void)
+ *      not current, the void), portals (Ember portal
+ *      ignition, removal, the travel timer, linking, and building)
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
  *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
@@ -10569,6 +10969,7 @@ function frame(now) {
   weather.update(sim ? dt : 0);
   fireflies.update(sim ? dt : 0);
   ash.update(sim ? dt : 0);
+  portals.update(sim ? dt : 0);
   sky.update(sim ? dt : 0);
   viewModel.update(dt);
   hud.update(dt);
@@ -10606,7 +11007,7 @@ window.clonecraft = {
   projectiles, bow, armorId, ARMOR_TIERS, blockDrop, validSave, spawnHostiles, RECIPES, lineOfSight,
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
-  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, heldLight, shadows, clouds,
+  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, portals, heldLight, shadows, clouds,
   realm, REALMS, defaultTarget, standNear,
 };
 

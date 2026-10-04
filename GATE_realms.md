@@ -69,16 +69,26 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 3: Ember portal
 
-- [ ] The frame check accepts obsidian rectangles with openings 2..4 wide and 3..5 tall, along x and along z, with or without corners. It rejects a missing side block, a wrong block, a filled opening, and openings out of range. (Node test.)
-- [ ] A right click with a Magma Core lights a valid frame and uses the core. A click on an invalid frame keeps the core and shows "The frame is not complete".
-- [ ] The portal pane draws in the frame's plane with a moving swirl and particles. It emits light 11. The player walks through it, and the crosshair passes through it to the block behind. (Screenshots.)
-- [ ] Breaking a frame block removes every portal block in that opening. So does placing a block into the opening.
-- [ ] Standing in the portal for 2.5 s travels. The vignette grows during the wait. Stepping out at 2 s resets the timer.
-- [ ] After arrival, the player can stand in the arrival portal without travelling again until the player steps out and back in.
-- [ ] Linking: overworld (800, y, −400) arrives near ember (100, −50). An existing ember portal within 16 blocks of the target is reused. An overworld portal within 128 blocks of (x × 8, z × 8) is reused.
-- [ ] With no portal at the target, the game builds a 2×3 obsidian portal on solid ground. Over open lava, it builds the obsidian platform. A built portal never touches lava. The built portal survives a reload.
-- [ ] Round trip: overworld portal A to the Ember Realm and back arrives at A.
-- [ ] Travel from a boat or cart is refused with the toast.
+- [x] The frame check accepts obsidian rectangles with openings 2..4 wide and 3..5 tall, along x and along z, with or without corners. It rejects a missing side block, a wrong block, a filled opening, and openings out of range. (Node test.)
+  Note (Phase 3): Node: `tests/portals.test.js` covers every size 2..4 × 3..5 on both axes, with and without corners, and clicks on the bottom row, a side, and the top row. It rejects a missing side, stone in a side, cobble in the top row, dirt or water in the opening, sizes 1×3, 5×3, 2×2, and 2×6, and clicks on air or away from the frame. 45 of 45 tests pass.
+- [x] A right click with a Magma Core lights a valid frame and uses the core. A click on an invalid frame keeps the core and shows "The frame is not complete".
+  Note (Phase 3): Playwright: a core on an incomplete frame showed "The frame is not complete" and kept the core. A core on a complete frame lit 6 cells and the stack went from 2 to 1. A second click on the lit frame kept the core.
+- [x] The portal pane draws in the frame's plane with a moving swirl and particles. It emits light 11. The player walks through it, and the crosshair passes through it to the block behind. (Screenshots.)
+  Note (Phase 3): Screenshots show the swirl and sparks on x-axis and z-axis frames. Block light reads 11 in the cells and 10 one cell away. The crosshair targets the stone behind the pane. With held W, the player walked from z 0.4 to z −6.0 through the pane at z −4 (y 133). The timer reached 0.35 s and reset, with no travel.
+- [x] Breaking a frame block removes every portal block in that opening. So does placing a block into the opening.
+  Note (Phase 3): Playwright: breaking a side block of the Ember frame at x 58, z 127 removed all 6 cells. Stone placed through the pane at (59, 33, 130) stayed, and the other 5 cells became air.
+- [x] Standing in the portal for 2.5 s travels. The vignette grows during the wait. Stepping out at 2 s resets the timer.
+  Note (Phase 3): Playwright: at t 2.03 the vignette read 0.98 (screenshot). A step out at 2 s set the timer and the vignette to 0 with no travel. A full 2.5 s stand travelled.
+- [x] After arrival, the player can stand in the arrival portal without travelling again until the player steps out and back in.
+  Note (Phase 3): Playwright: after arrival at A the player stood 4 s in the pane with the timer at 0 and no travel. A step out and back in travelled. Every 'travel' state now disarms the portal, so a direct `go()` call does not re-trigger either (re-checked).
+- [x] Linking: overworld (800, y, −400) arrives near ember (100, −50). An existing ember portal within 16 blocks of the target is reused. An overworld portal within 128 blocks of (x × 8, z × 8) is reused.
+  Note (Phase 3): Playwright: overworld (800, 100, −400) arrived at ember (101, 34, −58.5), 8.5 blocks from (100, −50). An ember portal 15.1 blocks from the target was reused; one at 17 blocks led to a new build. An overworld portal at 122.5 blocks was reused; one at 130.5 led to a new build.
+- [x] With no portal at the target, the game builds a 2×3 obsidian portal on solid ground. Over open lava, it builds the obsidian platform. A built portal never touches lava. The built portal survives a reload.
+  Note (Phase 3): Playwright: builds on solid ground had `platform` false. Over open lava at ember (60, 130), the build made the platform: 12 platform obsidian, 0 lava touches, and the player not in lava. Node tests cover the ledge and lava cases. After a reload the platform portal kept 6 cells; the Ember Realm held 36 cells and the overworld 24. The site radius is 14, not 16 (SPEC_realms updated: 14 × 8 = 112 keeps the return within 128).
+- [x] Round trip: overworld portal A to the Ember Realm and back arrives at A.
+  Note (Phase 3): Playwright: travel from ember portal B arrived at overworld portal A (25.5, 133, −3.5) with no new build. Travel from A arrived at B (3.5, 69, −0.5).
+- [x] Travel from a boat or cart is refused with the toast.
+  Note (Phase 3): Playwright: a boat and a cart, each mounted in pane B for 4 s, touched the pane every sample. The timer stayed 0 and no travel happened. The toasts read "Leave the boat to travel" and "Leave the cart to travel", once each. A dismount inside the pane then travelled after 2.5 s. The hum reads 0.147 in the pane, 0.090 at 3 blocks, and 0 far away.
 
 ## Phase 4: Ember content
 

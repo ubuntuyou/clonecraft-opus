@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 47 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 49 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -14,14 +14,14 @@
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
+ *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
  *    and crafting never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
  *   1. Constants and configuration: config
  *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
- *      dur and ench)
+ *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan)
  *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
  *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
  *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
@@ -59,7 +59,8 @@
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes, realms (the realm table, travel, the stash of the realms that are
- *      not current, the void)
+ *      not current, the void), portals (Ember portal
+ *      ignition, removal, the travel timer, linking, and building)
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
  *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
@@ -86,6 +87,7 @@
 import './three.js';
 import './config.js';
 import './blocks.js';
+import './portal-frame.js';
 import './biomes.js';
 import './atlas.js';
 import './worldgen.js';
@@ -122,6 +124,7 @@ export { clockText, fadeIn, setState, showPause } from './menus.js';
 export { persist } from './persist.js';
 export { homes, homesEl, homesKey, openHomes, setHomes } from './homes.js';
 export { realm, REALMS } from './realms.js';
+export { portals } from './portals.js';
 import './sky.js';
 export { weather } from './weather.js';
 import './fireflies.js';

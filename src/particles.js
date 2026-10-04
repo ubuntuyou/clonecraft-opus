@@ -238,6 +238,13 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });
     },
+    portal(x, y, z, alongX) {   // a spark drifts off an Ember portal pane (cell x, y, z)
+      const off = randRange(-0.6, 0.6), c = Math.random();
+      emit(x + (alongX ? Math.random() : 0.5 + off * 0.2), y + Math.random(), z + (alongX ? 0.5 + off * 0.2 : Math.random()),
+        alongX ? randRange(-0.15, 0.15) : off, randRange(-0.1, 0.35), alongX ? off : randRange(-0.15, 0.15),
+        { color: c < 0.45 ? [1, 0.5, 0.12] : c < 0.8 ? [1, 0.78, 0.3] : [0.95, 0.22, 0.4], life: randRange(0.8, 1.6),
+          size: randRange(0.04, 0.08), grav: -0.15, drag: 1.2, flags: 6 });
+    },
     tntSpark(x, y, z) {   // sparks and smoke from a burning TNT fuse
       for (let i = 0; i < 3; i++) emit(x, y, z, randRange(-0.8, 0.8), randRange(1, 2.2), randRange(-0.8, 0.8),
         { color: Math.random() < 0.5 ? [1, 0.85, 0.4] : [1, 0.5, 0.12], life: randRange(0.2, 0.4), size: 0.06, grav: 6, drag: 1, flags: 2 });

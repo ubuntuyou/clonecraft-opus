@@ -37,11 +37,12 @@ const B = {
   SANDSTONE: 143, CHISELED_SANDSTONE: 144, SPAWNER: 249,
   // Ember Realm (SPEC_realms, Phase 2)
   EMBER_ROCK: 176, ASH_SAND: 177, EMBER_LAMP: 178, EMBERITE_ORE: 179, EMBER_BRICKS: 180,
+  PORTAL_EMBER: 181,  // the Ember portal pane (Phase 3); src/portals.js lights and removes it
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
 const CRYSTAL_GROW = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 0, -1]];
-const SHAPE = { NONE: 0, CUBE: 1, CROSS: 2, TORCH: 3, WATER: 4, CACTUS: 5, DOOR: 6, CRYSTAL: 7, STAIRS: 8, FARMLAND: 9, CROP: 10, RAIL: 11, LADDER: 12 };
+const SHAPE = { NONE: 0, CUBE: 1, CROSS: 2, TORCH: 3, WATER: 4, CACTUS: 5, DOOR: 6, CRYSTAL: 7, STAIRS: 8, FARMLAND: 9, CROP: 10, RAIL: 11, LADDER: 12, PORTAL: 13 };
 // Horizontal directions used by facing blocks and doors: 0 +X, 1 +Z, 2 -X, 3 -Z.
 const DIR4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const DIR_FACE = [0, 4, 1, 5];          // direction -> FACES index
@@ -214,6 +215,12 @@ defBlock(B.ASH_SAND, { name: 'Ash Sand', tex: all('ash_sand'), hardness: 0.5, to
 defBlock(B.EMBER_LAMP, { name: 'Ember Lamp', tex: all('ember_lamp'), hardness: 0.3, emit: 15, glows: true, sound: 'glass' });
 defBlock(B.EMBER_BRICKS, { name: 'Ember Bricks', tex: all('ember_bricks'), hardness: 2, tool: 'pickaxe' });
 GLOWS[B.EMBERITE_ORE] = 1;
+// The Ember portal pane (Phase 3): light 11, no collision, and the crosshair ray passes through it.
+// A placed block replaces it, which removes the whole opening (portals.onEdit). The mesher takes the
+// pane's axis from its portal neighbours.
+defBlock(B.PORTAL_EMBER, { name: 'Ember Portal', shape: SHAPE.PORTAL, tex: all('portal_ember'), opaque: false, solid: false,
+  skyFree: true, hardness: -1, emit: 11, replaceable: true, drop: null, noItem: true, sound: 'glass' });
+TARGETABLE[B.PORTAL_EMBER] = 0;
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;

@@ -102,11 +102,15 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - Compare settings in one page, interleaved. `CONFIG.shadows` and `CONFIG.bloom` are read every frame, so set them in place and cycle the settings several times. Separate page loads per setting drift too much.
 - GPU timer queries (`EXT_disjoint_timer_query_webgl2`) work in Chrome on the M1, but the per-pass times are not usable. A 101×63 blur pass reads the same ~4.9 ms as a 1620×1012 pass, and the fixed 2048² shadow pass reads 14.6 ms at 3240×2025 and 6.2 ms at 2160×1350. Use them for A/B differences only.
 - The two smallest bloom levels are nearly free. Skipping their 4 passes (`LEVELS` 5 to 3) at 3240×2025 saved about 0.1 ms per frame (56.4 to 56.7 fps, interleaved, 2026-10-01). At the line-434 view (looking down, sun high) the light shafts are off, so the frame is the shadow pass, the scene pass, 9 bloom passes, and the composite.
+- A portal frame's bottom row is obsidian, so the pane starts one block above the floor. To walk through a test frame, raise the floor to the bottom row on both sides.
+- `portals.go()` does not clear `armed`. The 'travel' state that `go()` starts clears it. Any new travel path must pass through the 'travel' state, or an arrival in a pane sends the player back.
+- A boat is about 1.4 blocks wide. Spawn it at the centre of a 2-wide opening, or the vehicle code lifts it clear of the frame.
 - `CONFIG.shadows` false sets `uShadowOn` 0. The terrain then uses the old ±12 % face term, not the ambient-plus-direct split.
 
 ## Pointers
 
 - Realm QA: `clonecraft.realm.travel('ember')`, `('crystal')`, or `('overworld')` switches the realm. Crystal stub terrain loads too fast to see the travel screen. To hold it, set `clonecraft.world.update = () => {}` before the travel, then `delete clonecraft.world.update`.
+- Portal QA: `clonecraft.portals` exposes `t`, `armed`, `cells`, `humGain`, `vignette`, `lastBuild`, `touching()`, and `go()`. `clonecraft.vehicles.spawn(kind, x, y, z, yaw)` plus `mount(v)` seat the player for the rider test.
 
 - Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.
 - `game.clearDaylight` runs from 4.5/15 (`NIGHT_DAYLIGHT`) at night to 1 at day. Keep round(15 × floor) at 7 or less, or hostile mobs stop spawning in the open. Caustics gate at `uDaylight` 0.35, so the floor must stay below it. `game.daylight` is that value dimmed by the weather. `sky.update()` sets both.

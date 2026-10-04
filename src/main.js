@@ -40,6 +40,7 @@ import { setState, showPause } from './menus.js';
 import { persist, validSave } from './persist.js';
 import { closeHomes, goHome, homes, openHomes, setHome } from './homes.js';
 import { defaultTarget, realm, REALMS, standNear } from './realms.js';
+import { portals } from './portals.js';
 import { sky } from './sky.js';
 import { weather } from './weather.js';
 import { fireflies } from './fireflies.js';
@@ -89,6 +90,7 @@ function frame(now) {
   weather.update(sim ? dt : 0);
   fireflies.update(sim ? dt : 0);
   ash.update(sim ? dt : 0);
+  portals.update(sim ? dt : 0);
   sky.update(sim ? dt : 0);
   viewModel.update(dt);
   hud.update(dt);
@@ -126,7 +128,7 @@ window.clonecraft = {
   projectiles, bow, armorId, ARMOR_TIERS, blockDrop, validSave, spawnHostiles, RECIPES, lineOfSight,
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
-  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, heldLight, shadows, clouds,
+  spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, portals, heldLight, shadows, clouds,
   realm, REALMS, defaultTarget, standNear,
 };
 

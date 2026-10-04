@@ -75,9 +75,10 @@ const terrainUniforms = {
 const TERRAIN_VS = /* glsl */`
   attribute vec2 aUv; attribute vec4 aLight; attribute vec4 aTint; attribute float aCry;
   varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet;
+  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
   void main() {
+    vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66);                                  // portal pane (alpha 160)
     vUv = aUv / 4096.0; vLight = aLight; vTint = aTint.rgb; vCry = aCry;
     vCrystal = step(0.88, aTint.a) * step(aTint.a, 0.94);                                // crystal faces glow
     vGlow = step(0.7, aTint.a) * step(aTint.a, 0.85) * (aTint.a > 0.82 ? 0.5 : 1.0);   // 1 glow, 0.5 soft glow
@@ -110,7 +111,7 @@ const TERRAIN_FS = /* glsl */`
   uniform sampler2D uCaus; uniform sampler2D uRipple;
   uniform highp sampler3D uHeld; uniform vec3 uHeldOrigin; uniform float uHeldOn; uniform float uWet;
   varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet;
+  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   float curve(float l) { return (pow(0.83, (1.0 - l) * 15.0) - 0.0611) / 0.9389; }
   // block light (torches, lava) falls off slower than sky light, so a torch reaches farther
   float curveB(float l) { return (pow(0.85, (1.0 - l) * 15.0) - 0.0874) / 0.9126; }
@@ -154,9 +155,29 @@ const TERRAIN_FS = /* glsl */`
     g += h * 0.055 * detail;
     return normalize(vec3(-g.x, 1.0, -g.y));
   }
+  // Phase 3: the Ember portal pane. Two reads of the caustic net, bent by moving sine fields, flow
+  // over a crimson-to-orange band pattern. The pane ignores light (it emits light 11), and its
+  // bright streaks pass 1.0 in HDR, so the bloom pass gives them a halo.
+  vec4 portalPane(vec3 n) {
+    vec2 q = (abs(n.x) > abs(n.z) ? vWorld.zy : vWorld.xy) * 0.9;
+    float t = uTime * 0.6;
+    vec2 w = vec2(sin(q.y * 2.3 + t * 1.3) + sin(q.x * 1.7 - t), cos(q.x * 2.1 - t * 1.1) + sin(q.y * 1.3 + t * 0.7));
+    float a = texture2D(uCaus, q * 0.35 + w * 0.12 + vec2(t * 0.05, -t * 0.08)).r;
+    float b = texture2D(uCaus, q * 0.6 - w * 0.1 + vec2(-t * 0.07, t * 0.04)).r;
+    float s = 0.5 + 0.5 * sin(q.x * 3.0 + q.y * 2.0 + w.x * 2.0 + w.y + t * 2.0);
+    vec3 col = mix(vec3(0.42, 0.03, 0.05), vec3(1.0, 0.36, 0.06), s);
+    col += vec3(1.0, 0.72, 0.3) * (a * 1.3 + b * 0.7) * (0.9 + (uGlow - 1.0) * 0.5);
+    return vec4(col, clamp(0.68 + 0.25 * (a + b), 0.0, 0.95));
+  }
   #endif
   void main() {
     #ifdef WATER
+      if (vPortal > 0.5) {
+        vec4 pc = portalPane(normalize(cross(dFdx(vWorld), dFdy(vWorld))));
+        float pf = smoothstep(uFogNear, uFogFar, vDist);
+        gl_FragColor = vec4(mix(pc.rgb, uFogColor, pf), mix(pc.a, 1.0, pf));
+        return;
+      }
       vec3 col = vec3(0.10, 0.27, 0.42);   // G1: fixed water color, no atlas tile
     #else
       vec4 tex = texture2D(map, vUv);
