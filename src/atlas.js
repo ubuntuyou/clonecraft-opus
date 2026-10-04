@@ -455,6 +455,25 @@ paintTile('crystal_frame_top', (P, rng) => {
   P.copy('obsidian');
   P.fill((x, y) => { if ((x === 7 || x === 8) && y > 2 && y < 13) P.set(x, y, mix3([40, 170, 170], [190, 250, 240], rng())); });
 });
+// Resonance Pylon (Phase 6): a pale crystal prism in a voidstone collar. The core texels have red > 0.8,
+// so they glow (the block sets `glows`).
+paintTile('pylon', (P, rng) => {
+  paintVoidstone(P, rng);
+  P.fill((x, y) => {
+    const d = Math.abs(x - 7.5);
+    if (d > 4.6 - Math.abs(y - 7.5) * 0.12 || y < 1 || y > 14) return;
+    const t = clamp(1 - d / 5 + (rng() - 0.5) * 0.12, 0, 1);
+    P.set(x, y, x === 7 || x === 8 ? [240, 255, 252] : mix3([96, 70, 190], [214, 250, 255], t));
+  });
+  for (let x = 2; x < 14; x++) { P.set(x, 0, [26, 20, 40]); P.set(x, 15, [26, 20, 40]); }
+});
+paintTile('pylon_top', (P, rng) => {
+  paintVoidstone(P, rng);
+  P.fill((x, y) => {
+    const d = Math.abs(x - 7.5) + Math.abs(y - 7.5);
+    if (d < 5.5) P.set(x, y, d < 2 ? [244, 255, 252] : mix3([110, 84, 200], [214, 250, 255], 1 - d / 5.5 + (rng() - 0.5) * 0.1));
+  });
+});
 // Crystal portal: a spiral of turquoise and pale violet on deep indigo (break particles, fallback look).
 paintTile('portal_crystal', (P, rng) => {
   P.fill((x, y) => {
@@ -1101,6 +1120,18 @@ ITEM_PIX[I.EMBER_HEART] = pixArt((set) => {
     set(x, y, f > -0.02 ? [40, 10, 12] : core < 2.2 ? [255, 236, 170] : core < 3.6 ? [255, 150, 48] : core < 4.8 ? [196, 58, 26] : [96, 24, 22]);
   }
   set(5, 5, [255, 210, 170]);
+});
+// Phase 6: the Prism Heart, a faceted heart of pale crystal with a violet core.
+ITEM_PIX[I.PRISM_HEART] = pixArt((set) => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const u = (x + 0.5 - 8) / 6.4, v = (8.6 - (y + 0.5)) / 6.4;
+    const f = (u * u + v * v - 1) ** 3 - u * u * v * v * v;
+    if (f > 0) continue;
+    const core = Math.hypot(x + 0.5 - 8, y + 0.5 - 8.5), facet = (x + y) % 4 === 0;
+    set(x, y, f > -0.02 ? [30, 22, 70] : core < 2.2 ? [250, 240, 255] : core < 3.6 ? [190, 140, 255]
+      : facet ? [220, 255, 250] : x < 8 ? [110, 220, 230] : [70, 170, 200]);
+  }
+  set(5, 5, [255, 255, 255]); set(6, 4, [230, 255, 250]);
 });
 // Travel icons (Batch 16): a boat and a minecart from the side, a compass from above.
 ITEM_PIX[I.BOAT] = pixArt((set) => {

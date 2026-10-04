@@ -41,6 +41,7 @@ import { persist, validSave } from './persist.js';
 import { closeHomes, goHome, homes, openHomes, setHome } from './homes.js';
 import { defaultTarget, realm, REALMS, standNear } from './realms.js';
 import { portals } from './portals.js';
+import { boss } from './boss.js';
 import { sky } from './sky.js';
 import { weather } from './weather.js';
 import { fireflies } from './fireflies.js';
@@ -91,6 +92,7 @@ function frame(now) {
   fireflies.update(sim ? dt : 0);
   ash.update(sim ? dt : 0);
   portals.update(sim ? dt : 0);
+  boss.update(sim ? dt : 0);   // after updateMobs; it also shows the victory screen once the state is 'playing'
   sky.update(sim ? dt : 0);
   viewModel.update(dt);
   hud.update(dt);
@@ -129,7 +131,7 @@ window.clonecraft = {
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
   spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, portals, heldLight, shadows, clouds,
-  realm, REALMS, defaultTarget, standNear, emberType,
+  realm, REALMS, defaultTarget, standNear, emberType, boss,
 };
 
 requestAnimationFrame(frame);

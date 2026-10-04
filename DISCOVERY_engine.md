@@ -116,12 +116,20 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `world.locked(x, y, z)` makes `setBlock` return false. Every edit path must check the return value before it spends an item or drops a block.
 - `frameOk` and `findFrame` default the ring to obsidian. A crystal portal call must pass `B.CRYSTAL_FRAME`, or the frame check fails.
 - In the Crystal Realm, `sky.js` writes the fixed star direction to `terrainUniforms.uSunDir`. The shadow pass reads that uniform. The exported `sky.sunDir` is still the day-clock vector, so do not use it for crystal light.
+- `Mob.paint()` recolors every material in the mob's `mats`. A material that must keep its color (the Colossus shield) must stay out of `mats`.
+- Mouse look and canvas clicks need the state 'playing' and pointer lock. Every travel and the inventory screen drop the lock, but the state returns to 'playing'. Click the canvas center to relock before you send K or mouse motion.
+- A count-1 inventory slot shows no text. Do not select slots by their text.
+- A block placement goes to the face the ray hits. A ray into a hole below grade hits the face in front of the hole. Look down into the hole from above.
+- The slam hits only a player whose feet are below the floor + 3 (y 100). A QA script that hovers at feet y 101.5 fights the boss without slam damage.
 
 ## Pointers
 
 - Realm QA: `clonecraft.realm.travel('ember')`, `('crystal')`, or `('overworld')` switches the realm. Crystal terrain can load too fast to see the travel screen. To hold it, set `clonecraft.world.update = () => {}` before the travel, then `delete clonecraft.world.update`.
 - Ember content QA: `clonecraft` exposes `Mob`, `mobs`, `projectiles`, `spawners` (`.live`), `looted`, `featureAt`, `emberType`, `WG`, and `respawn`. On seed 12345, fortress cell (0, 0) has its keep centre at (40, 40), the floor at y 84, the spawner at (40, 85, 40), and the heart chest at (36, 85, 36).
 - Mob QA in headless Chromium: a per-frame health refill does not stop a death. Set `player.invuln = 99` every frame instead. After a death, `setState('playing')` hides the death screen but leaves `player.dead` true. Call `respawn()`, wait for the 'travel' state to end, then travel back.
+- Pointer lock in Playwright: the MCP browser refuses `requestPointerLock`. Before `page.goto`, add an init script that defines `Document.prototype.pointerLockElement` as a getter and replaces `requestPointerLock` and `exitPointerLock`. Each replacement sets the element and dispatches `pointerlockchange`. Then send mouse look as `mousemove` events with `movementX` and `movementY` (0.0022 rad per unit at sensitivity 1).
+- Boss QA: `clonecraft.boss` exposes `col` (the live Colossus), `HOME`, `PYLONS`, `EXIT`, and `pylonsStanding`. `realm.boss.defeated` gates the spawn; set it false to fight again in a used save. On seed 1234, fortress cell (1, 0) has its keep at (136, 55), the floor at y 44, and the heart chest at (132, 45, 51).
+- Ember flight paths: generate the Ember chunks in Node (as in the walk check below) and run a BFS over cells where the cell and the cell above are air. Merge straight runs into waypoints, then fly them with K.
 - Portal QA: `clonecraft.portals` exposes `t`, `armed`, `cells`, `humGain`, `vignette`, `lastBuild`, `touching()`, and `go()`. `clonecraft.vehicles.spawn(kind, x, y, z, yaw)` plus `mount(v)` seat the player for the rider test.
 
 - Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.

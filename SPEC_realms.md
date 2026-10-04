@@ -138,6 +138,12 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 - Death: the boss spins and cracks for 3 s with a light burst, then shatters. It drops the Prism Heart (a trophy item), 8–16 crystals, and 2–4 Emberite Ingots. An exit portal of Crystal Frames, already lit, appears at the arena center. It leads like the arrival portal.
 - After the kill, the save records it. The boss never returns. The exit portal stays.
 - Victory screen, on the first kill only: "The Prism Colossus is defeated", the time played in this world, and a Continue button. The world pauses behind it. Continue or Esc returns to play.
+- Numbers rsh chose in Phase 6 (Joe has not reviewed them):
+  - Pillars are 3×3 voidstone columns. On seed 1234 the pylons sit at y 107..112. A pylon has hardness 0.
+  - The boss roams within 38 blocks of the center. It slams when the player is within 5 blocks, then waits 2.5 s before the next slam. The warning lifts it 1.6 blocks.
+  - The slam hits only a player whose feet are below the floor + 3. A player who hovers higher takes no slam damage.
+  - A shard flies straight at 15 blocks per s.
+  - The exit portal opening is 3 wide and 4 tall, along x, in the plane z = 0 at the center. When the boss dies within 3 blocks of that plane, the loot lands 3.5 blocks in front of it (+z), so no drop sits in the pane.
 
 ### Where it lives
 

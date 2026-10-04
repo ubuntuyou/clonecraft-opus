@@ -247,6 +247,19 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });
     },
+    // Crystal sparks (Phase 6): turquoise, pale, and violet glowing specks. crystalSpark emits one with
+    // the given velocity and life; crystalBurst emits n in all directions at up to `speed`.
+    crystalSpark(x, y, z, vx, vy, vz, life = 0.6, size = 0.09) {
+      const c = Math.random();
+      emit(x, y, z, vx, vy, vz, { color: c < 0.45 ? [0.35, 1, 0.92] : c < 0.8 ? [0.85, 0.97, 1] : [0.72, 0.5, 1],
+        life: life * randRange(0.7, 1.2), size: size * randRange(0.7, 1.3), grav: 0, drag: 1.5, flags: 6 });
+    },
+    crystalBurst(x, y, z, n = 12, speed = 3) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, b = Math.acos(randRange(-1, 1)), s = randRange(0.3, 1) * speed;
+        this.crystalSpark(x, y, z, Math.sin(b) * Math.cos(a) * s, Math.cos(b) * s, Math.sin(b) * Math.sin(a) * s, 0.6, 0.1);
+      }
+    },
     portal(x, y, z, alongX, cry) {   // a spark drifts off a portal pane (cell x, y, z); cry: a crystal pane
       const off = randRange(-0.6, 0.6), c = Math.random();
       const color = cry ? (c < 0.45 ? [0.3, 1, 0.92] : c < 0.8 ? [0.75, 0.95, 1] : [0.78, 0.55, 1])

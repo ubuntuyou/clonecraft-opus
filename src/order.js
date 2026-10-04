@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 49 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 50 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -60,7 +60,8 @@
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes, realms (the realm table, travel, the stash of the realms that are
  *      not current, the void), portals (Ember portal
- *      ignition, removal, the travel timer, linking, and building)
+ *      ignition, removal, the travel timer, linking, and building), boss (the Prism Colossus:
+ *      the pylons, the beams, the fight, the boss bar, the exit portal, the victory)
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
  *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
@@ -125,6 +126,7 @@ export { persist } from './persist.js';
 export { homes, homesEl, homesKey, openHomes, setHomes } from './homes.js';
 export { realm, REALMS } from './realms.js';
 export { portals } from './portals.js';
+import './boss.js';
 import './sky.js';
 export { weather } from './weather.js';
 import './fireflies.js';

@@ -1146,7 +1146,7 @@ function WorldGenModule(SEED, K) {
   // ---------------------------------------------------------------- crystal realm (SPEC_realms Phase 5)
   // Floating islands over a void. The arena island sits at the origin: radius 44 at most, a flat
   // Glimmer Moss top at y 96, and an underside that tapers to a point. A voidstone ring at radius 26
-  // marks the pillar ring (Phase 6). The arrival portal (CRYSTAL_ARRIVAL) stands on the arena at z 36,
+  // carries the 6 pillars (Phase 6). The arrival portal (CRYSTAL_ARRIVAL) stands on the arena at z 36,
   // on a voidstone pad. Other islands sit on a 64-block jittered grid: 1 cell in 2 holds an island
   // (radius 7..22), 1 in 5.5 an islet (radius 2..5). Their tops lie at y 70..110. An island whose
   // reach (radius x ISLE_REACH) comes within ISLE_CLEAR blocks of the origin is dropped. Crystal
@@ -1158,6 +1158,14 @@ function WorldGenModule(SEED, K) {
   // The arrival portal opening: 3 wide along x, 4 tall, in the plane z = 36. Its frame ring sits
   // one cell around it, the bottom row flush with the arena floor.
   const CRYSTAL_ARRIVAL = { axis: 'x', x0: -1, y0: CRYSTAL_TOP + 1, z0: 36, w: 3, h: 4 };
+  // The 6 arena pillars (Phase 6): 3x3 voidstone columns centered on the ring of radius PILLAR_R, at
+  // 0, 60, ..., 300 degrees, so none blocks the view from the arrival portal. Each is 10..16 blocks
+  // tall above the floor, with a Crystal Frame capital and a Resonance Pylon on the center of the top.
+  // PYLONS lists the pylon cells as [x, y, z].
+  const PYLONS = [0, 1, 2, 3, 4, 5].map((i) => {
+    const a = i * Math.PI / 3, h = 10 + Math.floor(hashF(SEED ^ 0x9e11a, i, 7) * 7);
+    return [Math.round(Math.cos(a) * PILLAR_R), CRYSTAL_TOP + h + 1, Math.round(Math.sin(a) * PILLAR_R)];
+  });
   const isleCache = new Map();
   // The island of grid cell (gx, gz): { x, z, r, top, hill, depth } or null. Pure and memoized.
   function isleAt(gx, gz) {
@@ -1234,6 +1242,15 @@ function WorldGenModule(SEED, K) {
         if (Math.abs(d - PILLAR_R) < 0.55 || pad) blocks[i] = B.VOIDSTONE;
         if (blocks[i + 256] === B.CRYSTAL && pad) blocks[i + 256] = B.AIR;
       }
+      // the pillars and their pylons
+      for (const [px, py, pz] of PYLONS) for (let z = pz - 1; z <= pz + 1; z++) for (let x = px - 1; x <= px + 1; x++) {
+        const lx = x - x0, lz = z - z0;
+        if (lx < 0 || lx >= CS || lz < 0 || lz >= CS) continue;
+        for (let y = CRYSTAL_TOP; y < py - 1; y++) blocks[idx(lx, y, lz)] = B.VOIDSTONE;
+        blocks[idx(lx, py - 1, lz)] = B.CRYSTAL_FRAME;
+        if (x === px && z === pz) blocks[idx(lx, py, lz)] = B.PYLON;
+        heights[lz * CS + lx] = Math.max(heights[lz * CS + lx], x === px && z === pz ? py : py - 1);
+      }
       // the arrival portal: a Crystal Frame ring with crystal panes, always lit
       for (let v = -1; v <= a.h; v++) for (let u = -1; u <= a.w; u++) {
         const wx = a.x0 + u, y = a.y0 + v, lx = wx - x0, lz = a.z0 - z0;
@@ -1249,7 +1266,7 @@ function WorldGenModule(SEED, K) {
   }
 
   return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID,
-    CRYSTAL_ARRIVAL, isleAt, ISLE_CLEAR, ARENA_R };
+    CRYSTAL_ARRIVAL, isleAt, ISLE_CLEAR, ARENA_R, CRYSTAL_TOP, PYLONS };
 }
 
 export { WorldGenModule };

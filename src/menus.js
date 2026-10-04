@@ -1,14 +1,14 @@
 // ---- menus and settings -------------------------------------------------------------
 import { CONFIG, saveSettings, SEED } from './config.js';
 import { game, input } from './engine.js';
-import { requestLock, respawn, resumeEl, setEscLock, setPausedAt } from './player.js';
+import { requestLock, respawn, resumeEl, resumeGame, setEscLock, setPausedAt } from './player.js';
 import { resetMining } from './interact.js';
 import { invEl } from './inventory-ui.js';
 import { audio } from './audio.js';
 import { $, hud, SPLASHES } from './hud.js';
 import { persist, homesEl } from './order.js';
 
-const overlayEl = $('overlay'), deathEl = $('death'), travelEl = $('travel'), playBtn = $('playBtn');
+const overlayEl = $('overlay'), deathEl = $('death'), travelEl = $('travel'), victoryEl = $('victory'), playBtn = $('playBtn');
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 $('seedText').textContent = `Seed ${SEED} · the world saves itself · ?seed=${SEED} reopens it`;
 
@@ -19,6 +19,7 @@ function setState(s) {
   homesEl.classList.toggle('show', s === 'homes');
   deathEl.classList.toggle('show', s === 'dead');
   travelEl.classList.toggle('show', s === 'travel');
+  victoryEl.classList.toggle('show', s === 'victory');
   $('crosshair').style.display = s === 'playing' ? 'block' : 'none';
   if (s !== 'playing') { resumeEl.style.display = 'none'; setEscLock(false); }
   $('hud').style.display = game.started ? 'block' : 'none';
@@ -27,7 +28,7 @@ function setState(s) {
   if (s !== 'playing') { input.keys.clear(); input.mouseL = input.mouseR = false; resetMining(); }
 }
 function showPause() {
-  if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes' || game.state === 'travel') return;
+  if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes' || game.state === 'travel' || game.state === 'victory') return;
   setState('paused');
   setPausedAt(performance.now());
   persist.save();
@@ -50,6 +51,16 @@ function startOrResume() {
 playBtn.addEventListener('click', (e) => { e.stopPropagation(); startOrResume(); });
 overlayEl.addEventListener('click', (e) => { if (e.target === overlayEl) startOrResume(); });
 $('respawnBtn').addEventListener('click', () => { audio.init(); respawn(); });
+// The victory screen (Phase 6). It shows the time played in this world (game.clock). Continue and Esc
+// (player.js) return to play.
+function showVictory() {
+  const m = Math.floor(game.clock / 60), h = Math.floor(m / 60);
+  $('victoryTime').textContent = `Time played: ${h ? `${h} h ` : ''}${m % 60} min`;
+  setState('victory');
+  if (document.pointerLockElement) document.exitPointerLock();
+  persist.save();
+}
+$('victoryBtn').addEventListener('click', () => resumeGame(false));
 
 function bindSetting(id, valId, key, fmt, apply) {
   const el = $(id), val = $(valId);
@@ -93,4 +104,4 @@ freezeEl.addEventListener('change', () => {
   saveSettings();
 });
 
-export { clockText, fadeIn, playBtn, setState, showPause };
+export { clockText, fadeIn, playBtn, setState, showPause, showVictory };

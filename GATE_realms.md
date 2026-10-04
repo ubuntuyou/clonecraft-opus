@@ -11,8 +11,9 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 - [x] An item with an id of 256 or more survives every stack path: pick up, hotbar, held view model, icon, tooltip, split, drop, chest, furnace fuel and output, trash and undo, craft result, death drop, save, export, and import.
   Note (Phase 0): armor ids 300..323 passed pick up, hotbar, held view model, icon, tooltip, move, armor slot, chest, trash and undo, craft result (recipe in the table grid), Q drop, death drop, save, export, and import. Split and furnace fuel and output need a stackable, burnable, or smeltable id of 256 or more. None exists before Phase 4 (Raw Emberite, Ember Dust, Emberite Ingot), so this item stays open until Phase 4 checks those paths.
   Note (Phase 4): Playwright: a right-click split of a Raw Emberite (256) stack gave two halves. Ember Dust (259) went into the furnace fuel slot and burned. Raw Emberite went into the input slot, and an Emberite Ingot (257) came out of the output slot into the inventory.
-- [ ] Ids 176..186 are blocks and fit in a chunk byte. No B id and I id overlap. (Node test.)
+- [x] Ids 176..186 are blocks and fit in a chunk byte. No B id and I id overlap. (Node test.)
   Note (Phase 0): the Node tests prove every block id is below 255, ids 176..199 are free, and B and I do not overlap. The blocks 176..186 arrive in Phases 2, 3, 5, and 6. This item closes when the last of them exists.
+  Note (Phase 6): PYLON (186) is the last of them. The Node test `ids 176..199 hold only the realm blocks and their block items` passes.
 
 ## Phase 1: realm core
 
@@ -135,19 +136,32 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 6: Prism Colossus
 
-- [ ] The arena has 6 pillars on a ring of radius 26 with a pylon on each. Each pylon emits crystal light 15 and shows a beam to the boss.
-- [ ] A pylon breaks by a hand hit and by an arrow, and drops nothing.
-- [ ] The boss sleeps until the player is within 32 blocks of the center. The boss bar shows then and hides at 64 blocks.
-- [ ] Phase 1: hits do no damage while any pylon stands. The shield flash shows, and the toast appears once per fight. A 3-shard fan fires every 3 s for 4 damage each (armored).
-- [ ] Phase 2: with all pylons gone, the boss hunts at speed 2.5. The slam warns for 0.8 s, then deals 8 within 4 blocks with knockback.
-- [ ] Phase 3: at 50 % HP, speed 3.5, a 5-shard fan every 3 s, and 2 Shardlings every 12 s, never more than 4 alive.
-- [ ] Shardling: 8 HP, speed 4, a hit of 3, drops a crystal 1 time in 2.
-- [ ] Death of the player resets the fight: full HP, Shardlings gone, broken pylons stay broken. Leaving the realm does the same.
-- [ ] The boss death plays for 3 s, then drops the Prism Heart, 8–16 crystals, and 2–4 Emberite Ingots, and builds the lit exit portal at the center.
-- [ ] The exit portal leads like the arrival portal.
-- [ ] After a reload, the boss does not return, and the exit portal stays.
-- [ ] The victory screen shows on the first kill only, with the time played and a Continue button. The world pauses behind it. Continue and Esc both return to play.
-- [ ] The full flow works without the debug handle: craft and light an ember portal, find a fortress, take the Ember Heart, build and light a crystal portal, kill the boss, and return home. (One Playwright run may use creative-style item grants for materials only.)
+- [x] The arena has 6 pillars on a ring of radius 26 with a pylon on each. Each pylon emits crystal light 15 and shows a beam to the boss.
+  Note (Phase 6): Node test for the ring. Playwright: 6 pylons at radius 26, heights 107..112 on seed 1234. Screenshots show the pillars, the pylons, the light, and the beams to the boss.
+- [x] A pylon breaks by a hand hit and by an arrow, and drops nothing.
+  Note (Phase 6): Playwright: a hand hit breaks a pylon at once. A player arrow breaks one too. Neither leaves a drop. The flow run broke all 6 by hand.
+- [x] The boss sleeps until the player is within 32 blocks of the center. The boss bar shows then and hides at 64 blocks.
+  Note (Phase 6): Playwright: the boss sleeps at 33.5 blocks and wakes at 31. The bar shows at 31, 50, and 63 blocks. At 66 blocks the boss sleeps and the bar hides. It stays hidden at 50 and 40 blocks and shows again at 31.
+- [x] Phase 1: hits do no damage while any pylon stands. The shield flash shows, and the toast appears once per fight. A 3-shard fan fires every 3 s for 4 damage each (armored).
+  Note (Phase 6): Playwright: hits leave 300 HP while pylons stand. The shield flash shows, and the toast shows once. Fans of 3 come every 3 s. A shard deals 4 to a player with no armor and 0.8 to a player in full diamond armor, so armor applies.
+- [x] Phase 2: with all pylons gone, the boss hunts at speed 2.5. The slam warns for 0.8 s, then deals 8 within 4 blocks with knockback.
+  Note (Phase 6): Playwright: the speed peaks at 2.5. The slam warns for 0.82 s, deals 8 at 3 blocks with strong knockback, and 0 at 6 blocks. Fix in QA: the slam hits only a player near the floor.
+- [x] Phase 3: at 50 % HP, speed 3.5, a 5-shard fan every 3 s, and 2 Shardlings every 12 s, never more than 4 alive.
+  Note (Phase 6): Playwright: the speed is 3.5. 5-shard fans come every 3.0 s through 8 slams. Summons of 2 come at 12 s and 24 s, with a cap of 4. Fix in QA: the fan and summon timers now run during a slam.
+- [x] Shardling: 8 HP, speed 4, a hit of 3, drops a crystal 1 time in 2.
+  Note (Phase 6): Playwright: a Shardling hits for 3. The drop roll gave a crystal 17 times in 40. HP 8 and speed 4 are in the mob table.
+- [x] Death of the player resets the fight: full HP, Shardlings gone, broken pylons stay broken. Leaving the realm does the same.
+  Note (Phase 6): Playwright: after a death and after leaving, the boss has full HP, the Shardlings are gone, and the broken pylons stay broken.
+- [x] The boss death plays for 3 s, then drops the Prism Heart, 8–16 crystals, and 2–4 Emberite Ingots, and builds the lit exit portal at the center.
+  Note (Phase 6): Playwright: the death plays for 3 s. Two kills dropped 1 Prism Heart each, 10 and 9 crystals, and 2 and 4 Emberite Ingots. Both fall in the ranges 8..16 and 2..4. The exit portal at x -1..1, y 97..100, z 0 is lit. Fix in QA: drops shift off the exit pane.
+- [x] The exit portal leads like the arrival portal.
+  Note (Phase 6): Playwright: without `crystalBack` the exit portal leads to the spawn. In the flow run it led to the `crystalBack` portal at (323.5, 131, 348.5).
+- [x] After a reload, the boss does not return, and the exit portal stays.
+  Note (Phase 6): Playwright: after a reload, no boss spawns, the exit portal stands, and neither the bar nor the victory screen shows.
+- [x] The victory screen shows on the first kill only, with the time played and a Continue button. The world pauses behind it. Continue and Esc both return to play.
+  Note (Phase 6): Playwright: the screen shows the title, the time played, and Continue. The game clock delta is 0 behind it. Continue and Esc both return to play. The boss spawns only while `realm.boss.defeated` is false, so a world has one kill.
+- [x] The full flow works without the debug handle: craft and light an ember portal, find a fortress, take the Ember Heart, build and light a crystal portal, kill the boss, and return home. (One Playwright run may use creative-style item grants for materials only.)
+  Note (Phase 6): Playwright, seed 1234, a fresh save, real input. Grants were materials only (diamonds, sticks, planks, string, flint, feathers, crystals, obsidian, a Magma Core, bread). The run crafted the gear and frames in the recipe book and lit an obsidian portal with the Magma Core. It took the Ember Heart from the heart chest of fortress (1, 0) at (132, 45, 51), built and lit a Crystal Frame portal, broke 6 pylons, and killed the boss in 27 s with a diamond sword. It took the Prism Heart and returned through the exit portal. The game logged no errors. The console showed only `favicon.ico` 404s from the QA static server. The QA script died 3 times on the way (a fall, a wisp, and a fall after pointer lock was lost on travel). Each death was a script error, and the game behaved correctly.
 
 ## Phase 7: finish
 

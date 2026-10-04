@@ -172,6 +172,32 @@ test('crystal: nothing below y 20, the 72-block clearance, the arena, the arriva
   assert.ok(checked >= 5, `islands checked: ${checked}`);
 });
 
+// The arena pillars (gate Phase 6, item 1): 6 pillars on the ring of radius 26, 10..16 blocks tall,
+// each with a Resonance Pylon on top. No pillar stands between the arrival portal and the center.
+test('crystal: 6 pillars on the ring, each with a pylon on top', () => {
+  const W = WorldGenModule(12345, K), heights = new Set();
+  assert.equal(W.PYLONS.length, 6);
+  const get = (x, y, z) => {
+    const cx = Math.floor(x / CS), cz = Math.floor(z / CS), c = W.generateChunk(cx, cz, 'crystal');
+    return c.blocks[(y << 8) | ((z - cz * CS) << 4) | (x - cx * CS)];
+  };
+  for (const [px, py, pz] of W.PYLONS) {
+    assert.ok(Math.abs(Math.hypot(px, pz) - 26) < 1, `pillar ${px},${pz}: radius ${Math.hypot(px, pz).toFixed(2)}`);
+    const h = py - 1 - W.CRYSTAL_TOP;
+    assert.ok(h >= 10 && h <= 16, `pillar ${px},${pz}: height ${h}`);
+    heights.add(h);
+    assert.equal(get(px, py, pz), B.PYLON, `pylon ${px},${py},${pz}`);
+    assert.equal(get(px, py + 1, pz), B.AIR);
+    for (const [dx, dz] of [[-1, -1], [0, 0], [1, 1], [1, -1]]) {
+      for (let y = W.CRYSTAL_TOP + 1; y < py - 1; y++) assert.equal(get(px + dx, y, pz + dz), B.VOIDSTONE, `column ${px + dx},${y},${pz + dz}`);
+      assert.equal(get(px + dx, py - 1, pz + dz), B.CRYSTAL_FRAME, 'capital');
+    }
+    assert.ok(Math.abs(px) > 3 || pz < 0, `pillar ${px},${pz} blocks the arrival view`);
+  }
+  assert.ok(heights.size > 1, 'pillar heights vary');
+  assert.deepEqual(W.PYLONS, WorldGenModule(12345, K).PYLONS);
+});
+
 // Ember Realm terrain over 17 x 17 = 289 chunks (gate Phase 2, items 2 and 3).
 test('ember: bedrock shell, roof bumps to y 116, lava sea, the 4 blocks, and the Emberite vein rate', () => {
   const W = WorldGenModule(12345, K), R = 8, N = (2 * R + 1) ** 2;

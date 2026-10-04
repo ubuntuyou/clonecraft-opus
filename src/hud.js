@@ -70,6 +70,15 @@ const hud = {
     const text = lost ? '?' : d < 2 ? 'At spawn' : `${Math.round(d)} blocks to spawn`;
     if (text !== this.compassText) { this.compassText = text; this.compassEl.lastChild.textContent = text; }
   },
+  // The boss bar (Phase 6): `frac` of the HP (0..1); `shield` tints it turquoise. null hides it.
+  bossEl: $('bossbar'), bossShown: false, bossFrac: -1, bossShield: null,
+  bossBar(frac, shield = false) {
+    const on = frac !== null;
+    if (on !== this.bossShown) { this.bossShown = on; this.bossEl.classList.toggle('on', on); }
+    if (!on) return;
+    if (shield !== this.bossShield) { this.bossShield = shield; this.bossEl.classList.toggle('shield', shield); }
+    if (Math.abs(frac - this.bossFrac) > 1e-4) { this.bossFrac = frac; this.bossEl.lastChild.firstChild.style.width = `${(frac * 100).toFixed(2)}%`; }
+  },
   toast(msg) { this.toastEl.textContent = msg; this.toastEl.style.opacity = 1; this.toastT = 2.5; },
   showItemName() {
     const s = inv.held();

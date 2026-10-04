@@ -23,7 +23,7 @@ let lockSoft = false, escLock = false, softLockAt = -1e9, pausedAt = -1e9;
 const resumeEl = document.getElementById('resume');   // $() is defined later
 function lockRefused() {
   if (lockSoft && game.state === 'playing') resumeEl.style.display = 'block';
-  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes' && game.state !== 'travel') showPause();
+  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes' && game.state !== 'travel' && game.state !== 'victory') showPause();
 }
 function requestLock(soft) {
   lockSoft = !!soft;
@@ -57,6 +57,10 @@ addEventListener('keydown', (e) => {
   if (e.code === 'F3') { e.preventDefault(); game.debug = !game.debug; return; }
   if (game.state === 'inventory') { inventoryKey(e); return; }
   if (game.state === 'homes') { homesKey(e); return; }
+  if (game.state === 'victory') {   // the victory screen: Esc returns to play, like Continue
+    if (e.code === 'Escape') { e.preventDefault(); if (!e.repeat) resumeGame(true); }
+    return;
+  }
   if (game.state === 'paused' && e.code === 'Escape') {   // the 400 ms guard skips the Esc that paused the game
     e.preventDefault();
     if (!e.repeat && performance.now() - pausedAt > 400) resumeGame(true);
@@ -297,10 +301,10 @@ function updateCamera(dt) {
 
 // Armor applies to these damage kinds. Each armor point cuts the damage by 4%, up to 80%.
 // Each worn Emberite piece cuts lava damage by 20% (SPEC_realms, Phase 4).
-const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1, fireball: 1 };
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1, fireball: 1, shard: 1, slam: 1 };
 function armorFactor() { return 1 - Math.min(0.8, inv.armorPoints() * 0.04); }
 const emberitePieces = () => inv.armor.filter((s) => s && ITEMS[s.id].armor?.tier === EMBERITE_ARMOR).length;
-// kind: mob, arrow, explosion, lightning, fireball (armored), or fall, lava, cactus, void (not armored).
+// kind: mob, arrow, explosion, lightning, fireball, shard, slam (armored), or fall, lava, cactus, void (not armored).
 // No damage lands while a menu, the loading screen, or the travel screen shows.
 function damagePlayer(amount, cause, from, kind = 'mob') {
   const p = player;

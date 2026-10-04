@@ -57,6 +57,16 @@
   #armorbar i { width: 18px; height: 18px; background-size: contain; image-rendering: pixelated; }
   #itemname { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(8px + var(--slot) + 62px);
     font-size: 17px; font-weight: bold; text-shadow: 2px 2px 0 #3f3f3f; opacity: 0; transition: opacity .5s; }
+  /* The boss bar (Phase 6): the boss name over its HP, at the top center. */
+  #bossbar { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); width: min(480px, 70vw);
+    display: none; flex-direction: column; align-items: center; gap: 4px; }
+  #bossbar.on { display: flex; }
+  #bossbar span { font-size: 16px; font-weight: bold; text-shadow: 2px 2px 0 #1a0f33;
+    background: rgba(0,0,0,.6); padding: 1px 8px; border-radius: 2px; }   /* .6 backing: 4.5:1 over the pale aurora (R2) */
+  #bossbar .bar { width: 100%; height: 10px; background: #1a1230; border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+  #bossbar .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(#e6c8ff, #9a5cf0 60%, #6a2fc0);
+    transition: width .25s ease-out; }
+  #bossbar.shield .bar i { background: linear-gradient(#d8fffb, #5ce6dc 60%, #2a9ea0); }
   #toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 18px; font-weight: bold;
     text-shadow: 2px 2px 0 #3f3f3f; opacity: 0; transition: opacity .6s; text-align: center; }
   /* compass dial (Batch 16): the needle points to the spawn while a compass is held */
@@ -221,6 +231,10 @@
   #travel .loadbar { width: 320px; max-width: 80vw; }
   #death h1 { font-size: 48px; margin: 0 0 10px; text-shadow: 3px 3px 0 #3f0000; }
   #death p { margin: 0 0 18px; }
+  /* The victory screen (Phase 6): the world pauses behind it. */
+  #victory { flex-direction: column; background: radial-gradient(ellipse at center, rgba(70,40,130,.78) 0%, rgba(8,4,20,.9) 75%); z-index: 5; }
+  #victory h1 { font-size: 40px; margin: 0 0 12px; text-align: center; text-shadow: 3px 3px 0 #1a0f33; }
+  #victory p { margin: 0 0 18px; font-size: 18px; }
 </style>
 </head>
 <body>
@@ -236,6 +250,7 @@
   <div id="resume">Click to resume · Esc for the menu</div>
   <div id="miningbar"><i></i></div>
   <div id="debug"></div>
+  <div id="bossbar"><span>Prism Colossus</span><div class="bar"><i></i></div></div>
   <div id="toast"></div>
   <div id="itemname"></div>
   <div id="hearts"></div>
@@ -381,6 +396,12 @@
   <h1>You died!</h1>
   <p id="deathMsg"></p>
   <button class="btn" id="respawnBtn">Respawn</button>
+</div>
+
+<div id="victory" class="screen">
+  <h1>The Prism Colossus is defeated</h1>
+  <p id="victoryTime"></p>
+  <button class="btn" id="victoryBtn">Continue</button>
 </div>
 
 <script type="module" src="./main.js"></script>

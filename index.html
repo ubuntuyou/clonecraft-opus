@@ -58,6 +58,16 @@
   #armorbar i { width: 18px; height: 18px; background-size: contain; image-rendering: pixelated; }
   #itemname { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(8px + var(--slot) + 62px);
     font-size: 17px; font-weight: bold; text-shadow: 2px 2px 0 #3f3f3f; opacity: 0; transition: opacity .5s; }
+  /* The boss bar (Phase 6): the boss name over its HP, at the top center. */
+  #bossbar { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); width: min(480px, 70vw);
+    display: none; flex-direction: column; align-items: center; gap: 4px; }
+  #bossbar.on { display: flex; }
+  #bossbar span { font-size: 16px; font-weight: bold; text-shadow: 2px 2px 0 #1a0f33;
+    background: rgba(0,0,0,.6); padding: 1px 8px; border-radius: 2px; }   /* .6 backing: 4.5:1 over the pale aurora (R2) */
+  #bossbar .bar { width: 100%; height: 10px; background: #1a1230; border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+  #bossbar .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(#e6c8ff, #9a5cf0 60%, #6a2fc0);
+    transition: width .25s ease-out; }
+  #bossbar.shield .bar i { background: linear-gradient(#d8fffb, #5ce6dc 60%, #2a9ea0); }
   #toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 18px; font-weight: bold;
     text-shadow: 2px 2px 0 #3f3f3f; opacity: 0; transition: opacity .6s; text-align: center; }
   /* compass dial (Batch 16): the needle points to the spawn while a compass is held */
@@ -222,6 +232,10 @@
   #travel .loadbar { width: 320px; max-width: 80vw; }
   #death h1 { font-size: 48px; margin: 0 0 10px; text-shadow: 3px 3px 0 #3f0000; }
   #death p { margin: 0 0 18px; }
+  /* The victory screen (Phase 6): the world pauses behind it. */
+  #victory { flex-direction: column; background: radial-gradient(ellipse at center, rgba(70,40,130,.78) 0%, rgba(8,4,20,.9) 75%); z-index: 5; }
+  #victory h1 { font-size: 40px; margin: 0 0 12px; text-align: center; text-shadow: 3px 3px 0 #1a0f33; }
+  #victory p { margin: 0 0 18px; font-size: 18px; }
 </style>
   <script type="module" crossorigin>import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
@@ -374,6 +388,7 @@ const B = {
   PORTAL_EMBER: 181,  // the Ember portal pane (Phase 3); src/portals.js lights and removes it
   // Crystal Realm (SPEC_realms, Phase 5)
   PORTAL_CRYSTAL: 182, CRYSTAL_FRAME: 183, VOIDSTONE: 184, GLIMMER_MOSS: 185,
+  PYLON: 186,         // the Resonance Pylon on each arena pillar (Phase 6); src/boss.js reads it
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
@@ -568,6 +583,10 @@ defBlock(B.CRYSTAL_FRAME, { name: 'Crystal Frame', tex: { top: 'crystal_frame_to
 defBlock(B.VOIDSTONE, { name: 'Voidstone', tex: all('voidstone'), hardness: 3, tool: 'pickaxe' });
 defBlock(B.GLIMMER_MOSS, { name: 'Glimmer Moss', tex: { top: 'glimmer_moss_top', bottom: 'voidstone', side: 'glimmer_moss_side' },
   hardness: 0.6, tool: 'shovel', drop: B.VOIDSTONE, glows: true, sound: 'grass' });
+// The Resonance Pylon (Phase 6): crystal light 15. Any hit breaks it, and it drops nothing. It has no
+// item, so no player can rebuild a pylon and shield the boss again.
+defBlock(B.PYLON, { name: 'Resonance Pylon', tex: { top: 'pylon_top', bottom: 'pylon_top', side: 'pylon' }, hardness: 0,
+  emitCry: 15, drop: null, noItem: true, glows: true, sound: 'glass' });
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;
@@ -654,6 +673,7 @@ const I = {
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
   RAW_EMBERITE: 256, EMBERITE: 257, EMBER_HEART: 258, EMBER_DUST: 259,
+  PRISM_HEART: 260,   // the boss trophy (Phase 6)
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -676,6 +696,7 @@ defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
 defItem(I.EMBERITE, { name: 'Emberite Ingot' });
 defItem(I.EMBER_HEART, { name: 'Ember Heart', maxStack: 16 });
 defItem(I.EMBER_DUST, { name: 'Ember Dust' });
+defItem(I.PRISM_HEART, { name: 'Prism Heart', maxStack: 1 });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
 BLOCKS[B.EMBER_LAMP].drop = [I.EMBER_DUST, 2, 4];
@@ -1481,6 +1502,25 @@ paintTile('crystal_frame_top', (P, rng) => {
   P.copy('obsidian');
   P.fill((x, y) => { if ((x === 7 || x === 8) && y > 2 && y < 13) P.set(x, y, mix3([40, 170, 170], [190, 250, 240], rng())); });
 });
+// Resonance Pylon (Phase 6): a pale crystal prism in a voidstone collar. The core texels have red > 0.8,
+// so they glow (the block sets `glows`).
+paintTile('pylon', (P, rng) => {
+  paintVoidstone(P, rng);
+  P.fill((x, y) => {
+    const d = Math.abs(x - 7.5);
+    if (d > 4.6 - Math.abs(y - 7.5) * 0.12 || y < 1 || y > 14) return;
+    const t = clamp(1 - d / 5 + (rng() - 0.5) * 0.12, 0, 1);
+    P.set(x, y, x === 7 || x === 8 ? [240, 255, 252] : mix3([96, 70, 190], [214, 250, 255], t));
+  });
+  for (let x = 2; x < 14; x++) { P.set(x, 0, [26, 20, 40]); P.set(x, 15, [26, 20, 40]); }
+});
+paintTile('pylon_top', (P, rng) => {
+  paintVoidstone(P, rng);
+  P.fill((x, y) => {
+    const d = Math.abs(x - 7.5) + Math.abs(y - 7.5);
+    if (d < 5.5) P.set(x, y, d < 2 ? [244, 255, 252] : mix3([110, 84, 200], [214, 250, 255], 1 - d / 5.5 + (rng() - 0.5) * 0.1));
+  });
+});
 // Crystal portal: a spiral of turquoise and pale violet on deep indigo (break particles, fallback look).
 paintTile('portal_crystal', (P, rng) => {
   P.fill((x, y) => {
@@ -2127,6 +2167,18 @@ ITEM_PIX[I.EMBER_HEART] = pixArt((set) => {
     set(x, y, f > -0.02 ? [40, 10, 12] : core < 2.2 ? [255, 236, 170] : core < 3.6 ? [255, 150, 48] : core < 4.8 ? [196, 58, 26] : [96, 24, 22]);
   }
   set(5, 5, [255, 210, 170]);
+});
+// Phase 6: the Prism Heart, a faceted heart of pale crystal with a violet core.
+ITEM_PIX[I.PRISM_HEART] = pixArt((set) => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const u = (x + 0.5 - 8) / 6.4, v = (8.6 - (y + 0.5)) / 6.4;
+    const f = (u * u + v * v - 1) ** 3 - u * u * v * v * v;
+    if (f > 0) continue;
+    const core = Math.hypot(x + 0.5 - 8, y + 0.5 - 8.5), facet = (x + y) % 4 === 0;
+    set(x, y, f > -0.02 ? [30, 22, 70] : core < 2.2 ? [250, 240, 255] : core < 3.6 ? [190, 140, 255]
+      : facet ? [220, 255, 250] : x < 8 ? [110, 220, 230] : [70, 170, 200]);
+  }
+  set(5, 5, [255, 255, 255]); set(6, 4, [230, 255, 250]);
 });
 // Travel icons (Batch 16): a boat and a minecart from the side, a compass from above.
 ITEM_PIX[I.BOAT] = pixArt((set) => {
@@ -3375,7 +3427,7 @@ function WorldGenModule(SEED, K) {
   // ---------------------------------------------------------------- crystal realm (SPEC_realms Phase 5)
   // Floating islands over a void. The arena island sits at the origin: radius 44 at most, a flat
   // Glimmer Moss top at y 96, and an underside that tapers to a point. A voidstone ring at radius 26
-  // marks the pillar ring (Phase 6). The arrival portal (CRYSTAL_ARRIVAL) stands on the arena at z 36,
+  // carries the 6 pillars (Phase 6). The arrival portal (CRYSTAL_ARRIVAL) stands on the arena at z 36,
   // on a voidstone pad. Other islands sit on a 64-block jittered grid: 1 cell in 2 holds an island
   // (radius 7..22), 1 in 5.5 an islet (radius 2..5). Their tops lie at y 70..110. An island whose
   // reach (radius x ISLE_REACH) comes within ISLE_CLEAR blocks of the origin is dropped. Crystal
@@ -3387,6 +3439,14 @@ function WorldGenModule(SEED, K) {
   // The arrival portal opening: 3 wide along x, 4 tall, in the plane z = 36. Its frame ring sits
   // one cell around it, the bottom row flush with the arena floor.
   const CRYSTAL_ARRIVAL = { axis: 'x', x0: -1, y0: CRYSTAL_TOP + 1, z0: 36, w: 3, h: 4 };
+  // The 6 arena pillars (Phase 6): 3x3 voidstone columns centered on the ring of radius PILLAR_R, at
+  // 0, 60, ..., 300 degrees, so none blocks the view from the arrival portal. Each is 10..16 blocks
+  // tall above the floor, with a Crystal Frame capital and a Resonance Pylon on the center of the top.
+  // PYLONS lists the pylon cells as [x, y, z].
+  const PYLONS = [0, 1, 2, 3, 4, 5].map((i) => {
+    const a = i * Math.PI / 3, h = 10 + Math.floor(hashF(SEED ^ 0x9e11a, i, 7) * 7);
+    return [Math.round(Math.cos(a) * PILLAR_R), CRYSTAL_TOP + h + 1, Math.round(Math.sin(a) * PILLAR_R)];
+  });
   const isleCache = new Map();
   // The island of grid cell (gx, gz): { x, z, r, top, hill, depth } or null. Pure and memoized.
   function isleAt(gx, gz) {
@@ -3463,6 +3523,15 @@ function WorldGenModule(SEED, K) {
         if (Math.abs(d - PILLAR_R) < 0.55 || pad) blocks[i] = B.VOIDSTONE;
         if (blocks[i + 256] === B.CRYSTAL && pad) blocks[i + 256] = B.AIR;
       }
+      // the pillars and their pylons
+      for (const [px, py, pz] of PYLONS) for (let z = pz - 1; z <= pz + 1; z++) for (let x = px - 1; x <= px + 1; x++) {
+        const lx = x - x0, lz = z - z0;
+        if (lx < 0 || lx >= CS || lz < 0 || lz >= CS) continue;
+        for (let y = CRYSTAL_TOP; y < py - 1; y++) blocks[idx(lx, y, lz)] = B.VOIDSTONE;
+        blocks[idx(lx, py - 1, lz)] = B.CRYSTAL_FRAME;
+        if (x === px && z === pz) blocks[idx(lx, py, lz)] = B.PYLON;
+        heights[lz * CS + lx] = Math.max(heights[lz * CS + lx], x === px && z === pz ? py : py - 1);
+      }
       // the arrival portal: a Crystal Frame ring with crystal panes, always lit
       for (let v = -1; v <= a.h; v++) for (let u = -1; u <= a.w; u++) {
         const wx = a.x0 + u, y = a.y0 + v, lx = wx - x0, lz = a.z0 - z0;
@@ -3478,7 +3547,7 @@ function WorldGenModule(SEED, K) {
   }
 
   return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID,
-    CRYSTAL_ARRIVAL, isleAt, ISLE_CLEAR, ARENA_R };
+    CRYSTAL_ARRIVAL, isleAt, ISLE_CLEAR, ARENA_R, CRYSTAL_TOP, PYLONS };
 }
 
 const GEN_CONSTS = { CS, H, SEA, B, BIOME };
@@ -5007,7 +5076,7 @@ let lockSoft = false, escLock = false, softLockAt = -1e9, pausedAt = -1e9;
 const resumeEl = document.getElementById('resume');   // $() is defined later
 function lockRefused() {
   if (lockSoft && game.state === 'playing') resumeEl.style.display = 'block';
-  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes' && game.state !== 'travel') showPause();
+  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes' && game.state !== 'travel' && game.state !== 'victory') showPause();
 }
 function requestLock(soft) {
   lockSoft = !!soft;
@@ -5041,6 +5110,10 @@ addEventListener('keydown', (e) => {
   if (e.code === 'F3') { e.preventDefault(); game.debug = !game.debug; return; }
   if (game.state === 'inventory') { inventoryKey(e); return; }
   if (game.state === 'homes') { homesKey(e); return; }
+  if (game.state === 'victory') {   // the victory screen: Esc returns to play, like Continue
+    if (e.code === 'Escape') { e.preventDefault(); if (!e.repeat) resumeGame(true); }
+    return;
+  }
   if (game.state === 'paused' && e.code === 'Escape') {   // the 400 ms guard skips the Esc that paused the game
     e.preventDefault();
     if (!e.repeat && performance.now() - pausedAt > 400) resumeGame(true);
@@ -5281,10 +5354,10 @@ function updateCamera(dt) {
 
 // Armor applies to these damage kinds. Each armor point cuts the damage by 4%, up to 80%.
 // Each worn Emberite piece cuts lava damage by 20% (SPEC_realms, Phase 4).
-const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1, fireball: 1 };
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1, fireball: 1, shard: 1, slam: 1 };
 function armorFactor() { return 1 - Math.min(0.8, inv.armorPoints() * 0.04); }
 const emberitePieces = () => inv.armor.filter((s) => s && ITEMS[s.id].armor?.tier === EMBERITE_ARMOR).length;
-// kind: mob, arrow, explosion, lightning, fireball (armored), or fall, lava, cactus, void (not armored).
+// kind: mob, arrow, explosion, lightning, fireball, shard, slam (armored), or fall, lava, cactus, void (not armored).
 // No damage lands while a menu, the loading screen, or the travel screen shows.
 function damagePlayer(amount, cause, from, kind = 'mob') {
   const p = player;
@@ -7577,6 +7650,8 @@ function fillRecipe(r, row) {
  * keeps 8..16 blocks from the player, and shoots a fireball every 3 s
  * while it sees the player. The Cinder Knight is a melee mob with half knockback and half arrow
  * damage (`def.arrowRes`, read in projectiles.js).
+ * Crystal Realm mobs (SPEC_realms Phase 6): the Shardling is a plain melee mob. The Prism Colossus type
+ * holds the model and the stats; class Colossus in src/boss.js extends Mob and replaces its update.
  * ===================================================================================== */
 
 const mobs = [];
@@ -7663,6 +7738,22 @@ const MOB_TEXTURES = {
   }),
   ck_trim: () => mtex('ck_trim', [128, 66, 34], 0.2),
   ck_plume: () => mtex('ck_plume', [210, 60, 22], 0.25, (set, r) => { for (let i = 0; i < 20; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 150, 40]); }),
+  // Crystal Realm mobs (Phase 6): the Prism Colossus and the Shardling
+  pc_body: () => mtex('pc_body', [52, 40, 86], 0.2, (set, r) => {
+    for (let i = 0; i < 3; i++) { let x = r() * 16 | 0, y = 0; while (y < 16) { set(x, y, [90, 230, 222]); y++; if (r() < 0.4) x = (x + (r() < 0.5 ? 1 : 15)) & 15; } }
+    for (let i = 0; i < 12; i++) set(r() * 16 | 0, r() * 16 | 0, [30, 22, 52]);
+  }),
+  pc_face: () => mtex('pc_face', [52, 40, 86], 0.16, (set) => {
+    for (let x = 2; x < 14; x++) set(x, 4, [30, 22, 52]);
+    for (const x0 of [3, 10]) for (let y = 6; y < 9; y++) for (let x = x0; x < x0 + 3; x++) set(x, y, [236, 255, 252]);
+    for (let x = 5; x < 11; x++) set(x, 12, [150, 110, 255]);
+  }),
+  pc_crystal: () => mtex('pc_crystal', [140, 236, 232], 0.12, (set, r) => {
+    for (let i = 0; i < 30; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.6 ? [236, 255, 252] : [176, 150, 255]);
+  }),
+  pc_core: () => mtex('pc_core', [214, 190, 255], 0.08, (set) => { for (let y = 5; y < 11; y++) for (let x = 5; x < 11; x++) set(x, y, [255, 255, 255]); }),
+  sh_body: () => mtex('sh_body', [110, 214, 222], 0.18, (set, r) => { for (let i = 0; i < 24; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [220, 255, 250] : [130, 96, 220]); }),
+  sh_face: () => mtex('sh_face', [110, 214, 222], 0.12, (set) => eyes(set, 7, 3, 11, [236, 255, 252], [60, 20, 110])),
   c_skin: () => mtex('c_skin', [86, 172, 74], 0.5, (set, r) => { for (let i = 0; i < 50; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [40, 90, 40] : [170, 220, 160]); }),
   c_face: () => mtex('c_face', [86, 172, 74], 0.45, (set) => {
     const k = [16, 22, 16];
@@ -7824,6 +7915,48 @@ const MOB_TYPES = {
       sw.scale.setScalar(0.8); sw.position.set(0, -0.66, 0.12); sw.rotation.set(0, -Math.PI / 2, -Math.PI / 4);
       arms[0].add(sw);
       return { head, legs, arms };
+    },
+  },
+  // Shardling (SPEC_realms Phase 6): the Prism Colossus summons it. A small, fast crystal biter.
+  shardling: {
+    hostile: true, hp: 8, w: 0.55, h: 0.7, speed: 4, sound: null, damage: 3, reach: 1.0, sense: 32, fireproof: true,
+    glow: 0.9, kill: 'was cut by a Shardling',
+    drops: () => [[B.CRYSTAL, Math.random() < 0.5 ? 1 : 0]],
+    build(root, M) {
+      limb(root, M, 0.5, 0.36, 0.56, 'sh_body', 0, 0.42, 0);
+      const head = limb(root, M, 0.36, 0.32, 0.3, headFaces('sh_body', 'sh_face'), 0, 0.5, 0.28, 0, 0.04, 0.12);
+      for (const [x, z, t] of [[0, 0, 0], [-0.14, -0.14, -0.35], [0.14, -0.1, 0.4]]) limb(root, M, 0.1, 0.32, 0.1, 'pc_crystal', x, 0.58, z, 0, 0.16, 0).rotation.z = t;
+      const legs = [[-0.18, 0.18], [0.18, 0.18], [-0.18, -0.18], [0.18, -0.18]].map(([x, z]) => limb(root, M, 0.12, 0.26, 0.12, 'pc_crystal', x, 0.26, z, 0, -0.13, 0));
+      return { head, legs };
+    },
+  },
+  // Prism Colossus (SPEC_realms Phase 6): the arena boss. src/boss.js owns its behavior (class Colossus).
+  colossus: {
+    hostile: true, hp: 300, w: 2.4, h: 4.5, speed: 2.5, sound: null, kbRes: 1, fireproof: true, flies: true, glow: 1,
+    kill: 'was crushed by the Prism Colossus',
+    drops: () => [[I.PRISM_HEART, 1], [B.CRYSTAL, randInt(8, 16)], [I.EMBERITE, randInt(2, 4)]],
+    build(root, M) {
+      const torso = limb(root, M, 2.0, 1.7, 1.2, 'pc_body', 0, 2.7, 0);
+      limb(torso, M, 0.5, 0.5, 0.12, 'pc_core', 0, 0.1, 0.62);
+      for (const x of [-0.75, 0.75]) limb(torso, M, 0.4, 0.9, 0.4, 'pc_crystal', x, 0.85, -0.2, 0, 0.3, 0).rotation.z = x * 0.5;   // shoulder spires
+      limb(torso, M, 0.3, 1.1, 0.3, 'pc_crystal', 0, 0.85, -0.35, 0, 0.4, 0);
+      const head = limb(root, M, 1.0, 0.9, 0.9, headFaces('pc_body', 'pc_face'), 0, 3.55, 0.1, 0, 0.45, 0);
+      limb(head, M, 0.24, 0.5, 0.24, 'pc_crystal', 0, 0.95, 0, 0, 0.2, 0);
+      const arms = [-1.35, 1.35].map((x) => {
+        const a = limb(root, M, 0.7, 1.7, 0.7, 'pc_body', x, 3.3, 0, 0, -0.85, 0);
+        limb(a, M, 0.9, 0.8, 0.9, 'pc_crystal', 0, -1.9, 0);   // a crystal fist
+        return a;
+      });
+      // the lower body tapers to a hovering crystal point
+      const hips = limb(root, M, 1.3, 0.8, 0.9, 'pc_body', 0, 1.55, 0);
+      limb(hips, M, 0.7, 0.9, 0.6, 'pc_crystal', 0, -0.75, 0).rotation.y = Math.PI / 4;
+      limb(hips, M, 0.34, 0.6, 0.34, 'pc_crystal', 0, -1.35, 0).rotation.y = Math.PI / 4;
+      const orbit = new THREE.Group(); orbit.position.y = 2.7; root.add(orbit);
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3, sh = limb(orbit, M, 0.22, 0.6, 0.22, 'pc_crystal', Math.sin(a) * 2.1, i % 2 ? 0.5 : -0.4, Math.cos(a) * 2.1);
+        sh.rotation.z = i % 2 ? 0.5 : -0.5;
+      }
+      return { head, legs: [], arms, torso, orbit };
     },
   },
   creeper: {
@@ -8400,8 +8533,11 @@ const vehicles = (() => {
 // A player arrow deals `def.arrowRes` x its damage to a mob with that field (the Cinder Knight takes half).
 // A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
 // on the player, on a solid or liquid cell, or after FIREBALL_FLIGHT s. It breaks no block.
+// A crystal shard (Phase 6) is a bolt like the fireball: kind 'shard', SHARD_SPEED, armored 'shard'
+// damage. The Prism Colossus fires it (src/boss.js).
+// A player arrow that meets a Resonance Pylon breaks the pylon and shatters (Phase 6).
 
-const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10, FIREBALL_SPEED = 12, FIREBALL_FLIGHT = 6;
+const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10, FIREBALL_SPEED = 12, FIREBALL_FLIGHT = 6, SHARD_SPEED = 15;
 const projectiles = (() => {
   const list = [];
   // one vertex-coloured geometry along +z: shaft, head, and fletching
@@ -8427,6 +8563,19 @@ const projectiles = (() => {
   const fireShell = new THREE.BoxGeometry(0.34, 0.34, 0.34), fireCore = new THREE.BoxGeometry(0.2, 0.2, 0.2);
   const shellMat = new THREE.MeshBasicMaterial({ color: 0xff5a14, transparent: true, opacity: 0.8 });
   const coreMat = new THREE.MeshBasicMaterial({ color: 0xffe080 });
+  // a crystal shard: a long pale prism along +z with a violet glow shell; both always full bright
+  const shardCore = new THREE.BoxGeometry(0.1, 0.1, 0.55), shardShell = new THREE.BoxGeometry(0.2, 0.2, 0.42);
+  const shardCoreMat = new THREE.MeshBasicMaterial({ color: 0xe8fffc });
+  const shardShellMat = new THREE.MeshBasicMaterial({ color: 0x9a6cff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+  // The bolt kinds: speed, the death cause, the damage kind, and the burst.
+  const BOLTS = {
+    fireball: { speed: FIREBALL_SPEED, cause: 'was burned by an Ember Wisp', dmgKind: 'fireball',
+      burst(x, y, z) { particles.flameBurst(x, y, z); audio.fireballHit(x, y, z); },
+      trail(a) { if (Math.random() < 0.7) particles.fire(a.pos.x, a.pos.y - 0.1, a.pos.z, 0.2); } },
+    shard: { speed: SHARD_SPEED, cause: 'was pierced by a crystal shard', dmgKind: 'shard',
+      burst(x, y, z) { particles.crystalBurst(x, y, z, 10, 2.5); audio.dig('glass', 0.7, x, y, z); },
+      trail(a) { if (Math.random() < 0.6) particles.crystalSpark(a.pos.x, a.pos.y, a.pos.z, 0, 0, 0, 0.35); } },
+  };
   const _t = new THREE.Vector3(), _d = new THREE.Vector3();
   function shoot(x, y, z, vx, vy, vz, dmg, shooter) {
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true }));
@@ -8446,17 +8595,27 @@ const projectiles = (() => {
     scene.add(mesh); list.push(a);
     return a;
   }
-  function burst(x, y, z) { particles.flameBurst(x, y, z); audio.fireballHit(x, y, z); }
-  // Moves a fireball one frame. Returns false when the fireball is gone.
-  function flyFireball(a, dt) {
+  // A crystal shard from (x, y, z) along the unit direction (dx, dy, dz) at SHARD_SPEED.
+  function shard(x, y, z, dx, dy, dz, dmg, shooter) {
+    const mesh = new THREE.Group();
+    mesh.add(new THREE.Mesh(shardCore, shardCoreMat), new THREE.Mesh(shardShell, shardShellMat));
+    const a = { kind: 'shard', pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(dx, dy, dz).multiplyScalar(SHARD_SPEED),
+      dmg, shooter, stuck: null, age: 0, mesh };
+    mesh.position.copy(a.pos); mesh.lookAt(_t.copy(a.pos).add(a.vel));
+    scene.add(mesh); list.push(a);
+    return a;
+  }
+  // Moves a bolt (a fireball or a shard) one frame. Returns false when the bolt is gone.
+  function flyBolt(a, dt) {
+    const K = BOLTS[a.kind];
     if (a.age > FIREBALL_FLIGHT) return false;
     const p = player, sx = a.vel.x * dt, sy = a.vel.y * dt, sz = a.vel.z * dt;
     if (!p.dead) {
       const hw = p.w / 2 + 0.17;
       if (rayBox(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, p.pos.x - hw, p.pos.y - 0.17, p.pos.z - hw, p.pos.x + hw, p.pos.y + p.h + 0.17, p.pos.z + hw, 1)) {
         _d.set(a.vel.x, 0, a.vel.z).normalize();
-        damagePlayer(a.dmg, 'was burned by an Ember Wisp', { x: a.pos.x - _d.x, z: a.pos.z - _d.z }, 'fireball');
-        burst(a.pos.x, a.pos.y, a.pos.z);
+        damagePlayer(a.dmg, K.cause, { x: a.pos.x - _d.x, z: a.pos.z - _d.z }, K.dmgKind);
+        K.burst(a.pos.x, a.pos.y, a.pos.z);
         return false;
       }
     }
@@ -8465,15 +8624,16 @@ const projectiles = (() => {
       const x = a.pos.x + sx * k / n, y = a.pos.y + sy * k / n, z = a.pos.z + sz * k / n;
       const id = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
       if (id === UNLOADED) return false;
-      if (SOLID[id] || LIQ_KIND[id]) { burst(x - sx / n, y - sy / n, z - sz / n); return false; }
+      if (SOLID[id] || LIQ_KIND[id]) { K.burst(x - sx / n, y - sy / n, z - sz / n); return false; }
     }
     a.pos.x += sx; a.pos.y += sy; a.pos.z += sz;
     a.mesh.position.copy(a.pos);
-    a.mesh.rotation.x += dt * 7; a.mesh.rotation.y += dt * 5;
-    if (Math.random() < 0.7) particles.fire(a.pos.x, a.pos.y - 0.1, a.pos.z, 0.2);
+    if (a.kind === 'fireball') { a.mesh.rotation.x += dt * 7; a.mesh.rotation.y += dt * 5; }
+    else a.mesh.children[1].rotation.z += dt * 9;
+    K.trail(a);
     return true;
   }
-  function remove(i) { const a = list[i]; scene.remove(a.mesh); if (a.kind !== 'fireball') a.mesh.material.dispose(); list.splice(i, 1); }
+  function remove(i) { const a = list[i]; scene.remove(a.mesh); if (!a.kind) a.mesh.material.dispose(); list.splice(i, 1); }
   function clear() { for (let i = list.length - 1; i >= 0; i--) remove(i); }
   function stickAt(a, x, y, z, bx, by, bz) {
     a.pos.set(x, y, z); a.stuck = { x: bx, y: by, z: bz }; a.age = 0; a.vel.set(0, 0, 0);
@@ -8487,7 +8647,7 @@ const projectiles = (() => {
       a.age += dt;
       const bx = Math.floor(a.pos.x), by = Math.floor(a.pos.y), bz = Math.floor(a.pos.z);
       if (world.getBlock(bx, by, bz) === UNLOADED && by >= 0 && by < H) { remove(i); continue; }
-      if (a.kind === 'fireball') { if (!flyFireball(a, dt)) remove(i); continue; }
+      if (a.kind) { if (!flyBolt(a, dt)) remove(i); continue; }
       a.mesh.material.color.setScalar(Math.max(0.1, world.brightnessAt(bx, by, bz, game.daylight)));
       if (a.stuck) {
         if (a.age > ARROW_STUCK) { remove(i); continue; }
@@ -8523,17 +8683,24 @@ const projectiles = (() => {
         const x = a.pos.x + sx * k / n, y = a.pos.y + sy * k / n, z = a.pos.z + sz * k / n;
         const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z), id = world.getBlock(cx, cy, cz);
         if (!SOLID[id] || id === UNLOADED) continue;
+        if (id === B.PYLON && !a.shooter) {   // a player arrow breaks a pylon and shatters
+          world.setBlock(cx, cy, cz, B.AIR);
+          particles.blockBreak(cx, cy, cz, id); audio.dig('glass', 1, cx + 0.5, cy + 0.5, cz + 0.5);
+          stuck = 'gone';
+          break;
+        }
         const back = 0.25 / (Math.hypot(sx, sy, sz) || 1);   // the centre stays 0.25 back, so only the head pokes in
         stickAt(a, x - sx * back, y - sy * back, z - sz * back, cx, cy, cz);
         stuck = true;
       }
+      if (stuck === 'gone') { remove(i); continue; }
       if (stuck) continue;
       a.pos.x += sx; a.pos.y += sy; a.pos.z += sz;
       a.mesh.position.copy(a.pos);
       a.mesh.lookAt(_t.copy(a.pos).add(a.vel));
     }
   }
-  return { list, shoot, fireball, update, clear };
+  return { list, shoot, fireball, shard, update, clear };
 })();
 
 // ---- explosions ------------------------------------------------------------------------
@@ -9033,6 +9200,19 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });
     },
+    // Crystal sparks (Phase 6): turquoise, pale, and violet glowing specks. crystalSpark emits one with
+    // the given velocity and life; crystalBurst emits n in all directions at up to `speed`.
+    crystalSpark(x, y, z, vx, vy, vz, life = 0.6, size = 0.09) {
+      const c = Math.random();
+      emit(x, y, z, vx, vy, vz, { color: c < 0.45 ? [0.35, 1, 0.92] : c < 0.8 ? [0.85, 0.97, 1] : [0.72, 0.5, 1],
+        life: life * randRange(0.7, 1.2), size: size * randRange(0.7, 1.3), grav: 0, drag: 1.5, flags: 6 });
+    },
+    crystalBurst(x, y, z, n = 12, speed = 3) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, b = Math.acos(randRange(-1, 1)), s = randRange(0.3, 1) * speed;
+        this.crystalSpark(x, y, z, Math.sin(b) * Math.cos(a) * s, Math.cos(b) * s, Math.sin(b) * Math.sin(a) * s, 0.6, 0.1);
+      }
+    },
     portal(x, y, z, alongX, cry) {   // a spark drifts off a portal pane (cell x, y, z); cry: a crystal pane
       const off = randRange(-0.6, 0.6), c = Math.random();
       const color = cry ? (c < 0.45 ? [0.3, 1, 0.92] : c < 0.8 ? [0.75, 0.95, 1] : [0.78, 0.55, 1])
@@ -9356,6 +9536,15 @@ const hud = {
     const text = lost ? '?' : d < 2 ? 'At spawn' : `${Math.round(d)} blocks to spawn`;
     if (text !== this.compassText) { this.compassText = text; this.compassEl.lastChild.textContent = text; }
   },
+  // The boss bar (Phase 6): `frac` of the HP (0..1); `shield` tints it turquoise. null hides it.
+  bossEl: $('bossbar'), bossShown: false, bossFrac: -1, bossShield: null,
+  bossBar(frac, shield = false) {
+    const on = frac !== null;
+    if (on !== this.bossShown) { this.bossShown = on; this.bossEl.classList.toggle('on', on); }
+    if (!on) return;
+    if (shield !== this.bossShield) { this.bossShield = shield; this.bossEl.classList.toggle('shield', shield); }
+    if (Math.abs(frac - this.bossFrac) > 1e-4) { this.bossFrac = frac; this.bossEl.lastChild.firstChild.style.width = `${(frac * 100).toFixed(2)}%`; }
+  },
   toast(msg) { this.toastEl.textContent = msg; this.toastEl.style.opacity = 1; this.toastT = 2.5; },
   showItemName() {
     const s = inv.held();
@@ -9451,7 +9640,7 @@ hud.build();
 
 // ---- menus and settings -------------------------------------------------------------
 
-const overlayEl = $('overlay'), deathEl = $('death'), travelEl$1 = $('travel'), playBtn = $('playBtn');
+const overlayEl = $('overlay'), deathEl = $('death'), travelEl$1 = $('travel'), victoryEl = $('victory'), playBtn = $('playBtn');
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 $('seedText').textContent = `Seed ${SEED} · the world saves itself · ?seed=${SEED} reopens it`;
 
@@ -9462,6 +9651,7 @@ function setState(s) {
   homesEl.classList.toggle('show', s === 'homes');
   deathEl.classList.toggle('show', s === 'dead');
   travelEl$1.classList.toggle('show', s === 'travel');
+  victoryEl.classList.toggle('show', s === 'victory');
   $('crosshair').style.display = s === 'playing' ? 'block' : 'none';
   if (s !== 'playing') { resumeEl.style.display = 'none'; setEscLock(false); }
   $('hud').style.display = game.started ? 'block' : 'none';
@@ -9470,7 +9660,7 @@ function setState(s) {
   if (s !== 'playing') { input.keys.clear(); input.mouseL = input.mouseR = false; resetMining(); }
 }
 function showPause() {
-  if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes' || game.state === 'travel') return;
+  if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes' || game.state === 'travel' || game.state === 'victory') return;
   setState('paused');
   setPausedAt(performance.now());
   persist.save();
@@ -9493,6 +9683,16 @@ function startOrResume() {
 playBtn.addEventListener('click', (e) => { e.stopPropagation(); startOrResume(); });
 overlayEl.addEventListener('click', (e) => { if (e.target === overlayEl) startOrResume(); });
 $('respawnBtn').addEventListener('click', () => { audio.init(); respawn(); });
+// The victory screen (Phase 6). It shows the time played in this world (game.clock). Continue and Esc
+// (player.js) return to play.
+function showVictory() {
+  const m = Math.floor(game.clock / 60), h = Math.floor(m / 60);
+  $('victoryTime').textContent = `Time played: ${h ? `${h} h ` : ''}${m % 60} min`;
+  setState('victory');
+  if (document.pointerLockElement) document.exitPointerLock();
+  persist.save();
+}
+$('victoryBtn').addEventListener('click', () => resumeGame(false));
 
 function bindSetting(id, valId, key, fmt, apply) {
   const el = $(id), val = $(valId);
@@ -10193,6 +10393,322 @@ const portals = (() => {
     TRAVEL_T, ARRIVAL_STAND,
   };
 })();
+
+/* =====================================================================================
+ * boss.js — the Prism Colossus fight (SPEC_realms Phase 6). Living header.
+ * -------------------------------------------------------------------------------------
+ * The arena: worldgen puts 6 pillars on the ring of radius 26 around the Crystal Realm origin.
+ * A Resonance Pylon (B.PYLON) sits on each pillar top (WG.PYLONS). A pylon is a plain block, so a
+ * broken pylon is a block override and stays broken with no extra state. A pylon cell in an
+ * unloaded chunk counts as standing.
+ *
+ * The boss is class Colossus, a Mob in `mobs[]`. Melee, arrows, and the crosshair reach it like any
+ * mob. Its stats and model are MOB_TYPES.colossus (mobs.js). Colossus replaces Mob.update:
+ *  - 'sleep': it hovers at HOME. It wakes when the player comes within WAKE_R of the center.
+ *  - 'fight': phase 1 while any pylon stands (shielded, 3-shard fan every 3 s). Phase 2 with no
+ *    pylon and HP above 50 % (hunts at 2.5, slams, 3-shard fan every 4 s). Phase 3 at 50 % or
+ *    below (hunts at 3.5, slams, 5-shard fan every 3 s, 2 Shardlings every 12 s, 4 alive at most).
+ *    At SLEEP_R or more from the center, it returns to HOME and sleeps again. It keeps its HP.
+ *  - 'slam': it rises for SLAM_WARN s over a particle ring of radius SLAM_R on the floor, then
+ *    drops and hits the player within SLAM_R.
+ *  - 'dying': it spins and cracks for DEATH_T s, then shatters, drops its loot, and builds the
+ *    exit portal (built lit) at the arena center.
+ * A fight resets on the player's death (full HP, Shardlings gone, sleep, the toast may show again).
+ * Leaving the realm clears `mobs[]` (realm.enter), so the next visit spawns a fresh boss.
+ *
+ * `boss.update(dt)` spawns the boss when the Crystal Realm is current, the save has no kill
+ * (realm.boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
+ * boss bar (hud.bossBar), and shows the victory screen once the kill ends.
+ * ===================================================================================== */
+
+const FLOOR = WG.CRYSTAL_TOP + 1;            // the y of the arena floor surface (97)
+const HOVER = 2;                             // the boss floats this many blocks above the floor
+const HOME = new THREE.Vector3(0.5, FLOOR + HOVER, 0.5);
+const WAKE_R = 32, SLEEP_R = 64, ROAM_R = 38;
+const SHARD_DMG = 4, SLAM_DMG = 8, SLAM_R = 4, SLAM_NEAR = 5, SLAM_WARN = 0.8, SLAM_CD = 2.5, SLAM_RISE = 1.6;
+const FAN = { 1: [3, 3], 2: [3, 4], 3: [5, 3] };   // phase -> [shards per fan, seconds between fans]
+const SPEED = { 2: 2.5, 3: 3.5 };
+const SUMMON_T = 12, SUMMON_N = 2, SHARDLINGS_MAX = 4;
+const DEATH_T = 3;
+// The exit portal: an opening 3 wide and 4 tall (like the arrival portal) in the plane z = 0.
+const EXIT = { x0: -1, y0: FLOOR, z: 0, w: 3, h: 4 };
+const PYLONS = WG.PYLONS;
+
+const pylonStands = ([x, y, z]) => { const id = world.getBlock(x, y, z); return id === B.PYLON || id === UNLOADED; };
+const standingPylons = () => PYLONS.filter(pylonStands);
+const shardlings = () => mobs.filter((m) => m.type === 'shardling' && !m.dead);
+
+class Colossus extends Mob {
+  constructor() {
+    super('colossus', HOME.x, HOME.y, HOME.z);
+    this.state = 'sleep';
+    this.toasted = false;                       // "The pylons shield it" shows once per fight
+    this.fanT = 3; this.summonT = SUMMON_T; this.slamT = 0; this.slamCD = 0; this.shieldT = 0; this.crackT = 0;
+    this.yaw = Math.PI;                          // it faces the arrival portal (+z)
+    this.phase = 1;
+    // the shield: a faint turquoise shell while a pylon stands; it flashes when a hit lands
+    this.shield = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({
+      color: 0x7ff6ea, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.shield.scale.set(2.2, 3, 2.2); this.shield.position.y = 2.4;
+    this.group.add(this.shield);   // not in this.mats: paint() would overwrite its color
+  }
+
+  remove() { super.remove(); this.shield.material.dispose(); }
+
+  // Resets the fight: full HP, sleep at HOME, the toast may show again.
+  reset() {
+    this.hp = this.def.hp; boss.hp = null; this.state = 'sleep'; this.toasted = false;
+    this.fanT = 3; this.summonT = SUMMON_T; this.slamCD = 0;
+    this.pos.copy(HOME); this.vel.set(0, 0, 0);
+  }
+
+  hurt(dmg) {
+    if (this.dead || this.state === 'dying' || this.invuln > 0) return;
+    this.invuln = 0.5;
+    if (this.state === 'sleep') this.state = 'fight';
+    if (this.phase === 1) {
+      this.shieldT = 0.4;
+      audio.dig('glass', 0.8, this.pos.x, this.pos.y + 2, this.pos.z);
+      if (!this.toasted) { this.toasted = true; hud.toast('The pylons shield it'); }
+      return;
+    }
+    this.hp -= dmg; this.hurtT = 0.3;
+    audio.armorHit();
+    particles.crystalBurst(this.pos.x, this.pos.y + 2.5, this.pos.z, 6, 2);
+    if (this.hp <= 0) { this.hp = 0; this.state = 'dying'; this.deathT = 0; this.vel.set(0, 0, 0); }
+  }
+
+  // A fan of n shards at the player's chest, spread over the horizontal plane.
+  fan(n) {
+    const p = player, ex = this.pos.x, ey = this.pos.y + 2.7, ez = this.pos.z;
+    const tx = p.pos.x - ex, ty = p.pos.y + 1.1 - ey, tz = p.pos.z - ez, d = Math.hypot(tx, tz) || 1;
+    const yaw = Math.atan2(tx, tz), pitch = Math.atan2(ty, d), step = n > 3 ? 0.2 : 0.24;
+    for (let i = 0; i < n; i++) {
+      const a = yaw + (i - (n - 1) / 2) * step;
+      const dx = Math.sin(a) * Math.cos(pitch), dy = Math.sin(pitch), dz = Math.cos(a) * Math.cos(pitch);
+      projectiles.shard(ex + dx * 1.6, ey + dy * 1.6, ez + dz * 1.6, dx, dy, dz, SHARD_DMG, this);
+    }
+    particles.crystalBurst(ex, ey, ez, 8, 2);
+    audio.fireballShoot({ x: ex, y: ey, z: ez });
+    this.armT = 0.4;
+  }
+
+  summon() {
+    const n = Math.min(SUMMON_N, SHARDLINGS_MAX - shardlings().length);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, x = this.pos.x + Math.sin(a) * 2.5, z = this.pos.z + Math.cos(a) * 2.5;
+      const m = new Mob('shardling', x, FLOOR + 0.5, z);
+      m.angry = true; mobs.push(m);
+      particles.crystalBurst(x, FLOOR + 0.5, z, 14, 3);
+    }
+    if (n > 0) audio.enchant(0.6);
+  }
+
+  slam() {
+    const p = player, dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
+    for (let i = 0; i < 40; i++) {
+      const a = i / 40 * Math.PI * 2;
+      particles.crystalSpark(this.pos.x + Math.sin(a) * 1.2, FLOOR + 0.2, this.pos.z + Math.cos(a) * 1.2, Math.sin(a) * 9, 1.5, Math.cos(a) * 9, 0.5, 0.14);
+    }
+    audio.explode(this.pos.x, FLOOR, this.pos.z);
+    if (p.dead || Math.hypot(dx, dz) > SLAM_R || p.pos.y > FLOOR + 3 || p.pos.y < FLOOR - 2) return;
+    const h0 = p.health, inv0 = p.invuln;
+    damagePlayer(SLAM_DMG, this.def.kill, this.pos, 'slam');
+    if (p.health < h0 || (p.dead && inv0 <= 0)) {   // a strong knockback on top of damagePlayer's push
+      const d = Math.hypot(dx, dz) || 1;
+      p.vel.x += dx / d * 9; p.vel.z += dz / d * 9; p.vel.y = Math.max(p.vel.y, 9);
+    }
+  }
+
+  update(dt) {
+    this.age += dt;
+    const c = world.chunkAt(Math.floor(this.pos.x), Math.floor(this.pos.z));
+    if (!c || !c.lit) return true;               // frozen until its terrain is back
+    this.invuln -= dt; this.hurtT -= dt; this.shieldT -= dt; this.armT -= dt; this.slamCD -= dt;
+    const p = player, standing = standingPylons().length;
+    this.phase = standing > 0 ? 1 : this.hp > this.def.hp / 2 ? 2 : 3;
+    const cx = p.pos.x - HOME.x, cz = p.pos.z - HOME.z, fromCenter = Math.hypot(cx, cz);
+    const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z, dist = Math.hypot(dx, dz);
+    let ty = HOME.y, mx = 0, mz = 0, speed = 0, face = null;
+
+    if (this.state === 'dying') return this.dying(dt);
+    if (this.state === 'sleep') {
+      if (!p.dead && fromCenter < WAKE_R) this.state = 'fight';
+      mx = HOME.x - this.pos.x; mz = HOME.z - this.pos.z; speed = Math.min(2.5, Math.hypot(mx, mz) * 2);
+    } else if (fromCenter >= SLEEP_R) {
+      this.state = 'sleep';
+    } else {
+      // the fan and summon timers run in 'fight' and in 'slam', so a slam never delays them
+      const [n, every] = FAN[this.phase];
+      if ((this.fanT -= dt) <= 0 && !p.dead) { this.fan(n); this.fanT = every; }
+      if (this.phase === 3 && (this.summonT -= dt) <= 0) { this.summon(); this.summonT = SUMMON_T; }
+    }
+    if (this.state === 'slam') {
+      this.slamT += dt;
+      ty = HOME.y + SLAM_RISE * Math.min(1, this.slamT / SLAM_WARN);
+      face = Math.atan2(dx, dz);
+      if (Math.random() < dt * 60) {   // the warning ring on the floor
+        const a = Math.random() * Math.PI * 2;
+        particles.crystalSpark(this.pos.x + Math.sin(a) * SLAM_R, FLOOR + 0.1, this.pos.z + Math.cos(a) * SLAM_R, 0, randRange(0.5, 1.5), 0, 0.5, 0.12);
+      }
+      if (this.slamT >= SLAM_WARN) {
+        this.pos.y = FLOOR + 0.2; this.vel.y = 0;
+        this.slam();
+        this.state = 'fight'; this.slamCD = SLAM_CD;
+      }
+    } else if (this.state === 'fight') {
+      face = Math.atan2(dx, dz);
+      if (this.phase === 1) {
+        mx = HOME.x - this.pos.x; mz = HOME.z - this.pos.z; speed = Math.min(2.5, Math.hypot(mx, mz) * 2);
+      } else {
+        speed = SPEED[this.phase];
+        if (dist > 2.5) { mx = dx; mz = dz; }
+        const onFloor = p.pos.y < FLOOR + 3 && p.pos.y > FLOOR - 2;   // the slam reaches only the floor
+        if (dist < SLAM_NEAR && onFloor && this.slamCD <= 0 && !p.dead) { this.state = 'slam'; this.slamT = 0; audio.hiss({ x: this.pos.x, y: this.pos.y + 2, z: this.pos.z }); }
+      }
+    }
+
+    // ---- motion: steer at `speed`, stay over the arena, hover at `ty`
+    const md = Math.hypot(mx, mz);
+    if (md > 0.05) { mx /= md; mz /= md; } else mx = mz = 0;
+    const nx = this.pos.x + mx, nz = this.pos.z + mz;
+    if (Math.hypot(nx - HOME.x, nz - HOME.z) > ROAM_R) mx = mz = 0;
+    const a = 1 - Math.exp(-4 * dt);
+    this.vel.x += (mx * speed - this.vel.x) * a;
+    this.vel.z += (mz * speed - this.vel.z) * a;
+    if (this.state !== 'slam' || this.slamT < SLAM_WARN) {
+      const vy = Math.max(-4, Math.min(4, (ty - this.pos.y) * 3)) + Math.sin(this.age * 1.6) * 0.25;
+      this.vel.y += (vy - this.vel.y) * Math.min(1, dt * 4);
+    }
+    if (this.hitWall && md > 0.05) this.vel.y = Math.max(this.vel.y, 3);
+    moveEntity(this, dt);
+
+    // ---- animation
+    if (face !== null) this.yaw = angleLerp(this.yaw, face, Math.min(1, dt * 3));
+    else if (Math.hypot(this.vel.x, this.vel.z) > 0.3) this.yaw = angleLerp(this.yaw, Math.atan2(this.vel.x, this.vel.z), Math.min(1, dt * 3));
+    const P = this.parts;
+    P.orbit.rotation.y += dt * (this.phase === 3 ? 2.4 : 1.2);
+    const lift = this.state === 'slam' ? Math.min(1, this.slamT / SLAM_WARN) : 0;
+    P.arms.forEach((ar, i) => {
+      ar.rotation.x = -lift * 2.6 + Math.sin(this.age * 1.3 + i * Math.PI) * 0.08 - (this.armT > 0 ? Math.sin(this.armT / 0.4 * Math.PI) * 0.7 : 0);
+      ar.rotation.z = (i ? -1 : 1) * (0.08 + lift * 0.2);
+    });
+    P.head.rotation.x = this.state === 'sleep' ? 0.35 : 0;
+    this.group.position.copy(this.pos);
+    this.group.rotation.y = this.yaw;
+    const sh = this.shield.material;
+    sh.opacity = this.phase === 1 ? (this.shieldT > 0 ? 0.25 + this.shieldT : 0.07 + Math.sin(this.age * 3) * 0.03) : 0;
+    const k = this.state === 'sleep' ? 0.7 : 1;
+    if (this.hurtT > 0) this.paint(1.25, 0.55, 0.7); else this.paint(k, k, k);
+    if (Math.random() < dt * 8) particles.crystalSpark(this.pos.x + randRange(-1, 1), this.pos.y + randRange(0, 4), this.pos.z + randRange(-1, 1), 0, randRange(0.3, 0.9), 0, 1);
+    return true;
+  }
+
+  // The death: DEATH_T s of spin and cracks with a growing light, then the shatter.
+  dying(dt) {
+    this.deathT += dt;
+    const t = this.deathT / DEATH_T;
+    this.vel.set(0, 0, 0);
+    this.group.position.set(this.pos.x + randRange(-0.08, 0.08) * t, this.pos.y + t * 1.2, this.pos.z + randRange(-0.08, 0.08) * t);
+    this.group.rotation.y += dt * (2 + t * 14);
+    this.shield.material.opacity = t * 0.5;
+    this.shield.scale.set(2.2 + t * 1.5, 3 + t * 1.5, 2.2 + t * 1.5);
+    const flick = Math.random() < 0.3 + t * 0.5 ? 1.8 + t : 1;
+    this.paint(flick, flick, flick * 1.1);
+    if ((this.crackT -= dt) <= 0) {
+      this.crackT = 0.25 - t * 0.17;
+      particles.crystalBurst(this.pos.x, this.pos.y + randRange(1, 4), this.pos.z, 10 + t * 30, 3 + t * 4);
+      audio.dig('glass', 0.6 + t * 0.6, this.pos.x, this.pos.y + 2, this.pos.z);
+    }
+    if (this.deathT < DEATH_T) return true;
+    this.shatter();
+    return false;
+  }
+
+  shatter() {
+    const x = this.pos.x, y = this.pos.y + 2, z = this.pos.z;
+    particles.crystalBurst(x, y, z, 160, 10);
+    particles.explosion(x, y, z, 2);
+    audio.explode(x, y, z);
+    for (const m of shardlings()) { m.dead = true; m.deathT = 0; }   // they fall and poof, with no drops
+    // the loot lands in front of the exit portal (the arrival side, +z) when the boss dies near it
+    const dz = Math.abs(x - 0.5) < 4 && Math.abs(z) < 3 ? 3.5 - z : 0;
+    for (const [id, n] of this.def.drops()) if (n > 0) spawnDrop(id, n, x, FLOOR + 0.5, z + dz, null, 0.6);
+    buildExitPortal();
+    realm.boss.defeated = true;
+    boss.victoryPending = true;
+    persist.save();
+  }
+}
+
+// The exit portal: a Crystal Frame ring around a 3 x 4 opening, built lit (portals.ignite fills the panes).
+function buildExitPortal() {
+  const E = EXIT, own = !world.batch;
+  if (own) world.beginBatch();
+  for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
+    const ring = u === -1 || u === E.w || v === -1 || v === E.h;
+    world.setBlock(E.x0 + u, E.y0 + v, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
+  }
+  if (own) world.endBatch();
+  const r = portals.ignite(E.x0 - 1, E.y0, E.z, B.PORTAL_CRYSTAL);
+  if (r !== 'lit') console.warn(`exit portal: ignite returned ${r}`);
+}
+
+// ---- pylon beams: one additive box per pylon, from the pylon to the boss core
+const beamGeo = new THREE.BoxGeometry(0.12, 0.12, 1);
+beamGeo.translate(0, 0, 0.5);
+const beamMat = new THREE.MeshBasicMaterial({ color: 0x8ff8ee, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+const beams = PYLONS.map(() => { const m = new THREE.Mesh(beamGeo, beamMat); m.visible = false; m.frustumCulled = false; scene.add(m); return m; });
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+
+const boss = {
+  col: null,                 // the live Colossus, or null
+  hp: null,                  // the HP of a boss whose chunk unloaded; the next spawn keeps it
+  victoryPending: false,     // the kill ended; the victory screen waits for the 'playing' state
+  wasDead: false,
+  HOME, PYLONS, EXIT, WAKE_R, SLEEP_R,
+  get pylonsStanding() { return standingPylons().length; },
+
+  update(dt) {
+    const crystal = realm.current === 'crystal';
+    if (this.col && !mobs.includes(this.col)) this.col = null;   // realm.enter or a chunk unload removed it, or the death ended
+    if (!crystal) this.hp = null;                                 // a new visit starts a full fight
+    if (crystal && !realm.boss.defeated && !this.col) {
+      const c = world.chunkAt(Math.floor(HOME.x), Math.floor(HOME.z));
+      if (c && c.lit) { this.col = new Colossus(); if (this.hp) this.col.hp = this.hp; mobs.push(this.col); }
+    }
+    if (this.col && this.col.state !== 'dying') this.hp = this.col.hp;
+    const col = this.col;
+    // the player's death resets the fight
+    if (player.dead && !this.wasDead && col && col.state !== 'dying') {
+      col.reset();
+      for (const m of shardlings()) { particles.crystalBurst(m.pos.x, m.pos.y + 0.3, m.pos.z, 8, 2); m.remove(); mobs.splice(mobs.indexOf(m), 1); }
+    }
+    this.wasDead = player.dead;
+    // the beams
+    const alive = col && col.state !== 'dying';
+    PYLONS.forEach(([x, y, z], i) => {
+      const b = beams[i], on = alive && world.getBlock(x, y, z) === B.PYLON;
+      b.visible = !!on;
+      if (!on) return;
+      _a.set(x + 0.5, y + 0.5, z + 0.5);
+      _b.set(col.group.position.x, col.group.position.y + 2.7, col.group.position.z);
+      b.position.copy(_a); b.lookAt(_b);
+      const len = _a.distanceTo(_b), w = 1 + Math.sin(game.clock * 6 + i) * 0.25;
+      b.scale.set(w, w, len);
+      if (dt > 0 && Math.random() < dt * 6) {
+        const t = Math.random();
+        particles.crystalSpark(_a.x + (_b.x - _a.x) * t, _a.y + (_b.y - _a.y) * t, _a.z + (_b.z - _a.z) * t, 0, 0.3, 0, 0.5, 0.07);
+      }
+    });
+    // the boss bar: it shows while the boss is awake and the player is within SLEEP_R of the center
+    const p = player, near = Math.hypot(p.pos.x - HOME.x, p.pos.z - HOME.z) < SLEEP_R;
+    if (crystal && col && near && col.state !== 'sleep') hud.bossBar(col.hp / col.def.hp, col.phase === 1);
+    else hud.bossBar(null);
+    // the victory screen, once the kill has ended and no other screen shows
+    if (this.victoryPending && game.state === 'playing' && !p.dead) { this.victoryPending = false; showVictory(); }
+  },
+};
 
 /* =====================================================================================
  * === 17. DAY/NIGHT CYCLE AND SKY
@@ -11437,7 +11953,7 @@ const post = (() => {
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 49 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 50 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -11495,7 +12011,8 @@ const post = (() => {
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes, realms (the realm table, travel, the stash of the realms that are
  *      not current, the void), portals (Ember portal
- *      ignition, removal, the travel timer, linking, and building)
+ *      ignition, removal, the travel timer, linking, and building), boss (the Prism Colossus:
+ *      the pylons, the beams, the fight, the boss bar, the exit portal, the victory)
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
  *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
@@ -11559,6 +12076,7 @@ function frame(now) {
   fireflies.update(sim ? dt : 0);
   ash.update(sim ? dt : 0);
   portals.update(sim ? dt : 0);
+  boss.update(sim ? dt : 0);   // after updateMobs; it also shows the victory screen once the state is 'playing'
   sky.update(sim ? dt : 0);
   viewModel.update(dt);
   hud.update(dt);
@@ -11597,7 +12115,7 @@ window.clonecraft = {
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
   spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, portals, heldLight, shadows, clouds,
-  realm, REALMS, defaultTarget, standNear, emberType,
+  realm, REALMS, defaultTarget, standNear, emberType, boss,
 };
 
 requestAnimationFrame(frame);</script>
@@ -11615,6 +12133,7 @@ requestAnimationFrame(frame);</script>
   <div id="resume">Click to resume · Esc for the menu</div>
   <div id="miningbar"><i></i></div>
   <div id="debug"></div>
+  <div id="bossbar"><span>Prism Colossus</span><div class="bar"><i></i></div></div>
   <div id="toast"></div>
   <div id="itemname"></div>
   <div id="hearts"></div>
@@ -11760,6 +12279,12 @@ requestAnimationFrame(frame);</script>
   <h1>You died!</h1>
   <p id="deathMsg"></p>
   <button class="btn" id="respawnBtn">Respawn</button>
+</div>
+
+<div id="victory" class="screen">
+  <h1>The Prism Colossus is defeated</h1>
+  <p id="victoryTime"></p>
+  <button class="btn" id="victoryBtn">Continue</button>
 </div>
 
 </body>

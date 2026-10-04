@@ -4,7 +4,7 @@ import './host-stub.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ARMOR_PIECES, ARMOR_TIERS, armorId, B, blockDrop, BLOCKS, breakTime, I, IDS_VERSION, ITEMS, migrateIds, toolId } from '../src/blocks.js';
+import { ARMOR_PIECES, ARMOR_TIERS, armorId, B, blockDrop, BLOCKS, breakTime, EMIT_CRY, I, IDS_VERSION, ITEMS, migrateIds, toolId } from '../src/blocks.js';
 import { UNLOADED } from '../src/config.js';
 
 const bIds = Object.values(B), iIds = Object.values(I);
@@ -38,12 +38,12 @@ test('armor ids are 300..327 and follow 300 + 4 * tier + piece', () => {
   assert.equal(Math.min(...ids), 300);
   assert.equal(Math.max(...ids), 327);
 });
-// Ids 176..186 are the realm blocks; each phase adds its own. 186..199 stay empty until then.
-// The portal blocks (181, 182) have no item: only ignition or worldgen makes them.
+// Ids 176..186 are the realm blocks. 187..199 stay empty.
+// The portal blocks (181, 182) and the pylon (186) have no item: only ignition or worldgen makes them.
 test('ids 176..199 hold only the realm blocks and their block items', () => {
   const realm = [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE, B.EMBER_BRICKS, B.PORTAL_EMBER,
-    B.PORTAL_CRYSTAL, B.CRYSTAL_FRAME, B.VOIDSTONE, B.GLIMMER_MOSS];
-  const noItem = [B.PORTAL_EMBER, B.PORTAL_CRYSTAL];
+    B.PORTAL_CRYSTAL, B.CRYSTAL_FRAME, B.VOIDSTONE, B.GLIMMER_MOSS, B.PYLON];
+  const noItem = [B.PORTAL_EMBER, B.PORTAL_CRYSTAL, B.PYLON];
   const used = [];
   for (let id = 176; id <= 199; id++) if (BLOCKS[id] || ITEMS[id]) used.push(id);
   assert.deepEqual(used, realm);
@@ -64,6 +64,14 @@ test('Crystal Realm blocks: tools, hardness, and drops', () => {
   assert.ok(breakTime(B.VOIDSTONE, pick) < breakTime(B.VOIDSTONE, null));
   assert.ok(breakTime(B.GLIMMER_MOSS, shovel) < breakTime(B.GLIMMER_MOSS, null));
   assert.equal(breakTime(B.PORTAL_CRYSTAL, pick), Infinity);
+});
+
+// SPEC_realms Phase 6 (gate item 2): any hit breaks a pylon at once, and it drops nothing.
+test('Resonance Pylon: breaks at once, drops nothing, emits crystal light 15', () => {
+  assert.equal(breakTime(B.PYLON, null), 0);
+  assert.equal(BLOCKS[B.PYLON].drop, null);
+  assert.equal(EMIT_CRY[B.PYLON], 15);
+  assert.equal(ITEMS[I.PRISM_HEART].name, 'Prism Heart');
 });
 
 // SPEC_realms Phase 2 (gate item 4): tool, hardness, and drop of each Ember Realm block.

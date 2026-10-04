@@ -14,6 +14,8 @@
  * keeps 8..16 blocks from the player, and shoots a fireball every 3 s
  * while it sees the player. The Cinder Knight is a melee mob with half knockback and half arrow
  * damage (`def.arrowRes`, read in projectiles.js).
+ * Crystal Realm mobs (SPEC_realms Phase 6): the Shardling is a plain melee mob. The Prism Colossus type
+ * holds the model and the stats; class Colossus in src/boss.js extends Mob and replaces its update.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { clamp, EYE, GRAVITY, JUMP_V, randInt, randRange, UNLOADED, VOID_Y } from './config.js';
@@ -112,6 +114,22 @@ const MOB_TEXTURES = {
   }),
   ck_trim: () => mtex('ck_trim', [128, 66, 34], 0.2),
   ck_plume: () => mtex('ck_plume', [210, 60, 22], 0.25, (set, r) => { for (let i = 0; i < 20; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 150, 40]); }),
+  // Crystal Realm mobs (Phase 6): the Prism Colossus and the Shardling
+  pc_body: () => mtex('pc_body', [52, 40, 86], 0.2, (set, r) => {
+    for (let i = 0; i < 3; i++) { let x = r() * 16 | 0, y = 0; while (y < 16) { set(x, y, [90, 230, 222]); y++; if (r() < 0.4) x = (x + (r() < 0.5 ? 1 : 15)) & 15; } }
+    for (let i = 0; i < 12; i++) set(r() * 16 | 0, r() * 16 | 0, [30, 22, 52]);
+  }),
+  pc_face: () => mtex('pc_face', [52, 40, 86], 0.16, (set) => {
+    for (let x = 2; x < 14; x++) set(x, 4, [30, 22, 52]);
+    for (const x0 of [3, 10]) for (let y = 6; y < 9; y++) for (let x = x0; x < x0 + 3; x++) set(x, y, [236, 255, 252]);
+    for (let x = 5; x < 11; x++) set(x, 12, [150, 110, 255]);
+  }),
+  pc_crystal: () => mtex('pc_crystal', [140, 236, 232], 0.12, (set, r) => {
+    for (let i = 0; i < 30; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.6 ? [236, 255, 252] : [176, 150, 255]);
+  }),
+  pc_core: () => mtex('pc_core', [214, 190, 255], 0.08, (set) => { for (let y = 5; y < 11; y++) for (let x = 5; x < 11; x++) set(x, y, [255, 255, 255]); }),
+  sh_body: () => mtex('sh_body', [110, 214, 222], 0.18, (set, r) => { for (let i = 0; i < 24; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [220, 255, 250] : [130, 96, 220]); }),
+  sh_face: () => mtex('sh_face', [110, 214, 222], 0.12, (set) => eyes(set, 7, 3, 11, [236, 255, 252], [60, 20, 110])),
   c_skin: () => mtex('c_skin', [86, 172, 74], 0.5, (set, r) => { for (let i = 0; i < 50; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [40, 90, 40] : [170, 220, 160]); }),
   c_face: () => mtex('c_face', [86, 172, 74], 0.45, (set) => {
     const k = [16, 22, 16];
@@ -273,6 +291,48 @@ const MOB_TYPES = {
       sw.scale.setScalar(0.8); sw.position.set(0, -0.66, 0.12); sw.rotation.set(0, -Math.PI / 2, -Math.PI / 4);
       arms[0].add(sw);
       return { head, legs, arms };
+    },
+  },
+  // Shardling (SPEC_realms Phase 6): the Prism Colossus summons it. A small, fast crystal biter.
+  shardling: {
+    hostile: true, hp: 8, w: 0.55, h: 0.7, speed: 4, sound: null, damage: 3, reach: 1.0, sense: 32, fireproof: true,
+    glow: 0.9, kill: 'was cut by a Shardling',
+    drops: () => [[B.CRYSTAL, Math.random() < 0.5 ? 1 : 0]],
+    build(root, M) {
+      limb(root, M, 0.5, 0.36, 0.56, 'sh_body', 0, 0.42, 0);
+      const head = limb(root, M, 0.36, 0.32, 0.3, headFaces('sh_body', 'sh_face'), 0, 0.5, 0.28, 0, 0.04, 0.12);
+      for (const [x, z, t] of [[0, 0, 0], [-0.14, -0.14, -0.35], [0.14, -0.1, 0.4]]) limb(root, M, 0.1, 0.32, 0.1, 'pc_crystal', x, 0.58, z, 0, 0.16, 0).rotation.z = t;
+      const legs = [[-0.18, 0.18], [0.18, 0.18], [-0.18, -0.18], [0.18, -0.18]].map(([x, z]) => limb(root, M, 0.12, 0.26, 0.12, 'pc_crystal', x, 0.26, z, 0, -0.13, 0));
+      return { head, legs };
+    },
+  },
+  // Prism Colossus (SPEC_realms Phase 6): the arena boss. src/boss.js owns its behavior (class Colossus).
+  colossus: {
+    hostile: true, hp: 300, w: 2.4, h: 4.5, speed: 2.5, sound: null, kbRes: 1, fireproof: true, flies: true, glow: 1,
+    kill: 'was crushed by the Prism Colossus',
+    drops: () => [[I.PRISM_HEART, 1], [B.CRYSTAL, randInt(8, 16)], [I.EMBERITE, randInt(2, 4)]],
+    build(root, M) {
+      const torso = limb(root, M, 2.0, 1.7, 1.2, 'pc_body', 0, 2.7, 0);
+      limb(torso, M, 0.5, 0.5, 0.12, 'pc_core', 0, 0.1, 0.62);
+      for (const x of [-0.75, 0.75]) limb(torso, M, 0.4, 0.9, 0.4, 'pc_crystal', x, 0.85, -0.2, 0, 0.3, 0).rotation.z = x * 0.5;   // shoulder spires
+      limb(torso, M, 0.3, 1.1, 0.3, 'pc_crystal', 0, 0.85, -0.35, 0, 0.4, 0);
+      const head = limb(root, M, 1.0, 0.9, 0.9, headFaces('pc_body', 'pc_face'), 0, 3.55, 0.1, 0, 0.45, 0);
+      limb(head, M, 0.24, 0.5, 0.24, 'pc_crystal', 0, 0.95, 0, 0, 0.2, 0);
+      const arms = [-1.35, 1.35].map((x) => {
+        const a = limb(root, M, 0.7, 1.7, 0.7, 'pc_body', x, 3.3, 0, 0, -0.85, 0);
+        limb(a, M, 0.9, 0.8, 0.9, 'pc_crystal', 0, -1.9, 0);   // a crystal fist
+        return a;
+      });
+      // the lower body tapers to a hovering crystal point
+      const hips = limb(root, M, 1.3, 0.8, 0.9, 'pc_body', 0, 1.55, 0);
+      limb(hips, M, 0.7, 0.9, 0.6, 'pc_crystal', 0, -0.75, 0).rotation.y = Math.PI / 4;
+      limb(hips, M, 0.34, 0.6, 0.34, 'pc_crystal', 0, -1.35, 0).rotation.y = Math.PI / 4;
+      const orbit = new THREE.Group(); orbit.position.y = 2.7; root.add(orbit);
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3, sh = limb(orbit, M, 0.22, 0.6, 0.22, 'pc_crystal', Math.sin(a) * 2.1, i % 2 ? 0.5 : -0.4, Math.cos(a) * 2.1);
+        sh.rotation.z = i % 2 ? 0.5 : -0.5;
+      }
+      return { head, legs: [], arms, torso, orbit };
     },
   },
   creeper: {
@@ -583,4 +643,4 @@ function updateMobs(dt) {
   spawners.update(dt);
 }
 
-export { lineOfSight, Mob, MOB_TEXTURES, MOB_TYPES, mobs, updateMobs };
+export { angleLerp, lineOfSight, Mob, MOB_TEXTURES, MOB_TYPES, mobs, updateMobs };

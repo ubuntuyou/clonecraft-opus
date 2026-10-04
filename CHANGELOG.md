@@ -13,6 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Prism Colossus (SPEC_realms.md, Phase 6): a boss fight on the Crystal Realm arena.
+  - 6 voidstone pillars ring the arena. A Resonance Pylon on each top gives crystal light 15 and a beam to the boss. Any hit or an arrow breaks a pylon. It drops nothing.
+  - The boss wakes within 32 blocks of the center. A boss bar shows its HP and hides at 64 blocks.
+  - Phase 1: the pylons shield it, and it fires 3-shard fans. Phase 2: it hunts and slams for 8 within 4 blocks. Phase 3, at 50 % HP: it is faster, fires 5-shard fans, and summons Shardlings.
+  - Shardling: a small crystal mob with 8 HP that drops a crystal 1 time in 2.
+  - A player death or leaving the realm resets the fight. Broken pylons stay broken.
+  - The kill drops the Prism Heart, 8..16 crystals, and 2..4 Emberite Ingots. A lit exit portal appears at the center and leads home like the arrival portal.
+  - A victory screen shows the time played on the first kill. The boss never returns.
 - Crystal Realm (SPEC_realms.md, Phase 5): a Crystal Frame portal lit with an Ember Heart leads to a realm of floating islands.
   - New blocks: Crystal Frame, Voidstone, and Glimmer Moss. 1 obsidian and 4 crystals craft 2 Crystal Frames.
   - A Crystal Frame portal follows the Ember frame rules. An Ember Heart lights it and is used up. The frame wakes only in the overworld. Elsewhere the click shows "The frame does not wake here" and keeps the heart.

@@ -40,6 +40,7 @@ const B = {
   PORTAL_EMBER: 181,  // the Ember portal pane (Phase 3); src/portals.js lights and removes it
   // Crystal Realm (SPEC_realms, Phase 5)
   PORTAL_CRYSTAL: 182, CRYSTAL_FRAME: 183, VOIDSTONE: 184, GLIMMER_MOSS: 185,
+  PYLON: 186,         // the Resonance Pylon on each arena pillar (Phase 6); src/boss.js reads it
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
@@ -234,6 +235,10 @@ defBlock(B.CRYSTAL_FRAME, { name: 'Crystal Frame', tex: { top: 'crystal_frame_to
 defBlock(B.VOIDSTONE, { name: 'Voidstone', tex: all('voidstone'), hardness: 3, tool: 'pickaxe' });
 defBlock(B.GLIMMER_MOSS, { name: 'Glimmer Moss', tex: { top: 'glimmer_moss_top', bottom: 'voidstone', side: 'glimmer_moss_side' },
   hardness: 0.6, tool: 'shovel', drop: B.VOIDSTONE, glows: true, sound: 'grass' });
+// The Resonance Pylon (Phase 6): crystal light 15. Any hit breaks it, and it drops nothing. It has no
+// item, so no player can rebuild a pylon and shield the boss again.
+defBlock(B.PYLON, { name: 'Resonance Pylon', tex: { top: 'pylon_top', bottom: 'pylon_top', side: 'pylon' }, hardness: 0,
+  emitCry: 15, drop: null, noItem: true, glows: true, sound: 'glass' });
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;
@@ -320,6 +325,7 @@ const I = {
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
   RAW_EMBERITE: 256, EMBERITE: 257, EMBER_HEART: 258, EMBER_DUST: 259,
+  PRISM_HEART: 260,   // the boss trophy (Phase 6)
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -342,6 +348,7 @@ defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
 defItem(I.EMBERITE, { name: 'Emberite Ingot' });
 defItem(I.EMBER_HEART, { name: 'Ember Heart', maxStack: 16 });
 defItem(I.EMBER_DUST, { name: 'Ember Dust' });
+defItem(I.PRISM_HEART, { name: 'Prism Heart', maxStack: 1 });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
 BLOCKS[B.EMBER_LAMP].drop = [I.EMBER_DUST, 2, 4];
