@@ -12,6 +12,7 @@ import { B, IS_LAVA, IS_LEAF, IS_WATER, SOLID } from './blocks.js';
 import { BIOME } from './biomes.js';
 import { camera, game, player, scene, world } from './engine.js';
 import { weather } from './weather.js';
+import { realm } from './realms.js';
 
 const fireflies = (() => {
   const N = 140, RADIUS = 28, TRIES = 24, FADE = 1.5, PEAK = 4;
@@ -88,7 +89,7 @@ const fireflies = (() => {
 
   function update(dt) {
     const e = Math.sin(game.dayTime * Math.PI * 2);   // sun height: 0 at sunrise and sunset
-    level = (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k);
+    level = realm.current === 'overworld' ? (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k) : 0;   // overworld only
     const under = player.headInWater || player.headInLava;
     points.visible = level > 0.01 && !under;
     if (level <= 0.01) { for (let i = 0; i < N; i++) d[i * S + 10] = 0; shown = 0; return; }   // fresh spots next night

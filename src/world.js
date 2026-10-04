@@ -4,6 +4,9 @@
  * Chunk lifecycle: requested -> data (blocks from a worker, overrides applied)
  *   -> lit (initChunkLight) -> meshed (when it and all 8 neighbours are lit)
  *   -> unloaded (beyond renderDistance + 3; meshes disposed).
+ * Realms: `world.realm` names the realm of the loaded chunks. `reset()` unloads every chunk,
+ * then switches the realm and the override maps (SPEC_realms). An `onChunkUnloaded` hook
+ * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air.
  * ===================================================================================== */
 import { ckey, CONFIG, CS, H, lidx, UNLOADED, VOL } from './config.js';
 import { ATTEN, B, EMIT, EMIT_CRY, LIGHT_STOP, OPAQUE, SKY_FREE, SOLID } from './blocks.js';
@@ -74,7 +77,22 @@ class World {
     this.onChunkUnloaded = null;
     this.batch = null;                   // Set of chunks to remesh while batching edits
     this.onEdit = null;                  // (x, y, z, oldId, newId) after every setBlock (liquids wake here)
+    this.voidBelow = false;              // true in the Crystal Realm: a cell below y 0 is air, not bedrock
   }
+
+  // Realm switch (SPEC_realms): unloads every chunk (each calls onChunkUnloaded), drops the
+  // pending generation, and swaps in the target realm's override maps. The next update()
+  // requests the chunks around the player again.
+  reset(realm, overrides, overridesByChunk, voidBelow) {
+    for (const c of [...this.chunks.values()]) this.unload(c);
+    this.gen.setRealm(realm);
+    this.overrides = overrides; this.overridesByChunk = overridesByChunk;
+    this.voidBelow = voidBelow;
+    this.touched.clear(); this.batch = null;
+    this.lastRequest.cx = 1e9; this.center = null;
+  }
+
+  get realm() { return this.gen.realm; }   // the realm of the loaded chunks (reset() switches it)
 
   chunkAt(x, z) {                        // x, z: integer world coordinates
     const cx = x >> 4, cz = z >> 4;
@@ -86,7 +104,7 @@ class World {
   getChunk(cx, cz) { return this.chunks.get(ckey(cx, cz)); }
 
   getBlock(x, y, z) {
-    if (y < 0) return B.BEDROCK;
+    if (y < 0) return this.voidBelow ? B.AIR : B.BEDROCK;
     if (y >= H) return B.AIR;
     const c = this.chunkAt(x, z);
     return c ? c.blocks[lidx(x & 15, y, z & 15)] : UNLOADED;

@@ -15,21 +15,36 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 1: realm core
 
-- [ ] `clonecraft.realm.travel('ember')` and `('crystal')` load the target realm with the loading screen and its realm text. Return to the overworld works the same way.
-- [ ] An edit in each realm survives a round trip: overworld to ember, ember to crystal, crystal to overworld. No edit appears in the wrong realm.
-- [ ] A chest in the Ember Realm keeps its items across a round trip and across a reload. A chest at the same x, y, z in the overworld keeps different items.
-- [ ] Liquids, leaf decay, farming, and vehicles keep their state per realm across a round trip.
-- [ ] Drops left in a realm wait frozen and are still there on return in the same session.
-- [ ] A realm change removes all mobs. Passive overworld mobs return from `entityStore` when the overworld loads again.
-- [ ] A reload while in the Ember Realm starts in the Ember Realm at the same place.
-- [ ] The save holds `ids`, `realm`, `realms`, `portals`, and `boss`. An overworld-only save still reads the same top-level fields. `validSave` rejects a save with a bad realm name or a bad slice.
-- [ ] A late chunk from the old realm, still in a worker at the switch, never enters the new realm. (Travel during heavy loading; compare block bytes against a fresh generation.)
-- [ ] Death in the Ember Realm respawns the player at the overworld spawn. The death drops wait in the Ember Realm.
-- [ ] The homes screen lists only the current realm's homes. A home set in the Ember Realm teleports within the Ember Realm.
-- [ ] In the Crystal Realm, a cell below y 0 reads as air. Below y −32 the player takes 4 void damage every 0.5 s, and armor does not reduce it. Drops and mobs below y −32 vanish.
-- [ ] The compass spins and shows "?" outside the overworld.
-- [ ] Weather, clouds, rain sounds, lightning, and fireflies stay out of the new realms. The weather state keeps counting down there.
-- [ ] Pause, inventory, and death during a travel load do not break the switch. Esc on the loading screen does nothing.
+- [x] `clonecraft.realm.travel('ember')` and `('crystal')` load the target realm with the loading screen and its realm text. Return to the overworld works the same way.
+  Note (Phase 1): Observed for ember, crystal, and overworld. Each shows the realm text over an opaque tinted screen. The QA hold (`world.update = () => {}`) kept the screen up for the screenshots.
+- [x] An edit in each realm survives a round trip: overworld to ember, ember to crystal, crystal to overworld. No edit appears in the wrong realm.
+  Note (Phase 1): GLASS (overworld), PLANKS (ember), and DIRT (crystal) at (5, 60, 5) each survived the round trip. Arrival in ember and in crystal read AIR at that cell before the edit there.
+- [x] A chest in the Ember Realm keeps its items across a round trip and across a reload. A chest at the same x, y, z in the overworld keeps different items.
+  Note (Phase 1): Ember chest at (3, 45, 3) kept stone ×3 across a round trip and a reload. The overworld chest at (3, 45, 3) kept dirt ×7.
+- [x] Liquids, leaf decay, farming, and vehicles keep their state per realm across a round trip.
+  Note (Phase 1): The liquid, leaf, farming, and vehicle snapshots at leave and at re-entry were identical in the overworld and in ember. The ember liquid queue was not empty.
+- [x] Drops left in a realm wait frozen and are still there on return in the same session.
+  Note (Phase 1): An ember drop was at the same position on return.
+- [x] A realm change removes all mobs. Passive overworld mobs return from `entityStore` when the overworld loads again.
+  Note (Phase 1): Mobs were 0 after each realm change. Passive overworld mobs were 40 before and 40 after the return.
+- [x] A reload while in the Ember Realm starts in the Ember Realm at the same place.
+  Note (Phase 1): A reload in ember started in ember at (−11.25, 41, 21.5), the place of the save.
+- [x] The save holds `ids`, `realm`, `realms`, `portals`, and `boss`. An overworld-only save still reads the same top-level fields. `validSave` rejects a save with a bad realm name or a bad slice.
+  Note (Phase 1): The save holds `ids` 2, `realm`, `realms` (ember and crystal, all 8 slice keys), `portals`, and `boss`. `validSave` rejected a bad realm, an overworld key in `realms`, a bad slice, an array for `realms`, a bad portal, and a bad boss. A save from the build before Phase 1 loaded in the overworld with its edit, chest, and home, and re-saved with the new fields.
+- [x] A late chunk from the old realm, still in a worker at the switch, never enters the new realm. (Travel during heavy loading; compare block bytes against a fresh generation.)
+  Note (Phase 1): A teleport kept 4 workers busy at the switch. 8 stale results arrived and were dropped. All 293 loaded ember chunks had 0 differing cells against a fresh generation.
+- [x] Death in the Ember Realm respawns the player at the overworld spawn. The death drops wait in the Ember Realm.
+  Note (Phase 1): Death in ember respawned at the overworld spawn. A save during the respawn travel held the overworld and the spawn. The death drops (dirt ×9, glass ×4) were in ember on return.
+- [x] The homes screen lists only the current realm's homes. A home set in the Ember Realm teleports within the Ember Realm.
+  Note (Phase 1): The overworld homes screen showed "No homes yet." while ember had a home. `goHome` in ember stayed in ember.
+- [x] In the Crystal Realm, a cell below y 0 reads as air. Below y −32 the player takes 4 void damage every 0.5 s, and armor does not reduce it. Drops and mobs below y −32 vanish.
+  Note (Phase 1): Crystal cells below y 0 read AIR. The player took 4 damage every 0.5 s with 15 armor points. The death message was "fell out of the world". A drop and a mob below y −32 were removed.
+- [x] The compass spins and shows "?" outside the overworld.
+  Note (Phase 1): Observed: the needle spins and the text is "?" in ember and crystal.
+- [x] Weather, clouds, rain sounds, lightning, and fireflies stay out of the new realms. The weather state keeps counting down there.
+  Note (Phase 1): Travel in a storm snapped the weather to 0. In ember: `rainGain` 0, cloud cover 0, firefly level 0, and `weather.left` kept counting down. A 22 s storm watch in ember showed a maximum flash of 0. Return to the overworld snapped the storm back.
+- [x] Pause, inventory, and death during a travel load do not break the switch. Esc on the loading screen does nothing.
+  Note (Phase 1): Travel closed an open inventory. Esc, E, and H during the load kept the state 'travel'. A hidden tab kept 'travel'. Damage of 100 during the load was ignored, so death cannot start during the load. A second travel during the load returned false.
 
 ## Phase 2: Ember Realm terrain
 

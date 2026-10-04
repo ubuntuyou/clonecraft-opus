@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 46 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 47 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -58,9 +58,11 @@
  *      spawning (`spawners` run the spawner features)
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
- *      import), homes
- *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): rain or snow by biome and height
- *      pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
+ *      import), homes, realms (the realm table, travel, the stash of the realms that are
+ *      not current, the void)
+ *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
+ *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
+ *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
  *      the clock); fireflies (dusk to dawn over grass in plains, forest, and rainforest)
  *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,
  *      G3), held-light (a held torch flood-fills light into a 32^3 texture, G4), post (bloom,
@@ -118,6 +120,7 @@ export { hud } from './hud.js';
 export { clockText, fadeIn, setState, showPause } from './menus.js';
 export { persist } from './persist.js';
 export { homes, homesEl, homesKey, openHomes, setHomes } from './homes.js';
+export { realm, REALMS } from './realms.js';
 import './sky.js';
 export { weather } from './weather.js';
 import './fireflies.js';

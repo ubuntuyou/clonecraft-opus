@@ -3,7 +3,9 @@
  * -------------------------------------------------------------------------------------
  * The HUD is DOM over the canvas. `hud.update` repaints only dirty parts: the hotbar,
  * the hearts, and a text panel (refreshed 4x per second).
- * Game states: loading -> menu -> playing <-> paused | inventory | homes | dead.
+ * Game states: loading -> menu -> playing <-> paused | inventory | homes | dead | travel.
+ * 'travel' shows the travel screen while a realm loads. Input and damage do nothing then.
+ * Outside the overworld the compass needle spins and the text shows "?".
  * `setState` is the only place that shows and hides the screens.
  * ===================================================================================== */
 import { CONFIG, CS, SEED } from './config.js';
@@ -21,7 +23,7 @@ import { paintSlot, renderFurnaceProgress } from './inventory-ui.js';
 import { mobs } from './mobs.js';
 import { hostileCount } from './spawning.js';
 import { particles } from './particles.js';
-import { clockText, persist, weather } from './order.js';
+import { clockText, persist, realm, weather } from './order.js';
 
 const $ = (id) => document.getElementById(id);
 const SPLASHES = [
@@ -54,16 +56,18 @@ const hud = {
     }
   },
   // The compass dial shows while a compass is held. The needle angle is the spawn direction
-  // relative to the view (0 = ahead, clockwise). Within 2 blocks the needle spins.
+  // relative to the view (0 = ahead, clockwise). Within 2 blocks the needle spins. Outside the
+  // overworld the needle spins and the text is "?".
   updateCompass() {
     const p = player, s = inv.held(), on = !!s && s.id === I.COMPASS && !p.dead;
     if (on !== this.compassOn) { this.compassOn = on; this.compassEl.classList.toggle('on', on); }
     if (!on) return;
     const dx = p.spawn.x - p.pos.x, dz = p.spawn.z - p.pos.z, d = Math.hypot(dx, dz);
     const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw);
-    const ang = d < 2 ? game.clock * 6 : Math.atan2(dx * cy - dz * sy, -dx * sy - dz * cy);
+    const lost = realm.current !== 'overworld';
+    const ang = lost || d < 2 ? game.clock * 6 : Math.atan2(dx * cy - dz * sy, -dx * sy - dz * cy);
     this.compassEl.firstChild.firstChild.style.transform = `rotate(${ang.toFixed(3)}rad)`;
-    const text = d < 2 ? 'At spawn' : `${Math.round(d)} blocks to spawn`;
+    const text = lost ? '?' : d < 2 ? 'At spawn' : `${Math.round(d)} blocks to spawn`;
     if (text !== this.compassText) { this.compassText = text; this.compassEl.lastChild.textContent = text; }
   },
   toast(msg) { this.toastEl.textContent = msg; this.toastEl.style.opacity = 1; this.toastT = 2.5; },

@@ -7,6 +7,8 @@
 // it, so a slope or a treetop never mixes the two. A drop never falls below the top non-air block of
 // its column, so roofs, trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
 // the player and mobs within 3 blocks and lights nothing. Thunder follows at THUNDER_SPEED blocks/s.
+// Weather falls only in a realm with `weather: true` (the overworld). The kind and its timer keep
+// counting in every realm; elsewhere k and storm target 0. snap() sets them at once (realm travel).
 import { THREE } from './three.js';
 import { clamp, CS, H, lidx, randRange } from './config.js';
 import { B } from './blocks.js';
@@ -16,6 +18,7 @@ import { camera, game, player, scene, world } from './engine.js';
 import { damagePlayer } from './player.js';
 import { mobs } from './mobs.js';
 import { audio } from './audio.js';
+import { realm, REALMS } from './realms.js';
 
 const weather = (() => {
   const RADIUS = 24, FADE = 6, BOLT_RANGE = 64, THUNDER_SPEED = 34, NRAIN = 2600, NSNOW = 1100, STREAK = 1.3;
@@ -186,12 +189,16 @@ const weather = (() => {
     if (kind === 'clear') { kind = Math.random() < 1 / 3 ? 'storm' : 'rain'; left = randRange(120, 360); }
     else { kind = 'clear'; left = randRange(300, 900); }
   }
+  const here = () => REALMS[realm.current].weather;
+  const wetTarget = () => (here() && kind !== 'clear' ? 1 : 0), stormTarget = () => (here() && kind === 'storm' ? 1 : 0);
+  // Sets k and storm to their targets at once: on load and on a realm change.
+  function snap() { k = wetTarget(); storm = stormTarget(); flash = 0; }
   function update(dt) {
     if ((left -= dt) <= 0) next();
-    const wet = kind === 'clear' ? 0 : 1, st = kind === 'storm' ? 1 : 0;
+    const wet = wetTarget(), st = stormTarget();
     k += clamp(wet - k, -dt / FADE, dt / FADE);
     storm += clamp(st - storm, -dt / FADE, dt / FADE);
-    if (kind === 'storm' && storm > 0.5 && (boltT -= dt) <= 0) {
+    if (here() && kind === 'storm' && storm > 0.5 && (boltT -= dt) <= 0) {
       boltT = randRange(5, 20);
       const a = Math.random() * Math.PI * 2, r = BOLT_RANGE * Math.sqrt(Math.random());
       strike(player.pos.x + Math.cos(a) * r, player.pos.z + Math.sin(a) * r);
@@ -228,12 +235,12 @@ const weather = (() => {
     if (kn === 'storm') boltT = Math.min(boltT, 5);
   }
   return {
-    update, set, strike, wetAt, precip, top, zone, melt,
+    update, set, snap, strike, wetAt, precip, top, zone, melt,
     get kind() { return kind; }, get left() { return left; }, get k() { return k; }, get storm() { return storm; }, get flash() { return flash; },
     get dim() { return 1 - 0.25 * k - 0.2 * storm; },
     get rainGain() { return loop ? loop.gain.gain.value : 0; },   // for tests: the rain loop's current volume
     data() { return { kind, left }; },
-    load(w) { if (!w) return; kind = w.kind; left = w.left; k = kind === 'clear' ? 0 : 1; storm = kind === 'storm' ? 1 : 0; },
+    load(w) { if (!w) return; kind = w.kind; left = w.left; snap(); },
     KINDS,
   };
 })();

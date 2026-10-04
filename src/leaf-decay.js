@@ -76,6 +76,7 @@ const leafDecay = (() => {
     get pending() { return queue.size; },
     save() { return [...queue.values()].map((c) => [c[0], c[1], c[2]]); },
     load(list) { for (const c of list || []) add(c[0], c[1], c[2]); },
+    clear() { queue.clear(); },
   };
 })();
 

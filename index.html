@@ -115,8 +115,8 @@
   .btn:hover { background: #5a62a8; box-shadow: inset 2px 2px 0 #9aa2e6, inset -2px -2px 0 #363b70; }   /* white text on it: 5.6:1 (R2) */
   .btnrow .btn { min-width: 164px; }
   .btn:disabled { background: #444; color: #999; cursor: default; box-shadow: none; }
-  #loadbar { width: 100%; height: 8px; background: #222; border: 1px solid #000; margin: 8px 0 4px; }
-  #loadbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4c9a3a, #8fdc5c); transition: width .2s; }
+  #loadbar, .loadbar { width: 100%; height: 8px; background: #222; border: 1px solid #000; margin: 8px 0 4px; }
+  #loadbar i, .loadbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4c9a3a, #8fdc5c); transition: width .2s; }
   #loadtext { font-size: 14px; color: #bbb; min-height: 18px; }
   .hint { font-size: 14px; color: #aaa; margin-top: 6px; }
 
@@ -213,6 +213,13 @@
 
   /* ---------- death ---------- */
   #death { background: rgba(120,0,0,.55); flex-direction: column; }
+  /* The travel screen: opaque, tinted by the target realm (realms.js sets data-realm). */
+  #travel { flex-direction: column; background: #10161c; z-index: 6; }
+  #travel[data-realm="ember"] { background: radial-gradient(ellipse at center, #3a0d06 0%, #120302 75%); }
+  #travel[data-realm="crystal"] { background: radial-gradient(ellipse at center, #2c1650 0%, #07020f 75%); }
+  #travel[data-realm="overworld"] { background: radial-gradient(ellipse at center, #1d3a52 0%, #081018 75%); }
+  #travel h1 { font-size: 32px; margin: 0 0 16px; text-shadow: 3px 3px 0 #000; }
+  #travel .loadbar { width: 320px; max-width: 80vw; }
   #death h1 { font-size: 48px; margin: 0 0 10px; text-shadow: 3px 3px 0 #3f0000; }
   #death p { margin: 0 0 18px; }
 </style>
@@ -227,6 +234,7 @@ THREE.ColorManagement.enabled = false;
  * ===================================================================================== */
 const CS = 16;                 // chunk size (x and z)
 const H = 176;                 // world height
+const VOID_Y = -32;           // Crystal Realm: below this y the void hurts the player and removes mobs and drops
 const SEA = 128;               // sea level: water fills open columns up to and including this y
 const VOL = CS * CS * H;
 const REACH = 5;
@@ -1874,7 +1882,8 @@ function mobTexture(base, variance, painter, w = 16, h = 16) {
  * WorldGenModule is self-contained: it references nothing outside its own body.
  * The game serializes it with Function.prototype.toString() into Blob Web Workers, and
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
- * generateChunk(cx, cz) is a pure function of (SEED, cx, cz).
+ * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
+ * default), 'ember', or 'crystal'. The ember and crystal generators are flat stubs (SPEC_realms Phase 1).
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -2484,7 +2493,7 @@ function WorldGenModule(SEED, K) {
   }
 
   // `info` (optional, tests only) receives debug data: info.dungeon is the stamped dungeon plan.
-  function generateChunk(cx, cz, info) {
+  function overworldChunk(cx, cz, info) {
     const x0 = cx * CS, z0 = cz * CS;
     const blocks = new Uint8Array(CS * CS * H);
     const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
@@ -2780,15 +2789,46 @@ function WorldGenModule(SEED, K) {
     return { blocks, biomes, heights, features };
   }
 
+  // ---------------------------------------------------------------- realm stubs (SPEC_realms Phase 1)
+  // Ember: bedrock at y 0 and from y 124 up, stone from y 1 to 40, air between. Phase 2 replaces it.
+  // Crystal: one stone disc of radius 44 at the origin, y 90 to 96, over a void. Phase 5 replaces it.
+  const EMBER_FLOOR = 40, EMBER_ROOF = 124, CRYSTAL_TOP = 96, CRYSTAL_R = 44;
+  function stubChunk(cx, cz, realm) {
+    const blocks = new Uint8Array(CS * CS * H);
+    const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+      let top = 0;
+      if (realm === 'ember') {
+        for (let y = 0; y < H; y++) blocks[(y << 8) | (z << 4) | x] = y === 0 || y >= EMBER_ROOF ? B.BEDROCK : y <= EMBER_FLOOR ? B.STONE : B.AIR;
+        top = H - 1;
+      } else {
+        const wx = cx * CS + x, wz = cz * CS + z;
+        if (wx * wx + wz * wz <= CRYSTAL_R * CRYSTAL_R) {
+          for (let y = CRYSTAL_TOP - 6; y <= CRYSTAL_TOP; y++) blocks[(y << 8) | (z << 4) | x] = B.STONE;
+          top = CRYSTAL_TOP;
+        }
+      }
+      heights[z * CS + x] = top;
+    }
+    return { blocks, biomes, heights, features: [] };
+  }
+  function generateChunk(cx, cz, realm = 'overworld', info) {
+    return realm === 'overworld' ? overworldChunk(cx, cz, info) : stubChunk(cx, cz, realm);
+  }
+
   return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan };
 }
 
 const GEN_CONSTS = { CS, H, SEA, B, BIOME };
 const WG = WorldGenModule(SEED, GEN_CONSTS);   // main-thread instance
 
-/* ---- generation service: a pool of Blob Web Workers, with a main-thread fallback ---- */
+/* ---- generation service: a pool of Blob Web Workers, with a main-thread fallback ----
+ * Each request carries the current realm and epoch. setRealm() starts a new epoch and drops
+ * the pending work. A worker result from an older epoch never reaches onChunk (SPEC_realms). */
 class GenService {
   constructor() {
+    this.realm = 'overworld';
+    this.epoch = 0;
     this.pending = new Map();      // key -> {cx, cz}
     this.queue = [];               // keys waiting for a worker
     this.workers = [];
@@ -2796,8 +2836,8 @@ class GenService {
     this.fallback = false;
     const src = `${WorldGenModule.toString()}\nlet WG=null;\nonmessage=(e)=>{const m=e.data;` +
       `if(m.type==='init'){WG=WorldGenModule(m.seed,m.consts);return;}` +
-      `if(m.type==='gen'){const r=WG.generateChunk(m.cx,m.cz);` +
-      `postMessage({cx:m.cx,cz:m.cz,blocks:r.blocks,biomes:r.biomes,heights:r.heights,features:r.features},[r.blocks.buffer,r.biomes.buffer,r.heights.buffer]);}};`;
+      `if(m.type==='gen'){const r=WG.generateChunk(m.cx,m.cz,m.realm);` +
+      `postMessage({cx:m.cx,cz:m.cz,epoch:m.epoch,blocks:r.blocks,biomes:r.biomes,heights:r.heights,features:r.features},[r.blocks.buffer,r.biomes.buffer,r.heights.buffer]);}};`;
     const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
     try {
       const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
@@ -2818,6 +2858,13 @@ class GenService {
       this.fallback = true;
     }
   }
+  // Switches the realm of all later requests. Results of the old epoch are dropped on arrival.
+  setRealm(realm) {
+    this.realm = realm;
+    this.epoch++;
+    this.pending.clear();
+    this.queue = [];
+  }
   request(cx, cz) {
     const k = ckey(cx, cz);
     if (this.pending.has(k)) return;
@@ -2831,6 +2878,7 @@ class GenService {
   get inFlight() { return this.pending.size; }
   _done(w, d) {
     w.busy--;
+    if (d.epoch !== this.epoch) return;
     const k = ckey(d.cx, d.cz);
     if (this.pending.has(k)) { this.pending.delete(k); this.onChunk && this.onChunk(d.cx, d.cz, d); }
   }
@@ -2844,7 +2892,7 @@ class GenService {
       while (this.queue.length && performance.now() - t0 < 6) {
         const k = this.queue.shift(), p = this.pending.get(k);
         this.pending.delete(k);
-        const r = WG.generateChunk(p.cx, p.cz);
+        const r = WG.generateChunk(p.cx, p.cz, this.realm);
         this.onChunk && this.onChunk(p.cx, p.cz, r);
       }
       return;
@@ -2853,7 +2901,7 @@ class GenService {
       while (w.busy < 2 && this.queue.length) {
         const k = this.queue.shift(), p = this.pending.get(k);
         p.sent = true; w.busy++;
-        w.postMessage({ type: 'gen', cx: p.cx, cz: p.cz });
+        w.postMessage({ type: 'gen', cx: p.cx, cz: p.cz, realm: this.realm, epoch: this.epoch });
       }
     }
   }
@@ -2865,6 +2913,9 @@ class GenService {
  * Chunk lifecycle: requested -> data (blocks from a worker, overrides applied)
  *   -> lit (initChunkLight) -> meshed (when it and all 8 neighbours are lit)
  *   -> unloaded (beyond renderDistance + 3; meshes disposed).
+ * Realms: `world.realm` names the realm of the loaded chunks. `reset()` unloads every chunk,
+ * then switches the realm and the override maps (SPEC_realms). An `onChunkUnloaded` hook
+ * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air.
  * ===================================================================================== */
 
 class Chunk {
@@ -2931,7 +2982,22 @@ class World {
     this.onChunkUnloaded = null;
     this.batch = null;                   // Set of chunks to remesh while batching edits
     this.onEdit = null;                  // (x, y, z, oldId, newId) after every setBlock (liquids wake here)
+    this.voidBelow = false;              // true in the Crystal Realm: a cell below y 0 is air, not bedrock
   }
+
+  // Realm switch (SPEC_realms): unloads every chunk (each calls onChunkUnloaded), drops the
+  // pending generation, and swaps in the target realm's override maps. The next update()
+  // requests the chunks around the player again.
+  reset(realm, overrides, overridesByChunk, voidBelow) {
+    for (const c of [...this.chunks.values()]) this.unload(c);
+    this.gen.setRealm(realm);
+    this.overrides = overrides; this.overridesByChunk = overridesByChunk;
+    this.voidBelow = voidBelow;
+    this.touched.clear(); this.batch = null;
+    this.lastRequest.cx = 1e9; this.center = null;
+  }
+
+  get realm() { return this.gen.realm; }   // the realm of the loaded chunks (reset() switches it)
 
   chunkAt(x, z) {                        // x, z: integer world coordinates
     const cx = x >> 4, cz = z >> 4;
@@ -2943,7 +3009,7 @@ class World {
   getChunk(cx, cz) { return this.chunks.get(ckey(cx, cz)); }
 
   getBlock(x, y, z) {
-    if (y < 0) return B.BEDROCK;
+    if (y < 0) return this.voidBelow ? B.AIR : B.BEDROCK;
     if (y >= H) return B.AIR;
     const c = this.chunkAt(x, z);
     return c ? c.blocks[lidx(x & 15, y, z & 15)] : UNLOADED;
@@ -4240,7 +4306,7 @@ let lockSoft = false, escLock = false, softLockAt = -1e9, pausedAt = -1e9;
 const resumeEl = document.getElementById('resume');   // $() is defined later
 function lockRefused() {
   if (lockSoft && game.state === 'playing') resumeEl.style.display = 'block';
-  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes') showPause();
+  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes' && game.state !== 'travel') showPause();
 }
 function requestLock(soft) {
   lockSoft = !!soft;
@@ -4347,6 +4413,7 @@ function updatePlayer(dt) {
   if (p.dead) return;
   const c = world.chunkAt(Math.floor(p.pos.x), Math.floor(p.pos.z));
   if (!c || !c.lit) return;                  // wait for the terrain under the player
+  realm.voidTick(dt, damagePlayer);
 
   // --- intent. A rider sits still: `vehicles.update` moves the vehicle and seats the player.
   const riding = !!p.vehicle;
@@ -4513,10 +4580,11 @@ function updateCamera(dt) {
 // Armor applies to these damage kinds. Each armor point cuts the damage by 4%, up to 80%.
 const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1 };
 function armorFactor() { return 1 - Math.min(0.8, inv.armorPoints() * 0.04); }
-// kind: mob, arrow, explosion, lightning (armored), or fall, lava, cactus (not armored).
+// kind: mob, arrow, explosion, lightning (armored), or fall, lava, cactus, void (not armored).
+// No damage lands while a menu, the loading screen, or the travel screen shows.
 function damagePlayer(amount, cause, from, kind = 'mob') {
   const p = player;
-  if (p.dead || p.invuln > 0 || amount <= 0 || game.state === 'loading' || game.state === 'menu') return;
+  if (p.dead || p.invuln > 0 || amount <= 0 || game.state === 'loading' || game.state === 'menu' || game.state === 'travel') return;
   if (ARMORED[kind] && inv.armorPoints() > 0) { amount *= armorFactor(); inv.wearArmor(); audio.armorHit(); }
   p.health = Math.max(0, p.health - amount);
   p.invuln = 0.5; p.lastHurt = game.clock;
@@ -4555,13 +4623,17 @@ function setFlying(on) {
   }
 }
 
+// Respawn is at the overworld spawn. Outside the overworld it travels there; the death drops
+// wait in the realm of the death.
 function respawn() {
   const p = player;
   p.flying = false;
-  p.pos.copy(p.spawn); p.vel.set(0, 0, 0);
+  if (realm.current !== 'overworld') realm.travel('overworld', p.spawn.toArray(), () => p.spawn.toArray());
   p.health = p.maxHealth; p.dead = false; p.fallPeak = null; p.regenLeft = 0; p.invuln = 1.5; p.lastHurt = -99;
   p.pitch = 0;
   hud.dirtyHearts = true;
+  if (realm.travelling) return;              // the travel screen shows; updateTravel ends it
+  p.pos.copy(p.spawn); p.vel.set(0, 0, 0);
   fadeIn();
   setState('playing');
   requestLock();
@@ -5310,6 +5382,7 @@ const liquids = (() => {
     },
     get pending() { return queues[1].size + queues[2].size; },
     save() { return [1, 2].map((k) => [...queues[k].values()]); },
+    clear() { queues[1].clear(); queues[2].clear(); },
     load(lists) { [1, 2].forEach((k, i) => { for (const c of (lists && lists[i]) || []) queues[k].set(key(c[0], c[1], c[2]), c); }); },
   };
 })();
@@ -5385,6 +5458,7 @@ const leafDecay = (() => {
     get pending() { return queue.size; },
     save() { return [...queue.values()].map((c) => [c[0], c[1], c[2]]); },
     load(list) { for (const c of list || []) add(c[0], c[1], c[2]); },
+    clear() { queue.clear(); },
   };
 })();
 
@@ -5491,6 +5565,7 @@ const farming = (() => {
     toDirt,
     get pending() { return reg.size; },
     save() { return [...reg.values()].map((c) => [c[0], c[1], c[2], Math.max(0, c[3] - game.clock), c[4]]); },
+    clear() { reg.clear(); },
     load(list) { for (const c of list || []) reg.set(key(c[0], c[1], c[2]), [c[0], c[1], c[2], game.clock + c[3], c[4] | 0]); },
   };
 })();
@@ -5758,6 +5833,8 @@ function updateInteraction(dt) {
 
 // ---- dropped items -------------------------------------------------------------------
 // A drop is a small spinning item model with physics. The player collects it on contact.
+// A drop waits frozen while its chunk is not lit. realms.js stashes the drops of a realm the player
+// leaves. A drop below VOID_Y in the void (Crystal Realm) is removed.
 
 const drops = [];
 class Drop {
@@ -5789,7 +5866,7 @@ function updateDrops(dt) {
     const d = drops[i];
     d.age += dt;
     const c = world.chunkAt(Math.floor(d.pos.x), Math.floor(d.pos.z));
-    if (d.age > 300) { d.remove(); drops.splice(i, 1); continue; }
+    if (d.age > 300 || (world.voidBelow && d.pos.y < VOID_Y)) { d.remove(); drops.splice(i, 1); continue; }
     if (!c || !c.lit) continue;
     const dx = px - d.pos.x, dy = py - d.pos.y, dz = pz - d.pos.z, dist = Math.hypot(dx, dy, dz);
     if (!player.dead && d.age > d.delay && dist < (d.thrown ? THROWN_PICKUP_RANGE : PICKUP_RANGE)) {
@@ -7214,7 +7291,8 @@ function lineOfSight(ax, ay, az, bx, by, bz) {
 
 function updateMobs(dt) {
   for (let i = mobs.length - 1; i >= 0; i--) {
-    if (!mobs[i].update(dt)) { mobs[i].remove(); mobs.splice(i, 1); }
+    const m = mobs[i];
+    if (!m.update(dt) || (world.voidBelow && m.pos.y < VOID_Y)) { m.remove(); mobs.splice(i, 1); }
   }
   spawnHostiles(dt);
   spawners.update(dt);
@@ -7647,6 +7725,9 @@ function updateTnt(dt) {
   }
 }
 
+// Realm switch: every fuse goes out. The TNT block stays, unlit.
+function clearTnt() { for (const e of primedTnt.values()) removeTntFlash(e); primedTnt.clear(); }
+
 // ---- spawning ---------------------------------------------------------------------------
 
 const entityStore = new Map();   // chunk key -> [{type, x, y, z, hp}] saved passive mobs
@@ -7659,7 +7740,10 @@ const PASSIVE_BY_BIOME = {
 const passiveCount = () => { let n = 0; for (const m of mobs) if (!m.def.hostile && !m.dead) n++; return n; };
 const hostileCount = () => { let n = 0; for (const m of mobs) if (m.def.hostile && !m.dead) n++; return n; };
 
+// Passive mobs live only in the overworld (SPEC_realms Phase 1). world.realm is the realm of
+// the chunk: during a realm switch, world.reset unloads the old chunks before it changes realm.
 world.onChunkLoaded = (c) => {
+  if (world.realm !== 'overworld') return;
   const saved = entityStore.get(c.key);
   if (saved) {
     entityStore.delete(c.key);
@@ -7690,7 +7774,7 @@ world.onChunkUnloaded = (c) => {
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i];
     if (m.pos.x < x0 || m.pos.x >= x0 + CS || m.pos.z < z0 || m.pos.z >= z0 + CS) continue;
-    if (!m.def.hostile && !m.dead) saved.push({ type: m.type, x: m.pos.x, y: m.pos.y, z: m.pos.z, hp: m.hp });
+    if (!m.def.hostile && !m.dead && world.realm === 'overworld') saved.push({ type: m.type, x: m.pos.x, y: m.pos.y, z: m.pos.z, hp: m.hp });
     m.remove(); mobs.splice(i, 1);
   }
   if (saved.length) entityStore.set(c.key, saved);
@@ -7709,7 +7793,7 @@ function spawnRoom(x, y, z, def) {
 let spawnTimer = 0;
 function spawnHostiles(dt) {
   spawnTimer -= dt;
-  if (spawnTimer > 0 || player.dead) return;
+  if (spawnTimer > 0 || player.dead || world.realm !== 'overworld') return;
   spawnTimer = 0.35;
   if (hostileCount() >= MAX_HOSTILE) return;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -7811,7 +7895,8 @@ const spawners = (() => {
     }
     for (const [k, s] of live) if (!seen.has(k)) forget(k, s);
   }
-  return { update, live };
+  function clear() { for (const [k, s] of live) forget(k, s); }
+  return { update, live, clear };
 })();
 
 /* =====================================================================================
@@ -8290,7 +8375,9 @@ const audio = {
  * -------------------------------------------------------------------------------------
  * The HUD is DOM over the canvas. `hud.update` repaints only dirty parts: the hotbar,
  * the hearts, and a text panel (refreshed 4x per second).
- * Game states: loading -> menu -> playing <-> paused | inventory | homes | dead.
+ * Game states: loading -> menu -> playing <-> paused | inventory | homes | dead | travel.
+ * 'travel' shows the travel screen while a realm loads. Input and damage do nothing then.
+ * Outside the overworld the compass needle spins and the text shows "?".
  * `setState` is the only place that shows and hides the screens.
  * ===================================================================================== */
 
@@ -8325,16 +8412,18 @@ const hud = {
     }
   },
   // The compass dial shows while a compass is held. The needle angle is the spawn direction
-  // relative to the view (0 = ahead, clockwise). Within 2 blocks the needle spins.
+  // relative to the view (0 = ahead, clockwise). Within 2 blocks the needle spins. Outside the
+  // overworld the needle spins and the text is "?".
   updateCompass() {
     const p = player, s = inv.held(), on = !!s && s.id === I.COMPASS && !p.dead;
     if (on !== this.compassOn) { this.compassOn = on; this.compassEl.classList.toggle('on', on); }
     if (!on) return;
     const dx = p.spawn.x - p.pos.x, dz = p.spawn.z - p.pos.z, d = Math.hypot(dx, dz);
     const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw);
-    const ang = d < 2 ? game.clock * 6 : Math.atan2(dx * cy - dz * sy, -dx * sy - dz * cy);
+    const lost = realm.current !== 'overworld';
+    const ang = lost || d < 2 ? game.clock * 6 : Math.atan2(dx * cy - dz * sy, -dx * sy - dz * cy);
     this.compassEl.firstChild.firstChild.style.transform = `rotate(${ang.toFixed(3)}rad)`;
-    const text = d < 2 ? 'At spawn' : `${Math.round(d)} blocks to spawn`;
+    const text = lost ? '?' : d < 2 ? 'At spawn' : `${Math.round(d)} blocks to spawn`;
     if (text !== this.compassText) { this.compassText = text; this.compassEl.lastChild.textContent = text; }
   },
   toast(msg) { this.toastEl.textContent = msg; this.toastEl.style.opacity = 1; this.toastT = 2.5; },
@@ -8432,7 +8521,7 @@ hud.build();
 
 // ---- menus and settings -------------------------------------------------------------
 
-const overlayEl = $('overlay'), deathEl = $('death'), playBtn = $('playBtn');
+const overlayEl = $('overlay'), deathEl = $('death'), travelEl$1 = $('travel'), playBtn = $('playBtn');
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 $('seedText').textContent = `Seed ${SEED} · the world saves itself · ?seed=${SEED} reopens it`;
 
@@ -8442,6 +8531,7 @@ function setState(s) {
   invEl.classList.toggle('show', s === 'inventory');
   homesEl.classList.toggle('show', s === 'homes');
   deathEl.classList.toggle('show', s === 'dead');
+  travelEl$1.classList.toggle('show', s === 'travel');
   $('crosshair').style.display = s === 'playing' ? 'block' : 'none';
   if (s !== 'playing') { resumeEl.style.display = 'none'; setEscLock(false); }
   $('hud').style.display = game.started ? 'block' : 'none';
@@ -8450,7 +8540,7 @@ function setState(s) {
   if (s !== 'playing') { input.keys.clear(); input.mouseL = input.mouseR = false; resetMining(); }
 }
 function showPause() {
-  if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes') return;
+  if (!game.started || game.state === 'dead' || game.state === 'inventory' || game.state === 'homes' || game.state === 'travel') return;
   setState('paused');
   setPausedAt(performance.now());
   persist.save();
@@ -8519,6 +8609,8 @@ freezeEl.addEventListener('change', () => {
 // ---- save and load ------------------------------------------------------------------
 // One save per seed in localStorage (SAVE_KEY). It holds the block edits (overridesByChunk),
 // the player, the inventory, furnaces and chests, homes, queued liquid cells, and the time.
+// Realms: the top-level slice fields hold the overworld. `realm` names the realm of the player,
+// `realms` holds the ember and crystal slices, and `portals` and `boss` hold their state.
 // `ids` names the id plan of the save (IDS_VERSION). migrateIds upgrades an older save at boot and at import.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
 // play, on pause, and when the page hides or closes. An import sets `blocked`, so the
@@ -8528,18 +8620,20 @@ const persist = {
   timer: 0, savedAt: 0, warned: false, blocked: false,
   savedAgo() { return this.savedAt ? `${Math.round((performance.now() - this.savedAt) / 1000)} s ago` : 'never'; },
   data() {
-    const p = player, edits = [];
-    for (const [k, m] of world.overridesByChunk) { const flat = []; for (const [i, id] of m) flat.push(i, id); edits.push([k, flat]); }
+    const p = player, place = realm.place();
     // A rider saves at the exit spot of the vehicle and loads on foot. The vehicle saves in place.
+    // During a travel load the player saves at the place before travel (realm.place).
     const out = p.vehicle && !p.dead ? vehicles.exitSpot(p.vehicle) : null;
-    const pos = p.dead ? p.spawn : out ? new THREE.Vector3(out.x, out.y, out.z) : p.pos;
+    const pos = place.pos ? new THREE.Vector3().fromArray(place.pos) : p.dead ? p.spawn : out ? new THREE.Vector3(out.x, out.y, out.z) : p.pos;
+    const realms = {};
+    for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = realm.slice(name); if (sl) realms[name] = sl; }
     return {
       v: 1, ids: IDS_VERSION, seed: SEED, dayTime: game.dayTime, clock: game.clock,
       player: { pos: pos.toArray(), spawn: p.spawn.toArray(), yaw: p.yaw, pitch: p.pitch, health: p.dead ? p.maxHealth : p.health, flying: p.flying && !p.dead },
       inv: { slots: inv.slots, sel: inv.sel, loose: [...inv.craft, ...inv.altar, inv.cursor].filter(Boolean) },
       armor: inv.armor,
-      edits, te: [...tileEntities.values()], homes, liquids: liquids.save(), leaves: leafDecay.save(),
-      farm: farming.save(), enchantSeed, vehicles: vehicles.data(), looted: [...looted], weather: weather.data(),
+      ...realm.slice('overworld'), enchantSeed, weather: weather.data(),
+      realm: place.name, realms, portals: { ...realm.portals }, boss: { ...realm.boss },
     };
   },
   save() {
@@ -8562,28 +8656,8 @@ const persist = {
     inv.sel = d.inv.sel | 0;
     for (let i = 0; i < 4; i++) inv.armor[i] = (d.armor || [])[i] || null;
     for (const s of d.inv.loose || []) inv.add(s.id, s.count, s.dur, s.ench);
-    for (const [k, flat] of d.edits) {
-      const m = new Map(), cx = Math.floor(k / 65536) - 32768, cz = (k % 65536) - 32768;
-      for (let j = 0; j < flat.length; j += 2) {
-        const i = flat[j], x = cx * CS + (i & 15), y = i >> 8, z = cz * CS + ((i >> 4) & 15);
-        let id = flat[j + 1];
-        if (id === B.LEAVES) id = B.LEAVES_PLACED;   // saves before leaf decay: every leaf edit was a placed leaf
-        m.set(i, id);
-        world.overrides.set(`${x},${y},${z}`, id);
-        if (baseOf(id) === B.TORCH) torches.add(`${x},${y},${z}`);
-        const v = id - B.DOOR;
-        if (baseOf(id) === B.DOOR && (v & 4) && !(v & 8)) doorTimers.set(`${x},${y},${z}`, game.clock + CONFIG.doorCloseDelay);
-      }
-      world.overridesByChunk.set(k, m);
-    }
-    for (const t of d.te || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t);
-    setHomes(d.homes || []);
-    liquids.load(d.liquids);
-    leafDecay.load(d.leaves);
-    farming.load(d.farm);
+    realm.load(d);   // every realm slice: edits, chests, homes, liquids, leaves, farming, vehicles, looted
     if (Number.isInteger(d.enchantSeed)) setEnchantSeed(d.enchantSeed);
-    vehicles.load(d.vehicles);
-    for (const k of d.looted || []) looted.add(k);
     weather.load(d.weather);
     this.savedAt = performance.now();
   },
@@ -8601,6 +8675,25 @@ $('newWorldBtn').addEventListener('click', (e) => {
 // under its own seed, and reloads on that seed: SAVE is read only at boot, so a reload is the
 // only way to apply it. migrateIds runs before validSave, so an export from before the id plan
 // imports and is stored with the new ids. An import that meets an existing save for its seed asks first.
+// One realm slice: the top-level overworld fields, or one entry of `realms`. The overworld needs
+// `edits`; a stored slice may omit any field.
+function validSlice(s, top) {
+  const num = (x) => typeof x === 'number' && Number.isFinite(x);
+  const int = Number.isInteger, arr = Array.isArray;
+  const stack = (t) => t === null || (!!t && int(t.id) && !!ITEMS[t.id] && int(t.count) && t.count > 0 && validEnch(t));
+  const optArr = (a) => a === undefined || arr(a);
+  if (!s || typeof s !== 'object' || arr(s)) return false;
+  if (!top && s.edits === undefined) s = { ...s, edits: [] };
+  return arr(s.edits) && s.edits.every((e) => arr(e) && int(e[0]) && arr(e[1]) && e[1].length % 2 === 0
+      && e[1].every((v, j) => int(v) && (j % 2 === 0 ? v >= 0 && v < VOL : !!BLOCKS[v])))
+    && optArr(s.te) && (s.te || []).every((t) => t && int(t.x) && int(t.y) && int(t.z) && arr(t.slots) && t.slots.every(stack))
+    && optArr(s.homes) && (s.homes || []).every((h) => h && typeof h.name === 'string' && num(h.x) && num(h.y) && num(h.z))
+    && optArr(s.liquids) && optArr(s.leaves)
+    && optArr(s.farm) && (s.farm || []).every((c) => arr(c) && c.length === 5 && c.every(num))
+    && optArr(s.vehicles) && (s.vehicles || []).every((v) => v && typeof v.kind === 'string' && Object.hasOwn(VEHICLE_KINDS, v.kind)
+      && num(v.x) && num(v.y) && num(v.z) && num(v.yaw))
+    && optArr(s.looted) && (s.looted || []).every((k) => typeof k === 'string' && /^-?\d+,-?\d+,-?\d+$/.test(k));
+}
 function validSave(d) {
   const num = (x) => typeof x === 'number' && Number.isFinite(x);
   const int = Number.isInteger, arr = Array.isArray;
@@ -8611,19 +8704,16 @@ function validSave(d) {
   return !!d && d.v === 1 && d.ids === IDS_VERSION && int(d.seed) && (d.seed | 0) === d.seed && num(d.dayTime) && num(d.clock)
     && !!P && vec(P.pos) && vec(P.spawn) && num(P.yaw) && num(P.pitch) && num(P.health)
     && !!V && arr(V.slots) && V.slots.length <= 36 && V.slots.every(stack) && optArr(V.loose) && (V.loose || []).every((s) => s && stack(s))
-    && arr(d.edits) && d.edits.every((e) => arr(e) && int(e[0]) && arr(e[1]) && e[1].length % 2 === 0
-      && e[1].every((v, j) => int(v) && (j % 2 === 0 ? v >= 0 && v < VOL : !!BLOCKS[v])))
-    && optArr(d.te) && (d.te || []).every((t) => t && int(t.x) && int(t.y) && int(t.z) && arr(t.slots) && t.slots.every(stack))
-    && optArr(d.homes) && (d.homes || []).every((h) => h && typeof h.name === 'string' && num(h.x) && num(h.y) && num(h.z))
-    && optArr(d.liquids) && optArr(d.leaves)
-    && optArr(d.farm) && (d.farm || []).every((c) => arr(c) && c.length === 5 && c.every(num))
+    && validSlice(d, true)
     && optArr(d.armor) && (d.armor || []).length <= 4
     && (d.armor || []).every((s, i) => s === null || (stack(s) && ITEMS[s.id].armor?.piece === i))
     && (d.enchantSeed === undefined || int(d.enchantSeed))
-    && optArr(d.vehicles) && (d.vehicles || []).every((v) => v && typeof v.kind === 'string' && Object.hasOwn(VEHICLE_KINDS, v.kind)
-      && num(v.x) && num(v.y) && num(v.z) && num(v.yaw))
-    && optArr(d.looted) && (d.looted || []).every((k) => typeof k === 'string' && /^-?\d+,-?\d+,-?\d+$/.test(k))
-    && (d.weather === undefined || (!!d.weather && weather.KINDS.includes(d.weather.kind) && num(d.weather.left) && d.weather.left >= 0));
+    && (d.weather === undefined || (!!d.weather && weather.KINDS.includes(d.weather.kind) && num(d.weather.left) && d.weather.left >= 0))
+    && (d.realm === undefined || Object.hasOwn(REALMS, d.realm))
+    && (d.realms === undefined || (!!d.realms && typeof d.realms === 'object' && !arr(d.realms)
+      && Object.entries(d.realms).every(([k, sl]) => k !== 'overworld' && Object.hasOwn(REALMS, k) && validSlice(sl, false))))
+    && (d.portals === undefined || (!!d.portals && (d.portals.crystalBack === null || d.portals.crystalBack === undefined || vec(d.portals.crystalBack))))
+    && (d.boss === undefined || (!!d.boss && (d.boss.defeated === undefined || typeof d.boss.defeated === 'boolean')));
 }
 function localDate() {
   const t = new Date(), p2 = (n) => String(n).padStart(2, '0');
@@ -8729,6 +8819,221 @@ $('homeSetBtn').addEventListener('click', () => setHome());
 function setHomes(v) { homes = v; }
 
 /* =====================================================================================
+ * REALMS — living header (src/realms.js, SPEC_realms)
+ * -------------------------------------------------------------------------------------
+ * Three realms: overworld, ember (the Ember Realm), and crystal (the Crystal Realm). The
+ * player is in exactly one realm, `realm.current`. Only that realm's chunks load.
+ *
+ * Realm-scoped state: block edits, chests and furnaces, looted chests, homes, liquids, leaf
+ * decay, farming, vehicles, and dropped items. This module owns the stash of every realm that
+ * is not current. A stash holds the override maps, the save slice of the other modules, and the
+ * drop objects (detached from the scene, so they wait frozen). Torches and door timers are
+ * derived from the overrides. Mobs, arrows, primed TNT, and spawner models do not wait: a
+ * realm change removes them.
+ *
+ * Travel: realm.travel(name, to, arrive) saves, stashes the current realm, clears the scoped
+ * modules, restores the target stash, resets the world, and shows the travel screen. When the
+ * chunks around `to` are meshed, arrive(to) returns the standing point (default: standNear).
+ * The simulation stops during the load (state 'travel'). The game saves again on arrival.
+ *
+ * Save: the top-level slice fields hold the overworld. `realms.ember` and `realms.crystal` hold
+ * the other slices. `realm` names the realm of player.pos. persist.js calls slice() and load().
+ * ===================================================================================== */
+
+// ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
+// { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
+const REALMS = {
+  overworld: { name: 'overworld', label: 'the Overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
+  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 6, fog: { color: 0x2e0a05, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
+  crystal: { name: 'crystal', label: 'the Crystal Realm', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
+};
+const SLICE_FIELDS = ['edits', 'te', 'homes', 'liquids', 'leaves', 'farm', 'vehicles', 'looted'];
+const VOID_DAMAGE = 4, VOID_TICK = 0.5;
+
+// ---- edits: the save form (flat [chunk key, [index, id, ...]]) and the live maps ----------
+function editsOf(byChunk) {
+  const edits = [];
+  for (const [k, m] of byChunk) { const flat = []; for (const [i, id] of m) flat.push(i, id); edits.push([k, flat]); }
+  return edits;
+}
+function mapsOf(edits) {
+  const overrides = new Map(), overridesByChunk = new Map();
+  for (const [k, flat] of edits || []) {
+    const m = new Map(), cx = Math.floor(k / 65536) - 32768, cz = (k % 65536) - 32768;
+    for (let j = 0; j < flat.length; j += 2) {
+      const i = flat[j];
+      let id = flat[j + 1];
+      if (id === B.LEAVES) id = B.LEAVES_PLACED;   // saves before leaf decay: every leaf edit was a placed leaf
+      m.set(i, id);
+      overrides.set(`${cx * CS + (i & 15)},${i >> 8},${cz * CS + ((i >> 4) & 15)}`, id);
+    }
+    overridesByChunk.set(k, m);
+  }
+  return { overrides, overridesByChunk };
+}
+
+// A stash: { overrides, overridesByChunk, slice: { te, homes, liquids, leaves, farm, vehicles, looted }, drops }.
+function stashOf(slice) {
+  const s = slice || {};
+  return { ...mapsOf(s.edits), slice: s, drops: [] };
+}
+
+const realm = {
+  current: 'overworld',
+  travelling: null,                     // { from, pos, to, arrive } while the travel screen shows
+  portals: { crystalBack: null },
+  boss: { defeated: false },
+  stash: new Map(),                     // realm name -> stash, for every realm except current
+  voidT: 0,
+
+  get def() { return REALMS[this.current]; },
+
+  // The save slice of realm `name`, from the live modules or from its stash.
+  slice(name) {
+    if (name === this.current) {
+      return {
+        edits: editsOf(world.overridesByChunk), te: [...tileEntities.values()], homes,
+        liquids: liquids.save(), leaves: leafDecay.save(), farm: farming.save(), vehicles: vehicles.data(), looted: [...looted],
+      };
+    }
+    const s = this.stash.get(name);
+    if (!s) return null;
+    const out = { edits: editsOf(s.overridesByChunk) };
+    for (const f of SLICE_FIELDS) if (f !== 'edits') out[f] = s.slice[f] ?? [];
+    return out;
+  },
+  // Where the save puts the player: the realm before travel during a load, the overworld when dead.
+  place() {
+    const t = this.travelling;
+    if (t) return { name: t.from, pos: t.pos };
+    return { name: player.dead ? 'overworld' : this.current, pos: null };
+  },
+
+  // Boot: restores every slice of the save and makes d.realm current (persist.apply).
+  load(d) {
+    this.current = REALMS[d.realm] ? d.realm : 'overworld';
+    this.portals = { crystalBack: d.portals?.crystalBack ?? null };
+    this.boss = { defeated: !!d.boss?.defeated };
+    this.stash.clear();
+    const slices = { overworld: d, ...(d.realms || {}) };
+    for (const name of Object.keys(REALMS)) if (name !== this.current && slices[name]) this.stash.set(name, stashOf(slices[name]));
+    this.enter(stashOf(slices[this.current]));
+  },
+
+  // Detaches the live realm-scoped state into a stash and clears the modules.
+  leave() {
+    const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
+    for (const d of s.drops) scene.remove(d.mesh);
+    tileEntities.clear(); looted.clear(); setHomes([]);
+    liquids.clear(); leafDecay.clear(); farming.clear(); vehicles.clear();
+    torches.clear(); doorTimers.clear(); clearTnt(); projectiles.clear(); spawners.clear();
+    resetMining();
+    return s;
+  },
+  // Makes a stash live: resets the world to its override maps and loads the other modules.
+  enter(s) {
+    const def = REALMS[this.current];
+    world.reset(def.name, s.overrides, s.overridesByChunk, def.voidBelow);
+    for (const m of mobs) m.remove();
+    mobs.length = 0;
+    for (const [k, id] of world.overrides) {
+      if (baseOf(id) === B.TORCH) torches.add(k);
+      const v = id - B.DOOR;
+      if (baseOf(id) === B.DOOR && (v & 4) && !(v & 8)) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay);
+    }
+    const sl = s.slice;
+    for (const t of sl.te || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t);
+    for (const k of sl.looted || []) looted.add(k);
+    setHomes(sl.homes || []);
+    liquids.load(sl.liquids); leafDecay.load(sl.leaves); farming.load(sl.farm); vehicles.load(sl.vehicles);
+    for (const d of s.drops) { scene.add(d.mesh); drops.push(d); }
+    this.voidT = 0;
+  },
+
+  // Switches to realm `name`. `to` = [x, y, z] is where the chunks load (default: defaultTarget);
+  // arrive(to) returns the standing point once they are meshed. Returns false when the switch
+  // cannot start.
+  travel(name, to = defaultTarget(name), arrive = standNear) {
+    if (!REALMS[name] || name === this.current || this.travelling || !game.started || player.vehicle) return false;
+    if (!Array.isArray(to) || to.length !== 3 || !to.every(Number.isFinite)) return false;
+    if (game.state === 'inventory') closeInventory(true);
+    if (game.state === 'homes') closeHomes();
+    if (!player.dead) persist.save();
+    const dead = player.dead;               // a respawn travels while dead: a save then puts the player at spawn
+    this.travelling = { from: dead ? 'overworld' : this.current, pos: (dead ? player.spawn : player.pos).toArray(), to, arrive };
+    this.stash.set(this.current, this.leave());
+    this.current = name;
+    const s = this.stash.get(name) || stashOf(null);
+    this.stash.delete(name);
+    this.enter(s);
+    player.pos.set(to[0], to[1], to[2]); player.vel.set(0, 0, 0); player.fallPeak = null;
+    weather.snap();
+    travelText.textContent = REALMS[name].enter;
+    travelEl.dataset.realm = name;
+    travelBar.style.width = '0%';
+    setState('travel');
+    if (document.pointerLockElement) document.exitPointerLock();
+    return true;
+  },
+  // Each frame while the travel screen shows (main.js).
+  updateTravel() {
+    const t = this.travelling;
+    if (!t) return;
+    const r = world.readyAround(t.to[0], t.to[2], 3);
+    travelBar.style.width = `${Math.round(r * 100)}%`;
+    if (r < 1) return;
+    const p = t.arrive(t.to) || t.to;
+    player.pos.set(p[0], p[1], p[2]); player.vel.set(0, 0, 0); player.fallPeak = null; player.invuln = Math.max(player.invuln, 1);
+    this.travelling = null;
+    setState('playing');
+    fadeIn();
+    hud.dirtyHotbar = hud.dirtyHearts = true;
+    if (document.pointerLockElement !== canvas) resumeEl.style.display = 'block';
+    persist.save();
+  },
+
+  // The void (Crystal Realm): 4 damage every 0.5 s below y -32, not armored (player.js calls it).
+  voidTick(dt, hurt) {
+    if (!world.voidBelow || player.pos.y >= VOID_Y || player.dead) { this.voidT = 0; return; }
+    if ((this.voidT -= dt) > 0) return;
+    this.voidT = VOID_TICK;
+    hurt(VOID_DAMAGE, 'fell out of the world', null, 'void');
+  },
+};
+
+// A standing spot near (x, y, z): a solid floor that is not a leaf, log, cactus, or liquid,
+// with two free cells above. It searches columns within 8 blocks, each from y down, then up.
+function standNear(to) {
+  const x0 = Math.floor(to[0]), y0 = Math.max(1, Math.min(H - 3, Math.floor(to[1]))), z0 = Math.floor(to[2]);
+  const ok = (x, y, z) => {
+    const f = world.getBlock(x, y - 1, z);
+    if (!SOLID[f] || IS_LEAF[f] || f === B.LOG || f === B.CACTUS || f === UNLOADED) return false;
+    for (const dy of [0, 1]) { const b = world.getBlock(x, y + dy, z); if (SOLID[b] || LIQ_KIND[b] || b === UNLOADED) return false; }
+    return true;
+  };
+  for (let r = 0; r <= 8; r++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+    const x = x0 + dx, z = z0 + dz;
+    for (let y = y0; y >= 1; y--) if (ok(x, y, z)) return [x + 0.5, y, z + 0.5];
+    for (let y = y0 + 1; y < H - 2; y++) if (ok(x, y, z)) return [x + 0.5, y, z + 0.5];
+  }
+  return [x0 + 0.5, y0, z0 + 0.5];
+}
+
+// The default target of a travel without `to`. Crystal: the arena center. Else the player's point
+// in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the Ember Realm.
+// An ember y is the overworld y - 64, clamped to 33..110.
+function defaultTarget(name) {
+  if (name === 'crystal') return [0.5, 97, 0.5];
+  const p = player.pos;
+  const o = realm.current === 'crystal' ? realm.portals.crystalBack || player.spawn.toArray()
+    : realm.current === 'ember' ? [p.x * 8, p.y + 64, p.z * 8] : p.toArray();
+  return name === 'ember' ? [o[0] / 8, Math.max(33, Math.min(110, o[1] - 64)), o[2] / 8] : o;
+}
+
+const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('travelBar').firstChild;
+
+/* =====================================================================================
  * === 17. DAY/NIGHT CYCLE AND SKY
  * -------------------------------------------------------------------------------------
  * dayTime runs 0..1 over CONFIG.dayLength seconds: 0 sunrise, 0.25 noon, 0.5 sunset,
@@ -8742,6 +9047,9 @@ function setHomes(v) { homes = v; }
  * `weather` follows the sky. It fades k (wet) and storm over 6 s. The sky greys the dome and
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
+ * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
+ * a dark red dome, no sun, moon, stars, or clouds, and close red fog. crystal: a violet dome with
+ * full stars, a fixed light direction, and no sun disc or clouds. The day clock keeps running.
  * ===================================================================================== */
 
 const sky = (() => {
@@ -8993,9 +9301,40 @@ const sky = (() => {
     clouds$1.position.set(camera.position.x, CLOUD_Y, camera.position.z);
     clouds$1.scale.set(cloudUniforms$1.uFar.value, 1, cloudUniforms$1.uFar.value);
     clouds$1.visible = !player.headInWater && !player.headInLava;
+    const def = REALMS[realm.current];
+    if (def.sky !== 'day') realmSky(def, far);
+  }
+
+  // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
+  const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
+  const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
+  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize();
+  function realmSky(def, far) {
+    const ember = def.sky === 'ember';
+    uniforms.uTop.value.copy(ember ? EMBER_TOP : CRYSTAL_TOP);
+    uniforms.uHorizon.value.copy(ember ? EMBER_HOR : CRYSTAL_HOR);
+    uniforms.uGlowAmt.value = 0;
+    sun.material.opacity = halo.material.opacity = moon.material.opacity = 0;
+    starMat.uniforms.uOpacity.value = ember ? 0 : 1;
+    stars.visible = !ember;
+    clouds$1.visible = false;
+    cloudUniforms.uCloudCover.value = 0;               // no cloud shadows on the terrain
+    game.clearDaylight = game.daylight = ember ? 0.3 : 0.8;
+    terrainUniforms.uDaylight.value = game.daylight;
+    terrainUniforms.uSkyLight.value.copy(ember ? EMBER_LIGHT : CRYSTAL_LIGHT);
+    terrainUniforms.uSunDir.value.copy(CRYSTAL_SUN);
+    terrainUniforms.uSunAmt.value = ember ? 0 : 0.6;
+    if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
+    const fog = terrainUniforms.uFogColor.value;
+    fog.setHex(def.fog.color);
+    const f = Math.min(def.fog.far, far);
+    terrainUniforms.uFogNear.value = f * (ember ? 0.3 : 0.55); terrainUniforms.uFogFar.value = f;
+    scene.fog.color.copy(fog);
+    scene.fog.near = terrainUniforms.uFogNear.value; scene.fog.far = f;
+    renderer.setClearColor(fog);
   }
   // cloudNear, cloudFar: the cloud fade distances (uniform objects), for the light-shaft mask
-  return { update, sunDir, cloudNear: cloudUniforms$1.uNear, cloudFar: cloudUniforms$1.uFar };
+  return { update, sunDir, cloudNear: cloudUniforms$1.uNear, cloudFar: cloudUniforms$1.uFar, get mode() { return REALMS[realm.current].sky; } };
 })();
 
 // ---- weather (Batch 18) ---------------------------------------------------------------------
@@ -9007,6 +9346,8 @@ const sky = (() => {
 // it, so a slope or a treetop never mixes the two. A drop never falls below the top non-air block of
 // its column, so roofs, trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
 // the player and mobs within 3 blocks and lights nothing. Thunder follows at THUNDER_SPEED blocks/s.
+// Weather falls only in a realm with `weather: true` (the overworld). The kind and its timer keep
+// counting in every realm; elsewhere k and storm target 0. snap() sets them at once (realm travel).
 
 const weather = (() => {
   const RADIUS = 24, FADE = 6, BOLT_RANGE = 64, THUNDER_SPEED = 34, NRAIN = 2600, NSNOW = 1100, STREAK = 1.3;
@@ -9177,12 +9518,16 @@ const weather = (() => {
     if (kind === 'clear') { kind = Math.random() < 1 / 3 ? 'storm' : 'rain'; left = randRange(120, 360); }
     else { kind = 'clear'; left = randRange(300, 900); }
   }
+  const here = () => REALMS[realm.current].weather;
+  const wetTarget = () => (here() && kind !== 'clear' ? 1 : 0), stormTarget = () => (here() && kind === 'storm' ? 1 : 0);
+  // Sets k and storm to their targets at once: on load and on a realm change.
+  function snap() { k = wetTarget(); storm = stormTarget(); flash = 0; }
   function update(dt) {
     if ((left -= dt) <= 0) next();
-    const wet = kind === 'clear' ? 0 : 1, st = kind === 'storm' ? 1 : 0;
+    const wet = wetTarget(), st = stormTarget();
     k += clamp(wet - k, -dt / FADE, dt / FADE);
     storm += clamp(st - storm, -dt / FADE, dt / FADE);
-    if (kind === 'storm' && storm > 0.5 && (boltT -= dt) <= 0) {
+    if (here() && kind === 'storm' && storm > 0.5 && (boltT -= dt) <= 0) {
       boltT = randRange(5, 20);
       const a = Math.random() * Math.PI * 2, r = BOLT_RANGE * Math.sqrt(Math.random());
       strike(player.pos.x + Math.cos(a) * r, player.pos.z + Math.sin(a) * r);
@@ -9219,12 +9564,12 @@ const weather = (() => {
     if (kn === 'storm') boltT = Math.min(boltT, 5);
   }
   return {
-    update, set, strike, wetAt, precip, top, zone, melt,
+    update, set, snap, strike, wetAt, precip, top, zone, melt,
     get kind() { return kind; }, get left() { return left; }, get k() { return k; }, get storm() { return storm; }, get flash() { return flash; },
     get dim() { return 1 - 0.25 * k - 0.2 * storm; },
     get rainGain() { return loop ? loop.gain.gain.value : 0; },   // for tests: the rain loop's current volume
     data() { return { kind, left }; },
-    load(w) { if (!w) return; kind = w.kind; left = w.left; k = kind === 'clear' ? 0 : 1; storm = kind === 'storm' ? 1 : 0; },
+    load(w) { if (!w) return; kind = w.kind; left = w.left; snap(); },
     KINDS,
   };
 })();
@@ -9313,7 +9658,7 @@ const fireflies = (() => {
 
   function update(dt) {
     const e = Math.sin(game.dayTime * Math.PI * 2);   // sun height: 0 at sunrise and sunset
-    level = (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k);
+    level = realm.current === 'overworld' ? (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k) : 0;   // overworld only
     const under = player.headInWater || player.headInLava;
     points.visible = level > 0.01 && !under;
     if (level <= 0.01) { for (let i = 0; i < N; i++) d[i * S + 10] = 0; shown = 0; return; }   // fresh spots next night
@@ -9736,7 +10081,7 @@ const post = (() => {
   // Shaft color times strength for this frame; black when shafts should not show.
   function shaftColor(out) {
     out.setRGB(0, 0, 0);
-    if (!CONFIG.bloom || player.headInWater || player.headInLava) return out;
+    if (!CONFIG.bloom || player.headInWater || player.headInLava || sky.mode !== 'day') return out;
     const elev = sky.sunDir.y, dusk = Math.max(0, 1 - Math.abs(elev) / 0.3);
     let amt;
     if (elev > -0.04) {
@@ -9805,7 +10150,7 @@ const post = (() => {
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 46 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 47 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -9861,9 +10206,11 @@ const post = (() => {
  *      spawning (`spawners` run the spawner features)
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
- *      import), homes
- *  17. Day/night cycle and sky: sky; weather (clear, rain, storm): rain or snow by biome and height
- *      pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
+ *      import), homes, realms (the realm table, travel, the stash of the realms that are
+ *      not current, the void)
+ *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
+ *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
+ *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
  *      the clock); fireflies (dusk to dawn over grass in plains, forest, and rainforest)
  *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,
  *      G3), held-light (a held torch flood-fills light into a 32^3 texture, G4), post (bloom,
@@ -9889,7 +10236,7 @@ function frame(now) {
   setLast(now);
 
   camera.getWorldDirection(camDir);
-  world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' ? 40 : 7);
+  world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' || game.state === 'travel' ? 40 : 7);
 
   if (game.state === 'loading') {
     const r = world.readyAround(player.pos.x, player.pos.z, 3);
@@ -9897,6 +10244,7 @@ function frame(now) {
     loadText.textContent = `Generating terrain… ${world.chunks.size} chunks`;
     if (r >= 1) onLoaded();
   }
+  if (game.state === 'travel') realm.updateTravel();
 
   const sim = game.simulating();
   if (sim) {
@@ -9958,6 +10306,7 @@ window.clonecraft = {
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
   spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, heldLight, shadows, clouds,
+  realm, REALMS, defaultTarget, standNear,
 };
 
 requestAnimationFrame(frame);</script>
@@ -10110,6 +10459,11 @@ requestAnimationFrame(frame);</script>
 </div>
 <div id="cursorStack"><div class="icon"></div><div class="count"></div></div>
 <div id="tooltip"></div>
+
+<div id="travel" class="screen">
+  <h1 id="travelText"></h1>
+  <div id="travelBar" class="loadbar"><i></i></div>
+</div>
 
 <div id="death" class="screen">
   <h1>You died!</h1>

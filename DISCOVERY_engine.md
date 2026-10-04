@@ -15,6 +15,9 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `WorldGenModule()` must read no outside state. The worker runs its source text. `src/worldgen.js` therefore has no imports; `tools/depcheck.js` fails on one.
 - A structure stamp writes only cells inside its own chunk (`structCtx` drops the others). Every placement decision uses a world hash or `column()`, never the chunk's own blocks, so neighbour chunks agree (D28).
 - A structure must stay reachable on foot. After a stamp change, run the walk check (see Pointers).
+- New realm-scoped state must join `realm.leave()` and `realm.enter()` in `src/realms.js`, and the slice fields (`SLICE_FIELDS`) if it is saved. Otherwise it leaks from one realm into the next (D47).
+- During `world.reset`, `world.realm` is still the realm of the chunks that unload. Code in `onChunkUnloaded` can trust it. `realm.current` may already name the target.
+- Hooks that act only in the overworld (passive spawns, `entityStore`, hostile spawns, fireflies, weather) check `world.realm` or `realm.current`. Check this for any new ambient feature.
 - `game.daylight` includes the weather (`clearDaylight × weather.dim` plus the flash). Code that means the time of day, such as mob burning, reads `game.clearDaylight` (D29).
 
 ## Gotchas
@@ -99,6 +102,8 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `CONFIG.shadows` false sets `uShadowOn` 0. The terrain then uses the old ±12 % face term, not the ambient-plus-direct split.
 
 ## Pointers
+
+- Realm QA: `clonecraft.realm.travel('ember')`, `('crystal')`, or `('overworld')` switches the realm. Stub terrain loads too fast to see the travel screen. To hold it, set `clonecraft.world.update = () => {}` before the travel, then `delete clonecraft.world.update`.
 
 - Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.
 - `game.clearDaylight` runs from 4.5/15 (`NIGHT_DAYLIGHT`) at night to 1 at day. Keep round(15 × floor) at 7 or less, or hostile mobs stop spawning in the open. Caustics gate at `uDaylight` 0.35, so the floor must stay below it. `game.daylight` is that value dimmed by the weather. `sky.update()` sets both.

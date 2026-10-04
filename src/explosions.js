@@ -77,4 +77,7 @@ function updateTnt(dt) {
   }
 }
 
-export { explode, primedTnt, primeTnt, updateTnt };
+// Realm switch: every fuse goes out. The TNT block stays, unlit.
+function clearTnt() { for (const e of primedTnt.values()) removeTntFlash(e); primedTnt.clear(); }
+
+export { clearTnt, explode, primedTnt, primeTnt, updateTnt };

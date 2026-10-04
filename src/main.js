@@ -39,6 +39,7 @@ import { hud } from './hud.js';
 import { setState, showPause } from './menus.js';
 import { persist, validSave } from './persist.js';
 import { closeHomes, goHome, homes, openHomes, setHome } from './homes.js';
+import { defaultTarget, realm, REALMS, standNear } from './realms.js';
 import { sky } from './sky.js';
 import { weather } from './weather.js';
 import { fireflies } from './fireflies.js';
@@ -54,7 +55,7 @@ function frame(now) {
   setLast(now);
 
   camera.getWorldDirection(camDir);
-  world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' ? 40 : 7);
+  world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' || game.state === 'travel' ? 40 : 7);
 
   if (game.state === 'loading') {
     const r = world.readyAround(player.pos.x, player.pos.z, 3);
@@ -62,6 +63,7 @@ function frame(now) {
     loadText.textContent = `Generating terrain… ${world.chunks.size} chunks`;
     if (r >= 1) onLoaded();
   }
+  if (game.state === 'travel') realm.updateTravel();
 
   const sim = game.simulating();
   if (sim) {
@@ -123,6 +125,7 @@ window.clonecraft = {
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
   spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, heldLight, shadows, clouds,
+  realm, REALMS, defaultTarget, standNear,
 };
 
 requestAnimationFrame(frame);

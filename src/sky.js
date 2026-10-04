@@ -12,12 +12,16 @@
  * `weather` follows the sky. It fades k (wet) and storm over 6 s. The sky greys the dome and
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
+ * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
+ * a dark red dome, no sun, moon, stars, or clouds, and close red fog. crystal: a violet dome with
+ * full stars, a fixed light direction, and no sun disc or clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { clamp, CONFIG, CS, glowGain, lerp, mulberry32 } from './config.js';
 import { CLOUD_GLSL, CLOUD_Y, clouds as cloudField, cloudUniforms as fieldUniforms } from './clouds.js';
 import { terrainUniforms } from './terrain-material.js';
 import { camera, game, player, renderer, scene } from './engine.js';
+import { realm, REALMS } from './realms.js';
 import { weather } from './order.js';
 
 const sky = (() => {
@@ -269,9 +273,40 @@ const sky = (() => {
     clouds.position.set(camera.position.x, CLOUD_Y, camera.position.z);
     clouds.scale.set(cloudUniforms.uFar.value, 1, cloudUniforms.uFar.value);
     clouds.visible = !player.headInWater && !player.headInLava;
+    const def = REALMS[realm.current];
+    if (def.sky !== 'day') realmSky(def, far);
+  }
+
+  // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
+  const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
+  const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
+  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize();
+  function realmSky(def, far) {
+    const ember = def.sky === 'ember';
+    uniforms.uTop.value.copy(ember ? EMBER_TOP : CRYSTAL_TOP);
+    uniforms.uHorizon.value.copy(ember ? EMBER_HOR : CRYSTAL_HOR);
+    uniforms.uGlowAmt.value = 0;
+    sun.material.opacity = halo.material.opacity = moon.material.opacity = 0;
+    starMat.uniforms.uOpacity.value = ember ? 0 : 1;
+    stars.visible = !ember;
+    clouds.visible = false;
+    fieldUniforms.uCloudCover.value = 0;               // no cloud shadows on the terrain
+    game.clearDaylight = game.daylight = ember ? 0.3 : 0.8;
+    terrainUniforms.uDaylight.value = game.daylight;
+    terrainUniforms.uSkyLight.value.copy(ember ? EMBER_LIGHT : CRYSTAL_LIGHT);
+    terrainUniforms.uSunDir.value.copy(CRYSTAL_SUN);
+    terrainUniforms.uSunAmt.value = ember ? 0 : 0.6;
+    if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
+    const fog = terrainUniforms.uFogColor.value;
+    fog.setHex(def.fog.color);
+    const f = Math.min(def.fog.far, far);
+    terrainUniforms.uFogNear.value = f * (ember ? 0.3 : 0.55); terrainUniforms.uFogFar.value = f;
+    scene.fog.color.copy(fog);
+    scene.fog.near = terrainUniforms.uFogNear.value; scene.fog.far = f;
+    renderer.setClearColor(fog);
   }
   // cloudNear, cloudFar: the cloud fade distances (uniform objects), for the light-shaft mask
-  return { update, sunDir, cloudNear: cloudUniforms.uNear, cloudFar: cloudUniforms.uFar };
+  return { update, sunDir, cloudNear: cloudUniforms.uNear, cloudFar: cloudUniforms.uFar, get mode() { return REALMS[realm.current].sky; } };
 })();
 
 export { sky };

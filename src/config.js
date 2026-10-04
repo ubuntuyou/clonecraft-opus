@@ -3,6 +3,7 @@
  * ===================================================================================== */
 const CS = 16;                 // chunk size (x and z)
 const H = 176;                 // world height
+const VOID_Y = -32;           // Crystal Realm: below this y the void hurts the player and removes mobs and drops
 const SEA = 128;               // sea level: water fills open columns up to and including this y
 const VOL = CS * CS * H;
 const REACH = 5;
@@ -92,5 +93,5 @@ export {
   BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
   LEAF_CATCH_V, LEAF_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
   PLAYER_W, randInt, randRange, REACH, SAVE, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
-  storage, UNLOADED, VOL, WALK_SPEED,
+  storage, UNLOADED, VOID_Y, VOL, WALK_SPEED,
 };

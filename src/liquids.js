@@ -96,6 +96,7 @@ const liquids = (() => {
     },
     get pending() { return queues[1].size + queues[2].size; },
     save() { return [1, 2].map((k) => [...queues[k].values()]); },
+    clear() { queues[1].clear(); queues[2].clear(); },
     load(lists) { [1, 2].forEach((k, i) => { for (const c of (lists && lists[i]) || []) queues[k].set(key(c[0], c[1], c[2]), c); }); },
   };
 })();

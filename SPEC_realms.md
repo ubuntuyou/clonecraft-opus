@@ -168,7 +168,7 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 
 - `REALMS` in `src/realms.js`: `{ overworld, ember, crystal }`. Each entry holds `name`, `label`, `scale` (1 or 8), `sky` ('day', 'ember', 'crystal'), `ambient`, `fog`, `voidBelow` (true only for crystal), `weather` (true only for overworld).
 - `realm.current` is the name of the loaded realm.
-- `realm.travel(name, arrive)` runs the switch. `arrive(x, y, z)` gives the target point. Portals and the debug handle call it.
+- `realm.travel(name, to = defaultTarget(name), arrive = standNear)` runs the switch. `to` is the target point. When the chunks around `to` are meshed, `arrive(to)` returns the standing point. Portals and the debug handle call it.
 - A realm-scoped module exposes `save()`, `load(d)`, and `clear()`. `realm.travel` saves the current slice, clears every scoped module, loads the target slice, and resets the world.
 - `world.reset()` unloads every chunk (each calls `onChunkUnloaded`) and swaps in the target realm's override maps.
 - `WG.generateChunk(cx, cz, realm)`. A worker message carries the realm and an epoch number. The world drops a result whose epoch is old.

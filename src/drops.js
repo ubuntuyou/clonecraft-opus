@@ -1,7 +1,9 @@
 // ---- dropped items -------------------------------------------------------------------
 // A drop is a small spinning item model with physics. The player collects it on contact.
+// A drop waits frozen while its chunk is not lit. realms.js stashes the drops of a realm the player
+// leaves. A drop below VOID_Y in the void (Crystal Realm) is removed.
 import { THREE } from './three.js';
-import { randRange } from './config.js';
+import { randRange, VOID_Y } from './config.js';
 import { IS_LAVA, IS_WATER, ITEMS } from './blocks.js';
 import { game, player, scene, world } from './engine.js';
 import { moveEntity } from './collision.js';
@@ -37,7 +39,7 @@ function updateDrops(dt) {
     const d = drops[i];
     d.age += dt;
     const c = world.chunkAt(Math.floor(d.pos.x), Math.floor(d.pos.z));
-    if (d.age > 300) { d.remove(); drops.splice(i, 1); continue; }
+    if (d.age > 300 || (world.voidBelow && d.pos.y < VOID_Y)) { d.remove(); drops.splice(i, 1); continue; }
     if (!c || !c.lit) continue;
     const dx = px - d.pos.x, dy = py - d.pos.y, dz = pz - d.pos.z, dist = Math.hypot(dx, dy, dz);
     if (!player.dead && d.age > d.delay && dist < (d.thrown ? THROWN_PICKUP_RANGE : PICKUP_RANGE)) {

@@ -4,7 +4,8 @@
  * WorldGenModule is self-contained: it references nothing outside its own body.
  * The game serializes it with Function.prototype.toString() into Blob Web Workers, and
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
- * generateChunk(cx, cz) is a pure function of (SEED, cx, cz).
+ * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
+ * default), 'ember', or 'crystal'. The ember and crystal generators are flat stubs (SPEC_realms Phase 1).
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -614,7 +615,7 @@ function WorldGenModule(SEED, K) {
   }
 
   // `info` (optional, tests only) receives debug data: info.dungeon is the stamped dungeon plan.
-  function generateChunk(cx, cz, info) {
+  function overworldChunk(cx, cz, info) {
     const x0 = cx * CS, z0 = cz * CS;
     const blocks = new Uint8Array(CS * CS * H);
     const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
@@ -908,6 +909,33 @@ function WorldGenModule(SEED, K) {
       heights[z * CS + x] = y;
     }
     return { blocks, biomes, heights, features };
+  }
+
+  // ---------------------------------------------------------------- realm stubs (SPEC_realms Phase 1)
+  // Ember: bedrock at y 0 and from y 124 up, stone from y 1 to 40, air between. Phase 2 replaces it.
+  // Crystal: one stone disc of radius 44 at the origin, y 90 to 96, over a void. Phase 5 replaces it.
+  const EMBER_FLOOR = 40, EMBER_ROOF = 124, CRYSTAL_TOP = 96, CRYSTAL_R = 44;
+  function stubChunk(cx, cz, realm) {
+    const blocks = new Uint8Array(CS * CS * H);
+    const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+      let top = 0;
+      if (realm === 'ember') {
+        for (let y = 0; y < H; y++) blocks[(y << 8) | (z << 4) | x] = y === 0 || y >= EMBER_ROOF ? B.BEDROCK : y <= EMBER_FLOOR ? B.STONE : B.AIR;
+        top = H - 1;
+      } else {
+        const wx = cx * CS + x, wz = cz * CS + z;
+        if (wx * wx + wz * wz <= CRYSTAL_R * CRYSTAL_R) {
+          for (let y = CRYSTAL_TOP - 6; y <= CRYSTAL_TOP; y++) blocks[(y << 8) | (z << 4) | x] = B.STONE;
+          top = CRYSTAL_TOP;
+        }
+      }
+      heights[z * CS + x] = top;
+    }
+    return { blocks, biomes, heights, features: [] };
+  }
+  function generateChunk(cx, cz, realm = 'overworld', info) {
+    return realm === 'overworld' ? overworldChunk(cx, cz, info) : stubChunk(cx, cz, realm);
   }
 
   return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan };

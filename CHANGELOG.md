@@ -13,6 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Realm core (SPEC_realms.md, Phase 1): the game now has three realms: the overworld, the Ember Realm, and the Crystal Realm. Only the current realm loads.
+  - Each realm keeps its own block edits, chests and furnaces, homes, liquids, leaf decay, farming, vehicles, and looted chests. Dropped items wait frozen in their realm for the session.
+  - A realm change shows a travel screen ("Entering the Ember Realm…") and removes all mobs. Passive overworld mobs come back on return.
+  - Death in any realm respawns the player at the overworld spawn.
+  - The Ember Realm has a dark red sky and fog. The Crystal Realm has a violet sky with stars and a void below y 0. Below y −32 the void deals 4 damage every 0.5 s, and armor does not reduce it.
+  - Weather, clouds, and fireflies show only in the overworld. The compass spins outside the overworld.
+  - The save holds `realm`, `realms`, `portals`, and `boss`. An older save loads in the overworld unchanged.
+  - The new realms use flat stub terrain until Phases 2 and 5. `clonecraft.realm.travel('ember')` is the debug travel handle until the portals exist.
 - Grass spread (SPEC_expansion.md, "Grass spread"): grass grows back over exposed dirt, and covered grass turns to dirt.
   - Lit dirt next to grass (1 block to the side, from 1 below to 3 above) turns to grass after about 40 s on average. Sky light counts at night.
   - Grass under an opaque block, water, or lava turns to dirt. Darkness alone does not kill grass.

@@ -45,7 +45,7 @@ test('dungeons: 2 to 4 rooms, solid ground under every floor, 1 spawner, support
   let found = 0;
   for (let r = 0; found < 30 && r < 40; r++) for (let cz = -r; cz <= r; cz++) for (let cx = -r; cx <= r; cx++) {
     if (found >= 30 || Math.max(Math.abs(cx), Math.abs(cz)) !== r || !W.dungeonPlan(cx, cz)) continue;
-    const info = {}, c = W.generateChunk(cx, cz, info), D = info.dungeon;
+    const info = {}, c = W.generateChunk(cx, cz, 'overworld', info), D = info.dungeon;
     if (!D) continue;
     found++;
     const g = (x, y, z) => (x < 0 || x >= CS || z < 0 || z >= CS ? B.STONE : c.blocks[at(x, y, z)]);
@@ -97,4 +97,25 @@ test('dungeons: 2 to 4 rooms, solid ground under every floor, 1 spawner, support
   }
   assert.equal(found, 30);
   assert.deepEqual([...kinds].sort(), ['ladder', 'stairs']);
+});
+
+// SPEC_realms Phase 1: the stub terrain of the Ember and Crystal Realms. Phase 2 and Phase 6 replace it.
+test('realm stubs: deterministic, equal in a worker copy, and the overworld unchanged by the realm argument', () => {
+  const Copy = new Function(`return ${WorldGenModule.toString()}`)();
+  const a = WorldGenModule(12345, K), b = Copy(12345, K);
+  for (const realm of ['ember', 'crystal']) for (const [cx, cz] of [[0, 0], [2, -1], [-3, 2], [9, 9]]) {
+    assert.equal(hashChunk(a.generateChunk(cx, cz, realm)), hashChunk(b.generateChunk(cx, cz, realm)), `${realm} ${cx},${cz}`);
+  }
+  assert.equal(hashChunk(a.generateChunk(5, -3, 'overworld')), GOLDEN[1][2]);
+  const e = a.generateChunk(1, 1, 'ember');
+  const at = (c, x, y, z) => c.blocks[(y << 8) | (z << 4) | x];
+  assert.equal(at(e, 4, 0, 4), B.BEDROCK);
+  assert.equal(at(e, 4, 40, 4), B.STONE);
+  assert.equal(at(e, 4, 41, 4), B.AIR);
+  assert.equal(at(e, 4, 124, 4), B.BEDROCK);
+  const c0 = a.generateChunk(0, 0, 'crystal'), far = a.generateChunk(6, 6, 'crystal');
+  assert.equal(at(c0, 0, 96, 0), B.STONE);
+  assert.equal(at(c0, 0, 97, 0), B.AIR);
+  assert.equal(at(c0, 0, 0, 0), B.AIR);              // the void: no bedrock floor
+  assert.ok(far.blocks.every((id) => id === B.AIR));   // outside the disc
 });

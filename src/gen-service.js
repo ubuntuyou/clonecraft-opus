@@ -6,9 +6,13 @@ import { WorldGenModule } from './worldgen.js';
 const GEN_CONSTS = { CS, H, SEA, B, BIOME };
 const WG = WorldGenModule(SEED, GEN_CONSTS);   // main-thread instance
 
-/* ---- generation service: a pool of Blob Web Workers, with a main-thread fallback ---- */
+/* ---- generation service: a pool of Blob Web Workers, with a main-thread fallback ----
+ * Each request carries the current realm and epoch. setRealm() starts a new epoch and drops
+ * the pending work. A worker result from an older epoch never reaches onChunk (SPEC_realms). */
 class GenService {
   constructor() {
+    this.realm = 'overworld';
+    this.epoch = 0;
     this.pending = new Map();      // key -> {cx, cz}
     this.queue = [];               // keys waiting for a worker
     this.workers = [];
@@ -16,8 +20,8 @@ class GenService {
     this.fallback = false;
     const src = `${WorldGenModule.toString()}\nlet WG=null;\nonmessage=(e)=>{const m=e.data;` +
       `if(m.type==='init'){WG=WorldGenModule(m.seed,m.consts);return;}` +
-      `if(m.type==='gen'){const r=WG.generateChunk(m.cx,m.cz);` +
-      `postMessage({cx:m.cx,cz:m.cz,blocks:r.blocks,biomes:r.biomes,heights:r.heights,features:r.features},[r.blocks.buffer,r.biomes.buffer,r.heights.buffer]);}};`;
+      `if(m.type==='gen'){const r=WG.generateChunk(m.cx,m.cz,m.realm);` +
+      `postMessage({cx:m.cx,cz:m.cz,epoch:m.epoch,blocks:r.blocks,biomes:r.biomes,heights:r.heights,features:r.features},[r.blocks.buffer,r.biomes.buffer,r.heights.buffer]);}};`;
     const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
     try {
       const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
@@ -38,6 +42,13 @@ class GenService {
       this.fallback = true;
     }
   }
+  // Switches the realm of all later requests. Results of the old epoch are dropped on arrival.
+  setRealm(realm) {
+    this.realm = realm;
+    this.epoch++;
+    this.pending.clear();
+    this.queue = [];
+  }
   request(cx, cz) {
     const k = ckey(cx, cz);
     if (this.pending.has(k)) return;
@@ -51,6 +62,7 @@ class GenService {
   get inFlight() { return this.pending.size; }
   _done(w, d) {
     w.busy--;
+    if (d.epoch !== this.epoch) return;
     const k = ckey(d.cx, d.cz);
     if (this.pending.has(k)) { this.pending.delete(k); this.onChunk && this.onChunk(d.cx, d.cz, d); }
   }
@@ -64,7 +76,7 @@ class GenService {
       while (this.queue.length && performance.now() - t0 < 6) {
         const k = this.queue.shift(), p = this.pending.get(k);
         this.pending.delete(k);
-        const r = WG.generateChunk(p.cx, p.cz);
+        const r = WG.generateChunk(p.cx, p.cz, this.realm);
         this.onChunk && this.onChunk(p.cx, p.cz, r);
       }
       return;
@@ -73,7 +85,7 @@ class GenService {
       while (w.busy < 2 && this.queue.length) {
         const k = this.queue.shift(), p = this.pending.get(k);
         p.sent = true; w.busy++;
-        w.postMessage({ type: 'gen', cx: p.cx, cz: p.cz });
+        w.postMessage({ type: 'gen', cx: p.cx, cz: p.cz, realm: this.realm, epoch: this.epoch });
       }
     }
   }

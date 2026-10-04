@@ -11,7 +11,7 @@
  * open sky despawn by day. Creepers hiss for 1.5 s near the player, then explode.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { clamp, EYE, GRAVITY, JUMP_V, randInt, randRange, UNLOADED } from './config.js';
+import { clamp, EYE, GRAVITY, JUMP_V, randInt, randRange, UNLOADED, VOID_Y } from './config.js';
 import { B, I, IS_LAVA, LIQ_KIND, OPAQUE, SOLID } from './blocks.js';
 import { mobTexture } from './atlas.js';
 import { game, player, scene, world } from './engine.js';
@@ -475,7 +475,8 @@ function lineOfSight(ax, ay, az, bx, by, bz) {
 
 function updateMobs(dt) {
   for (let i = mobs.length - 1; i >= 0; i--) {
-    if (!mobs[i].update(dt)) { mobs[i].remove(); mobs.splice(i, 1); }
+    const m = mobs[i];
+    if (!m.update(dt) || (world.voidBelow && m.pos.y < VOID_Y)) { m.remove(); mobs.splice(i, 1); }
   }
   spawnHostiles(dt);
   spawners.update(dt);

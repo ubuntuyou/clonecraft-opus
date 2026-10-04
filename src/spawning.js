@@ -21,7 +21,10 @@ const PASSIVE_BY_BIOME = {
 const passiveCount = () => { let n = 0; for (const m of mobs) if (!m.def.hostile && !m.dead) n++; return n; };
 const hostileCount = () => { let n = 0; for (const m of mobs) if (m.def.hostile && !m.dead) n++; return n; };
 
+// Passive mobs live only in the overworld (SPEC_realms Phase 1). world.realm is the realm of
+// the chunk: during a realm switch, world.reset unloads the old chunks before it changes realm.
 world.onChunkLoaded = (c) => {
+  if (world.realm !== 'overworld') return;
   const saved = entityStore.get(c.key);
   if (saved) {
     entityStore.delete(c.key);
@@ -52,7 +55,7 @@ world.onChunkUnloaded = (c) => {
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i];
     if (m.pos.x < x0 || m.pos.x >= x0 + CS || m.pos.z < z0 || m.pos.z >= z0 + CS) continue;
-    if (!m.def.hostile && !m.dead) saved.push({ type: m.type, x: m.pos.x, y: m.pos.y, z: m.pos.z, hp: m.hp });
+    if (!m.def.hostile && !m.dead && world.realm === 'overworld') saved.push({ type: m.type, x: m.pos.x, y: m.pos.y, z: m.pos.z, hp: m.hp });
     m.remove(); mobs.splice(i, 1);
   }
   if (saved.length) entityStore.set(c.key, saved);
@@ -71,7 +74,7 @@ function spawnRoom(x, y, z, def) {
 let spawnTimer = 0;
 function spawnHostiles(dt) {
   spawnTimer -= dt;
-  if (spawnTimer > 0 || player.dead) return;
+  if (spawnTimer > 0 || player.dead || world.realm !== 'overworld') return;
   spawnTimer = 0.35;
   if (hostileCount() >= MAX_HOSTILE) return;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -173,7 +176,8 @@ const spawners = (() => {
     }
     for (const [k, s] of live) if (!seen.has(k)) forget(k, s);
   }
-  return { update, live };
+  function clear() { for (const [k, s] of live) forget(k, s); }
+  return { update, live, clear };
 })();
 
 export { hostileCount, spawners, spawnHostiles };

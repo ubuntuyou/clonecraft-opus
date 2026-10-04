@@ -16,14 +16,14 @@ import { camera, canvas, game, input, player, world } from './engine.js';
 import {
   moveEntity, bow, primaryClick, useItem, farming, dropEverything, dropHeld, inv, selectSlot, closeInventory,
   inventoryKey, openInventory, vehicles, primeTnt, particles, audio, hud, fadeIn, setState, showPause,
-  homesKey, openHomes,
+  homesKey, openHomes, realm,
 } from './order.js';
 
 let lockSoft = false, escLock = false, softLockAt = -1e9, pausedAt = -1e9;
 const resumeEl = document.getElementById('resume');   // $() is defined later
 function lockRefused() {
   if (lockSoft && game.state === 'playing') resumeEl.style.display = 'block';
-  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes') showPause();
+  else if (game.state !== 'dead' && game.state !== 'inventory' && game.state !== 'homes' && game.state !== 'travel') showPause();
 }
 function requestLock(soft) {
   lockSoft = !!soft;
@@ -130,6 +130,7 @@ function updatePlayer(dt) {
   if (p.dead) return;
   const c = world.chunkAt(Math.floor(p.pos.x), Math.floor(p.pos.z));
   if (!c || !c.lit) return;                  // wait for the terrain under the player
+  realm.voidTick(dt, damagePlayer);
 
   // --- intent. A rider sits still: `vehicles.update` moves the vehicle and seats the player.
   const riding = !!p.vehicle;
@@ -296,10 +297,11 @@ function updateCamera(dt) {
 // Armor applies to these damage kinds. Each armor point cuts the damage by 4%, up to 80%.
 const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1 };
 function armorFactor() { return 1 - Math.min(0.8, inv.armorPoints() * 0.04); }
-// kind: mob, arrow, explosion, lightning (armored), or fall, lava, cactus (not armored).
+// kind: mob, arrow, explosion, lightning (armored), or fall, lava, cactus, void (not armored).
+// No damage lands while a menu, the loading screen, or the travel screen shows.
 function damagePlayer(amount, cause, from, kind = 'mob') {
   const p = player;
-  if (p.dead || p.invuln > 0 || amount <= 0 || game.state === 'loading' || game.state === 'menu') return;
+  if (p.dead || p.invuln > 0 || amount <= 0 || game.state === 'loading' || game.state === 'menu' || game.state === 'travel') return;
   if (ARMORED[kind] && inv.armorPoints() > 0) { amount *= armorFactor(); inv.wearArmor(); audio.armorHit(); }
   p.health = Math.max(0, p.health - amount);
   p.invuln = 0.5; p.lastHurt = game.clock;
@@ -338,13 +340,17 @@ function setFlying(on) {
   }
 }
 
+// Respawn is at the overworld spawn. Outside the overworld it travels there; the death drops
+// wait in the realm of the death.
 function respawn() {
   const p = player;
   p.flying = false;
-  p.pos.copy(p.spawn); p.vel.set(0, 0, 0);
+  if (realm.current !== 'overworld') realm.travel('overworld', p.spawn.toArray(), () => p.spawn.toArray());
   p.health = p.maxHealth; p.dead = false; p.fallPeak = null; p.regenLeft = 0; p.invuln = 1.5; p.lastHurt = -99;
   p.pitch = 0;
   hud.dirtyHearts = true;
+  if (realm.travelling) return;              // the travel screen shows; updateTravel ends it
+  p.pos.copy(p.spawn); p.vel.set(0, 0, 0);
   fadeIn();
   setState('playing');
   requestLock();

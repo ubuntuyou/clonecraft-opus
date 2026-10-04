@@ -108,6 +108,7 @@ const farming = (() => {
     toDirt,
     get pending() { return reg.size; },
     save() { return [...reg.values()].map((c) => [c[0], c[1], c[2], Math.max(0, c[3] - game.clock), c[4]]); },
+    clear() { reg.clear(); },
     load(list) { for (const c of list || []) reg.set(key(c[0], c[1], c[2]), [c[0], c[1], c[2], game.clock + c[3], c[4] | 0]); },
   };
 })();

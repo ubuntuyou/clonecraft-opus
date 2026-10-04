@@ -259,6 +259,15 @@ A chunk stores one byte per cell, and 255 is `UNLOADED`. So a block id is 0..254
 Items have no such limit. `ITEMS` is a plain array, and no stack path indexes a byte table with an item id. So item-only ids move above 255 when blocks need the byte range. Armor moved from 176..199 to 300..323, and the realm blocks take 176..186. New item-only ids start at 256.
 The save carries `ids` (`IDS_VERSION`, now 2). `migrateIds` in `blocks.js` upgrades a save without `ids`: it adds 124 to each stack id in 176..199 in the inventory, the loose stacks, the armor slots, and the tile entity slots. Edits need no change, because no block ever used those ids. `persist.apply` runs it at boot, and the import runs it before `validSave`. `validSave` accepts only `ids === IDS_VERSION`, so a save from a newer id plan fails the import instead of loading wrong items. `migrateIds` is pure, so a Node test runs it on a real save from the build before the change (`tests/fixtures/save-before-ids2.json`).
 
+### D47. One realm loads at a time; the others wait in a stash
+
+The game has three realms (SPEC_realms). Only the current realm's chunks load. A second loaded world would double the chunk memory, the light work, and every per-chunk hook. So a realm change is a world reset, not a second world.
+`realm.travel` saves the game, then moves the current realm's scoped state into a stash. The scoped state is the override maps, the chests and furnaces, the looted set, the homes, liquids, leaf decay, farming, vehicles, and the drop objects. Then it clears those modules, restores the target stash, and calls `world.reset`. The drop objects leave the scene, so they wait frozen. Mobs, arrows, primed TNT, and spawner models do not wait. Passive overworld mobs come back from `entityStore`.
+The save keeps the overworld slice in the old top-level fields, so an old save loads unchanged. `realms` holds the ember and crystal slices, and `realm` names the realm of the player.
+`world.reset` unloads every chunk before it switches the realm. An `onChunkUnloaded` hook therefore sees the realm of the chunk it unloads.
+A worker can still hold a chunk of the old realm at the switch. `GenService.setRealm` starts a new epoch, and `_done` drops a result from an older epoch. Without the epoch, a late overworld chunk could enter the Ember Realm.
+State 'travel' stops the simulation while the target loads, as 'loading' does at boot. Damage, Esc, and the inventory keys do nothing in that state, so no screen can interrupt the switch.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -268,10 +277,11 @@ The save carries `ids` (`IDS_VERSION`, now 2). `migrateIds` in `blocks.js` upgra
 
 | Seam | Contract |
 | --- | --- |
-| `GenService` to world | A request gives `{blocks, biomes, heights}` typed arrays and a `features` list (chests, spawners) for one chunk. |
+| `GenService` to world | A request carries the realm and the epoch. A result from an older epoch is dropped. A request gives `{blocks, biomes, heights}` typed arrays and a `features` list (chests, spawners) for one chunk. |
 | world to mobs | `onChunkLoaded(chunk)` and `onChunkUnloaded(chunk)` hooks. |
 | block edits | `world.setBlock(x, y, z, id)` is the only write path. `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
 | world to liquids, leaves, farming, and grass | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, `farming.onEdit()`, and `grass.onEdit()`. |
+| realms to the scoped modules | `realm.leave()` takes each scoped module's `save()` and clears it. `realm.enter(stash)` calls each `load(d)`. New realm-scoped state joins both. |
 | containers | `tileEntity(x, y, z)` returns or creates the furnace or chest state. `openInventory(mode, target)` opens its screen. |
 | save | `persist.save()` writes the save. `persist.apply(SAVE)` restores it at boot. |
 | light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |

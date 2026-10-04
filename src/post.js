@@ -134,7 +134,7 @@ const post = (() => {
   // Shaft color times strength for this frame; black when shafts should not show.
   function shaftColor(out) {
     out.setRGB(0, 0, 0);
-    if (!CONFIG.bloom || player.headInWater || player.headInLava) return out;
+    if (!CONFIG.bloom || player.headInWater || player.headInLava || sky.mode !== 'day') return out;
     const elev = sky.sunDir.y, dusk = Math.max(0, 1 - Math.abs(elev) / 0.3);
     let amt;
     if (elev > -0.04) {
