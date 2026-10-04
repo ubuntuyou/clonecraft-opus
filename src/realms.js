@@ -40,6 +40,7 @@ import { fadeIn, setState } from './menus.js';
 import { persist } from './persist.js';
 import { closeHomes, homes, setHomes } from './homes.js';
 import { weather } from './order.js';
+import { WG } from './gen-service.js';
 
 // ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
 // { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
@@ -221,11 +222,11 @@ function standNear(to) {
   return [x0 + 0.5, y0, z0 + 0.5];
 }
 
-// The default target of a travel without `to`. Crystal: the arena center. Else the player's point
-// in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the Ember Realm.
-// An ember y is the overworld y - 64, clamped to 33..110.
+// The default target of a travel without `to`. Crystal: the arrival portal's stand point. Else the
+// player's point in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the
+// Ember Realm. An ember y is the overworld y - 64, clamped to 33..110.
 function defaultTarget(name) {
-  if (name === 'crystal') return [0.5, 97, 0.5];
+  if (name === 'crystal') { const a = WG.CRYSTAL_ARRIVAL; return [a.x0 + (a.w >> 1) + 0.5, a.y0, a.z0 + 0.5]; }
   const p = player.pos;
   const o = realm.current === 'crystal' ? realm.portals.crystalBack || player.spawn.toArray()
     : realm.current === 'ember' ? [p.x * 8, p.y + 64, p.z * 8] : p.toArray();

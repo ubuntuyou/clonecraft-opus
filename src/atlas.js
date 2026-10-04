@@ -413,6 +413,56 @@ paintTile('portal_ember', (P, rng) => {
     P.set(x, y, mix3([96, 14, 18], [255, 170, 60], clamp(band * band * (1.1 - r / 14), 0, 1)));
   });
 });
+// ---- Crystal Realm tiles (SPEC_realms, Phase 5). Only the moss specks and the frame's crystal
+// facets reach red > 0.8 (204); the moss specks glow, the frame does not (it sets no glows flag).
+function paintVoidstone(P, rng) {
+  const n = tileNoise(rng, 1), m = tileNoise(rng, 2);
+  P.fill((x, y) => {
+    const k = y * 16 + x;
+    let c = mix3([34, 28, 54], [70, 58, 100], n[k] + (rng() - 0.5) * 0.25);
+    if (m[k] > 0.82) c = shade(c, 0.7);
+    else if (m[k] < 0.08) c = [118, 92, 168];   // a faint violet vein
+    P.set(x, y, c);
+  });
+}
+paintTile('voidstone', paintVoidstone);
+// Glimmer Moss: deep violet-teal moss with pale glinting specks.
+function paintGlimmer(P, rng, x, y) {
+  const r = rng();
+  if (r < 0.016) return P.set(x, y, rng() < 0.5 ? [236, 214, 255] : [214, 255, 246]);
+  return P.set(x, y, mix3([46, 52, 104], [84, 118, 150], P.n[y * 16 + x] + (rng() - 0.5) * 0.3));
+}
+paintTile('glimmer_moss_top', (P, rng) => { P.n = tileNoise(rng, 1); P.fill((x, y) => paintGlimmer(P, rng, x, y)); });
+paintTile('glimmer_moss_side', (P, rng) => {
+  paintVoidstone(P, rng);
+  P.n = tileNoise(rng, 1);
+  const edge = Array.from({ length: 16 }, () => 2 + Math.floor(rng() * 3));
+  P.fill((x, y) => { if (y < edge[x]) paintGlimmer(P, rng, x, y); });
+});
+// Crystal Frame: an obsidian rim around a turquoise crystal facet.
+paintTile('crystal_frame', (P, rng) => {
+  P.copy('obsidian');
+  P.fill((x, y) => {
+    if (x < 3 || x > 12 || y < 3 || y > 12) return;
+    const d = Math.abs(x - 7.5) + Math.abs(y - 7.5);
+    if (d > 6.5) return;
+    const t = clamp(1 - d / 7 + (x < y ? 0.15 : -0.05) + (rng() - 0.5) * 0.1, 0, 1);
+    P.set(x, y, mix3([22, 104, 112], [200, 255, 246], t));
+  });
+  for (let i = 3; i < 13; i++) { P.set(i, 2, [110, 86, 160]); P.set(2, i, [110, 86, 160]); }
+});
+paintTile('crystal_frame_top', (P, rng) => {
+  P.copy('obsidian');
+  P.fill((x, y) => { if ((x === 7 || x === 8) && y > 2 && y < 13) P.set(x, y, mix3([40, 170, 170], [190, 250, 240], rng())); });
+});
+// Crystal portal: a spiral of turquoise and pale violet on deep indigo (break particles, fallback look).
+paintTile('portal_crystal', (P, rng) => {
+  P.fill((x, y) => {
+    const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const band = 0.5 + 0.5 * Math.sin(a * 2 + r * 0.9 + rng() * 0.6);
+    P.set(x, y, mix3([26, 16, 80], [120, 250, 236], clamp(band * band * (1.1 - r / 14), 0, 1)));
+  });
+});
 paintTile('cracked_bricks', (P, rng) => {
   paintBricks(P, rng);
   for (let c = 0; c < 3; c++) {   // cracks: short random walks in dark gray

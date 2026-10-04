@@ -38,14 +38,32 @@ test('armor ids are 300..327 and follow 300 + 4 * tier + piece', () => {
   assert.equal(Math.min(...ids), 300);
   assert.equal(Math.max(...ids), 327);
 });
-// Ids 176..186 are the realm blocks; each phase adds its own. 182..199 stay empty until then.
-// The Ember portal block (181) has no item: only ignition makes it.
+// Ids 176..186 are the realm blocks; each phase adds its own. 186..199 stay empty until then.
+// The portal blocks (181, 182) have no item: only ignition or worldgen makes them.
 test('ids 176..199 hold only the realm blocks and their block items', () => {
-  const realm = [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE, B.EMBER_BRICKS, B.PORTAL_EMBER];
+  const realm = [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE, B.EMBER_BRICKS, B.PORTAL_EMBER,
+    B.PORTAL_CRYSTAL, B.CRYSTAL_FRAME, B.VOIDSTONE, B.GLIMMER_MOSS];
+  const noItem = [B.PORTAL_EMBER, B.PORTAL_CRYSTAL];
   const used = [];
   for (let id = 176; id <= 199; id++) if (BLOCKS[id] || ITEMS[id]) used.push(id);
   assert.deepEqual(used, realm);
-  for (const id of realm) if (id === B.PORTAL_EMBER) assert.equal(ITEMS[id], undefined); else assert.equal(ITEMS[id].kind, 'block');
+  for (const id of realm) if (noItem.includes(id)) assert.equal(ITEMS[id], undefined); else assert.equal(ITEMS[id].kind, 'block');
+});
+
+// SPEC_realms Phase 5 (gate item 6): tool, hardness, and drop of each Crystal Realm block.
+test('Crystal Realm blocks: tools, hardness, and drops', () => {
+  const pick = { id: toolId('pickaxe', 1), count: 1 }, shovel = { id: toolId('shovel', 1), count: 1 };
+  const spec = [[B.VOIDSTONE, 3, 'pickaxe'], [B.GLIMMER_MOSS, 0.6, 'shovel'], [B.CRYSTAL_FRAME, 8, 'pickaxe'], [B.PORTAL_CRYSTAL, -1, null]];
+  for (const [id, hardness, tool] of spec) {
+    assert.equal(BLOCKS[id].hardness, hardness, BLOCKS[id].name);
+    assert.equal(BLOCKS[id].tool ?? null, tool, BLOCKS[id].name);
+  }
+  assert.deepEqual(blockDrop(B.VOIDSTONE), [B.VOIDSTONE, 1]);
+  assert.deepEqual(blockDrop(B.GLIMMER_MOSS), [B.VOIDSTONE, 1]);
+  assert.deepEqual(blockDrop(B.CRYSTAL_FRAME), [B.CRYSTAL_FRAME, 1]);
+  assert.ok(breakTime(B.VOIDSTONE, pick) < breakTime(B.VOIDSTONE, null));
+  assert.ok(breakTime(B.GLIMMER_MOSS, shovel) < breakTime(B.GLIMMER_MOSS, null));
+  assert.equal(breakTime(B.PORTAL_CRYSTAL, pick), Infinity);
 });
 
 // SPEC_realms Phase 2 (gate item 4): tool, hardness, and drop of each Ember Realm block.

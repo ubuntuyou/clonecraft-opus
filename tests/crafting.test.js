@@ -46,3 +46,10 @@ test('a shaped recipe matches when mirrored', () => {
 test('a wrong pattern gives null', () => {
   assert.equal(out(grid(['C C', ' S ', ' S '], { C: B.COBBLE, S: I.STICK })), null);
 });
+
+// SPEC_realms Phase 5 (gate item 1): an obsidian with a crystal on each side gives 2 Crystal Frames.
+test('obsidian ringed by 4 crystals gives 2 Crystal Frames', () => {
+  const r = matchRecipe(grid([' C ', 'COC', ' C '], { O: B.OBSIDIAN, C: B.CRYSTAL }), 3);
+  assert.deepEqual([r.out, r.count], [B.CRYSTAL_FRAME, 2]);
+  assert.equal(out(grid([' C ', 'C C', ' C '], { C: B.CRYSTAL })), null);
+});

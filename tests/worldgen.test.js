@@ -99,7 +99,7 @@ test('dungeons: 2 to 4 rooms, solid ground under every floor, 1 spawner, support
   assert.deepEqual([...kinds].sort(), ['ladder', 'stairs']);
 });
 
-// SPEC_realms: the realm generators. Ember is Phase 2. Crystal is a stub until Phase 5.
+// SPEC_realms: the realm generators. Ember is Phase 2. Crystal is Phase 5.
 test('realms: deterministic, equal in a worker copy, and the overworld unchanged by the realm argument', () => {
   const Copy = new Function(`return ${WorldGenModule.toString()}`)();
   const a = WorldGenModule(12345, K), b = Copy(12345, K), a2 = WorldGenModule(12345, K);
@@ -110,12 +110,66 @@ test('realms: deterministic, equal in a worker copy, and the overworld unchanged
   }
   assert.notEqual(hashChunk(a.generateChunk(0, 0, 'ember')), hashChunk(WorldGenModule(999, K).generateChunk(0, 0, 'ember')));
   assert.equal(hashChunk(a.generateChunk(5, -3, 'overworld')), GOLDEN[1][2]);
-  const at = (c, x, y, z) => c.blocks[(y << 8) | (z << 4) | x];
-  const c0 = a.generateChunk(0, 0, 'crystal'), far = a.generateChunk(6, 6, 'crystal');
-  assert.equal(at(c0, 0, 96, 0), B.STONE);
-  assert.equal(at(c0, 0, 97, 0), B.AIR);
-  assert.equal(at(c0, 0, 0, 0), B.AIR);              // the void: no bedrock floor
-  assert.ok(far.blocks.every((id) => id === B.AIR));   // outside the disc
+  assert.notEqual(hashChunk(a.generateChunk(0, 0, 'crystal')), hashChunk(WorldGenModule(999, K).generateChunk(0, 0, 'crystal')));
+});
+
+// Crystal Realm terrain over 25 x 25 chunks (gate Phase 5, items 4 and 5).
+test('crystal: nothing below y 20, the 72-block clearance, the arena, the arrival portal, moss, clusters, and tapers', () => {
+  const W = WorldGenModule(12345, K), R = 12, A = W.CRYSTAL_ARRIVAL;
+  const cols = new Map();   // "wx,wz" -> the column's ids, for the support and taper checks
+  let isleCells = 0, up = 0, down = 0;
+  for (let cz = -R; cz <= R; cz++) for (let cx = -R; cx <= R; cx++) {
+    const c = W.generateChunk(cx, cz, 'crystal');
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+      const wx = cx * CS + x, wz = cz * CS + z, d = Math.hypot(wx, wz), col = [];
+      for (let y = 0; y < H; y++) col.push(c.blocks[(y << 8) | (z << 4) | x]);
+      if (!col.some((id) => id !== B.AIR)) continue;
+      cols.set(`${wx},${wz}`, col);
+      for (let y = 0; y < 20; y++) assert.equal(col[y], B.AIR, `${wx},${y},${wz}: below y 20`);
+      assert.ok(d <= W.ARENA_R || d > W.ISLE_CLEAR, `${wx},${wz}: a block at ${d.toFixed(1)} from the origin`);
+      if (d > W.ISLE_CLEAR) isleCells++;
+      for (let y = 21; y < H - 1; y++) {
+        if (col[y] === B.CRYSTAL) { up++; assert.equal(col[y - 1], B.GLIMMER_MOSS, `${wx},${y},${wz}: a top cluster stands on moss`); }
+        if (col[y] === B.CRYSTAL + 1) { down++; assert.equal(col[y + 1], B.VOIDSTONE, `${wx},${y},${wz}: a hanging cluster hangs from voidstone`); }
+        // every exposed island top is moss (the arena's ring, pad, and portal excepted)
+        if (col[y] === B.VOIDSTONE && col[y + 1] === B.AIR && d > W.ARENA_R) assert.fail(`${wx},${y},${wz}: a bare top`);
+      }
+      if (d > W.ISLE_CLEAR) {
+        const top = col.findLastIndex((id) => id === B.GLIMMER_MOSS);
+        if (top >= 0) assert.ok(top >= 70 && top <= 110, `${wx},${wz}: top y ${top}`);
+      }
+    }
+  }
+  assert.ok(isleCells > 2000, `islands beyond the clearance: ${isleCells} columns`);
+  assert.ok(up > 20 && down > 50, `clusters: ${up} on tops, ${down} hanging`);
+  // the arena: a flat moss top at y 96 within radius 40, and an underside that tapers
+  const thick = (wx, wz) => 96 - cols.get(`${wx},${wz}`).findIndex((id) => id === B.VOIDSTONE);
+  for (const [wx, wz] of [[0, 0], [30, 5], [-12, -35], [20, -20]]) {
+    const col = cols.get(`${wx},${wz}`);
+    assert.equal(col[96], B.GLIMMER_MOSS, `${wx},${wz}: arena top`);
+    assert.equal(col[97], B.AIR);
+  }
+  assert.ok(thick(0, 0) > 30 && thick(0, 0) > 3 * thick(41, 0), `arena taper: ${thick(0, 0)} at the center, ${thick(41, 0)} at the rim`);
+  // the arrival portal: a Crystal Frame ring with crystal panes, its bottom row in the floor
+  for (let v = -1; v <= A.h; v++) for (let u = -1; u <= A.w; u++) {
+    const ring = u === -1 || u === A.w || v === -1 || v === A.h;
+    assert.equal(cols.get(`${A.x0 + u},${A.z0}`)[A.y0 + v], ring ? B.CRYSTAL_FRAME : B.PORTAL_CRYSTAL, `arrival ${u},${v}`);
+  }
+  assert.equal(A.y0, 97);
+  // every island tapers: its center column is thicker than a column near its rim
+  let checked = 0;
+  for (let gz = -3; gz <= 3; gz++) for (let gx = -3; gx <= 3; gx++) {
+    const i = W.isleAt(gx, gz);
+    if (!i || i.r < 7) continue;
+    const c = cols.get(`${Math.floor(i.x)},${Math.floor(i.z)}`);
+    if (!c) continue;
+    const span = (col) => col.findLastIndex((id) => id === B.VOIDSTONE || id === B.GLIMMER_MOSS) - col.findIndex((id) => id === B.VOIDSTONE);
+    const rim = cols.get(`${Math.floor(i.x + i.r * 0.8)},${Math.floor(i.z)}`);
+    if (rim) assert.ok(span(c) > span(rim), `island ${gx},${gz}: center ${span(c)}, rim ${span(rim)}`);
+    assert.ok(span(c) >= i.r, `island ${gx},${gz}: depth ${span(c)} for radius ${i.r.toFixed(1)}`);
+    checked++;
+  }
+  assert.ok(checked >= 5, `islands checked: ${checked}`);
 });
 
 // Ember Realm terrain over 17 x 17 = 289 chunks (gate Phase 2, items 2 and 3).

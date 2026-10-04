@@ -4,8 +4,9 @@
  * Pure portal geometry. No module state, no world access: every function reads blocks through
  * get(x, y, z), so Node tests call it with a plain map. src/portals.js applies the results.
  *
- * Frame: a vertical rectangle of obsidian along x or z. The opening is 2..4 wide and 3..5 tall
- * and holds only air. The sides, the bottom row, and the top row are obsidian. The 4 corner
+ * Frame: a vertical rectangle of frame blocks along x or z. The frame block is obsidian (the
+ * Ember portal) or Crystal Frame (the crystal portal, Phase 5). The opening is 2..4 wide and 3..5
+ * tall and holds only air. The sides, the bottom row, and the top row are frame blocks. The 4 corner
  * cells are optional. A frame is { axis, x0, y0, z0, w, h }: axis 'x' spans x (the pane lies in
  * the plane z = z0), axis 'z' spans z. (x0, y0, z0) is the low corner cell of the opening.
  *
@@ -25,29 +26,29 @@ const SITE_DY = 40;  // vertical reach of the site search, above and below the t
 // Cell (u, v) of a frame plane: u along the axis, v up. `d` offsets across the plane.
 const cellOf = (axis, x0, y0, z0, u, v, d = 0) => (axis === 'x' ? [x0 + u, y0 + v, z0 + d] : [x0 + d, y0 + v, z0 + u]);
 
-// True when the frame { axis, x0, y0, z0, w, h } is complete: an air opening in an obsidian ring.
-function frameOk(get, f) {
+// True when the frame { axis, x0, y0, z0, w, h } is complete: an air opening in a ring of `ring` blocks.
+function frameOk(get, f, ring = B.OBSIDIAN) {
   const { axis, x0, y0, z0, w, h } = f;
   const at = (u, v) => get(...cellOf(axis, x0, y0, z0, u, v));
   for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) if (at(u, v) !== B.AIR) return false;
-  for (let v = 0; v < h; v++) if (at(-1, v) !== B.OBSIDIAN || at(w, v) !== B.OBSIDIAN) return false;
-  for (let u = 0; u < w; u++) if (at(u, -1) !== B.OBSIDIAN || at(u, h) !== B.OBSIDIAN) return false;
+  for (let v = 0; v < h; v++) if (at(-1, v) !== ring || at(w, v) !== ring) return false;
+  for (let u = 0; u < w; u++) if (at(u, -1) !== ring || at(u, h) !== ring) return false;
   return true;
 }
 
-// The complete frame that holds obsidian cell (x, y, z) in its ring (corners count when present),
+// The complete frame that holds `ring` cell (x, y, z) in its ring (corners count when present),
 // or null. Smaller openings win when the cell belongs to more than one frame.
-function findFrame(get, x, y, z) {
-  if (get(x, y, z) !== B.OBSIDIAN) return null;
+function findFrame(get, x, y, z, ring = B.OBSIDIAN) {
+  if (get(x, y, z) !== ring) return null;
   for (let h = MIN_H; h <= MAX_H; h++) for (let w = MIN_W; w <= MAX_W; w++) for (const axis of ['x', 'z']) {
     const a = axis === 'x' ? x : z;   // the clicked cell's coordinate along the axis
     // (u, v) of the clicked cell in the frame: u in -1..w, v in -1..h, on the ring
     for (let v = -1; v <= h; v++) for (let u = -1; u <= w; u++) {
-      const ring = u === -1 || u === w || v === -1 || v === h;
-      if (!ring) continue;
+      const onRing = u === -1 || u === w || v === -1 || v === h;
+      if (!onRing) continue;
       const f = { axis, x0: axis === 'x' ? a - u : x, y0: y - v, z0: axis === 'z' ? a - u : z, w, h };
       if (f.y0 < 1 || f.y0 + h >= H) continue;
-      if (frameOk(get, f)) return f;
+      if (frameOk(get, f, ring)) return f;
     }
   }
   return null;

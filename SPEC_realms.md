@@ -117,6 +117,12 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 - The void: below y −32, the player takes 4 'void' damage every 0.5 s. Armor does not apply. Mobs and drops below y −32 are removed.
 - Light: the sky is open. The daylight is fixed at 0.8 and tinted lavender. A pale star gives a fixed light direction, so shadows still work. The sky dome is violet to black with bright stars and slow aurora bands. Fog is deep violet.
 - No natural mob spawns.
+- Numbers rsh chose in Phase 5 (Joe has not reviewed them):
+  - The arrival portal opening is 3 wide and 4 tall, along x, in the plane z = 36 on the arena top. Its frame and opening cannot be edited (ARCHITECTURE D52).
+  - Crystal Frame: hardness 8, pickaxe.
+  - Islands sit on a 64-block jittered grid. 1 cell in 2 holds an island (radius 7..22). About 1 in 5.5 holds an islet (radius 2..5).
+  - Crystal clusters: 1.5 % of island top cells, 2.5 % of the arena rim cells, 5 % of island underside cells, and 3 % of arena underside cells.
+  - Glimmer Moss shows bright specks on 1.6 % of its texture pixels.
 
 #### Prism Colossus
 

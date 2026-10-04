@@ -13,11 +13,11 @@ function grid(fill = B.AIR) {
   return { m, get, set };
 }
 // An obsidian frame with opening w x h, low opening corner (x0, y0, z0), along `axis`.
-function frame(g, axis, x0, y0, z0, w, h, corners = true) {
+function frame(g, axis, x0, y0, z0, w, h, corners = true, block = B.OBSIDIAN) {
   const at = (u, v, id) => (axis === 'x' ? g.set(x0 + u, y0 + v, z0, id) : g.set(x0, y0 + v, z0 + u, id));
   for (let v = -1; v <= h; v++) for (let u = -1; u <= w; u++) {
     const ring = u === -1 || u === w || v === -1 || v === h, corner = (u === -1 || u === w) && (v === -1 || v === h);
-    if (ring && (corners || !corner)) at(u, v, B.OBSIDIAN);
+    if (ring && (corners || !corner)) at(u, v, block);
   }
 }
 
@@ -34,6 +34,17 @@ test('the frame check accepts every opening size along x and z, with and without
       assert.equal(frameCells(f).length, w * h);
     }
   }
+});
+
+// SPEC_realms Phase 5: the crystal portal uses the same check with Crystal Frames in the ring.
+test('the frame check with a Crystal Frame ring accepts crystal frames and rejects obsidian', () => {
+  const g = grid();
+  frame(g, 'z', 4, 50, 8, 3, 4, false, B.CRYSTAL_FRAME);
+  const f = findFrame(g.get, 4, 49, 8, B.CRYSTAL_FRAME);
+  assert.deepEqual([f.axis, f.x0, f.y0, f.z0, f.w, f.h], ['z', 4, 50, 8, 3, 4]);
+  assert.equal(findFrame(g.get, 4, 49, 8), null, 'an obsidian check ignores crystal frames');
+  g.set(4, 51, 7, B.OBSIDIAN);
+  assert.equal(findFrame(g.get, 4, 49, 8, B.CRYSTAL_FRAME), null, 'one obsidian block in the ring');
 });
 
 test('the frame check rejects a missing side block, a wrong block, a filled opening, and bad sizes', () => {

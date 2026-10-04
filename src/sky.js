@@ -15,7 +15,8 @@
  * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
  * a dark red dome, no sun, moon, stars, or clouds, close red fog, and a red-orange light floor
  * (uAmbient) at block light `def.ambient`. The day sky sets uAmbient to black. crystal: a violet dome with
- * full stars, a fixed light direction, and no sun disc or clouds. The day clock keeps running.
+ * full, larger stars, 3 slow aurora bands, a small pale star disc at the fixed light direction, and
+ * no clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { clamp, CONFIG, CS, glowGain, lerp, mulberry32 } from './config.js';
@@ -31,12 +32,14 @@ const sky = (() => {
   const uniforms = {
     uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() },
     uGlow: { value: new THREE.Color(1, 0.45, 0.15) }, uGlowAmt: { value: 0 }, uSunDir: { value: new THREE.Vector3() },
+    uAurora: { value: 0 }, uTime: { value: 0 },
   };
   const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), new THREE.ShaderMaterial({
     uniforms, side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `
       uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uGlow; uniform float uGlowAmt; uniform vec3 uSunDir;
+      uniform float uAurora; uniform float uTime;
       varying vec3 vDir;
       void main() {
         vec3 d = normalize(vDir);
@@ -44,7 +47,23 @@ const sky = (() => {
         vec3 c = mix(uHorizon, uTop, smoothstep(-0.02, 0.45, h));
         c = mix(c, uHorizon * 0.55, smoothstep(0.0, -0.35, h));           // darker below the horizon
         float g = pow(max(dot(d, uSunDir), 0.0), 6.0) * uGlowAmt * smoothstep(0.55, -0.05, h);
-        gl_FragColor = vec4(mix(c, uGlow, clamp(g, 0.0, 1.0)), 1.0);
+        c = mix(c, uGlow, clamp(g, 0.0, 1.0));
+        // Aurora (Crystal Realm): 3 slow bands of curtains, teal low and violet high. Each band
+        // wanders in height with the azimuth; the curtains are thin vertical streaks that drift.
+        if (uAurora > 0.0) {
+          float az = atan(d.z, d.x), band = 0.0;
+          for (int i = 0; i < 3; i++) {
+            float fi = float(i);
+            float mid = 0.3 + 0.13 * fi + 0.06 * sin(az * (2.0 + fi) + uTime * (0.04 + 0.02 * fi) + fi * 1.7);
+            float w = 0.04 + 0.015 * sin(az * 5.0 + uTime * 0.08 + fi);
+            float y = (h - mid) / w;
+            float b = exp(-y * y) * (y < 0.0 ? 1.0 : exp(-y * 0.6));   // a sharp lower edge, a soft top
+            float curtain = 0.5 + 0.5 * sin(az * 31.0 + 2.0 * sin(az * 7.0 + uTime * 0.25) + uTime * 0.15 + fi * 3.0);
+            band += b * (0.35 + 0.65 * curtain) * (0.7 - 0.18 * fi);
+          }
+          c += mix(vec3(0.1, 0.9, 0.65), vec3(0.7, 0.3, 1.0), smoothstep(0.3, 0.62, h)) * band * uAurora;
+        }
+        gl_FragColor = vec4(c, 1.0);
       }`,
   }));
   dome.renderOrder = -10; dome.frustumCulled = false;
@@ -215,6 +234,8 @@ const sky = (() => {
     moon.position.copy(sunDir).multiplyScalar(-700); moon.lookAt(camera.position);
     sun.material.opacity = THREE.MathUtils.smoothstep(elev, -0.15, 0.05) * (1 - wk) * Math.exp(-sunCloud * 6);
     sun.material.color.setScalar(glowGain * glowGain);      // 4 in HDR: a white-hot disc with a wide bloom
+    sun.scale.setScalar(1); halo.material.color.setScalar(1); uniforms.uAurora.value = 0;
+    uniforms.uTime.value += dt;
     moon.material.color.setScalar(glowGain);
     moon.material.opacity = THREE.MathUtils.smoothstep(-elev, -0.15, 0.05) * (1 - 0.9 * day) * (1 - wk) * Math.exp(-moonCloud * 6);   // faint by day, as in Fable
     starMat.uniforms.uOpacity.value = clamp(1 - day * 1.6, 0, 1) * (1 - wk);
@@ -282,7 +303,7 @@ const sky = (() => {
   // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
   const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
   const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
-  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize();
+  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize(), CRYSTAL_STAR = C(0.86, 0.84, 1.0);
   const EMBER_AMBIENT = C(1, 0.52, 0.32);   // the tint of the ember light floor
   // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
   const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
@@ -292,6 +313,14 @@ const sky = (() => {
     uniforms.uHorizon.value.copy(ember ? EMBER_HOR : CRYSTAL_HOR);
     uniforms.uGlowAmt.value = 0;
     sun.material.opacity = halo.material.opacity = moon.material.opacity = 0;
+    if (!ember) {   // the pale star: a small lavender disc and halo at the fixed light direction, and the aurora
+      sun.position.copy(CRYSTAL_SUN).multiplyScalar(700); sun.lookAt(camera.position);
+      halo.position.copy(CRYSTAL_SUN).multiplyScalar(690); halo.lookAt(camera.position);
+      sun.scale.setScalar(0.45); sun.material.opacity = 1; sun.material.color.copy(CRYSTAL_STAR).multiplyScalar(glowGain * glowGain);
+      halo.material.color.copy(CRYSTAL_STAR); halo.material.opacity = 0.4;
+      uniforms.uAurora.value = 0.5;
+      starMat.uniforms.uSize.value = 2.8 * renderer.getPixelRatio();
+    }
     starMat.uniforms.uOpacity.value = ember ? 0 : 1;
     stars.visible = !ember;
     clouds.visible = false;

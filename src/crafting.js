@@ -36,6 +36,7 @@ shaped(['F', 'S', 'E'], { F: I.FLINT, S: I.STICK, E: I.FEATHER }, I.ARROW, 4);
 shaped([' TS', 'T S', ' TS'], { T: I.STICK, S: I.STRING }, I.BOW);
 ARMOR_TIERS.forEach((t, tier) => ARMOR_PIECES.forEach((p, piece) => shaped(p.shape, { M: t.item }, armorId(tier, piece))));
 shaped(['OCO', 'DMD', 'OCO'], { O: B.OBSIDIAN, C: B.CRYSTAL, D: I.DIAMOND, M: I.MAGMA_CORE }, B.ALTAR);
+shaped([' C ', 'COC', ' C '], { O: B.OBSIDIAN, C: B.CRYSTAL }, B.CRYSTAL_FRAME, 2);
 shaped(['P P', 'PPP'], { P: B.PLANKS }, I.BOAT);
 shaped(['S S', 'SXS', 'S S'], { S: I.STEEL, X: I.STICK }, B.RAIL, 16);
 shaped(['S S', 'SSS'], { S: I.STEEL }, I.MINECART);

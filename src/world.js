@@ -172,9 +172,10 @@ class World {
   }
 
   // ---------------------------------------------------------------- edits
-  // Sets a block, records the override, relights, and remeshes touched chunks now.
+  // Sets a block, records the override, relights, and remeshes touched chunks now. A cell that
+  // locked(x, y, z) reports (the arrival portal, src/portals.js) refuses every edit.
   setBlock(x, y, z, id) {
-    if (y < 0 || y >= H) return false;
+    if (y < 0 || y >= H || (this.locked && this.locked(x, y, z))) return false;
     const c = this.chunkAt(x, z);
     if (!c || !c.lit) return false;
     const lx = x & 15, lz = z & 15, i = lidx(lx, y, lz);

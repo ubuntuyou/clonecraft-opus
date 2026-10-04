@@ -13,6 +13,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Crystal Realm (SPEC_realms.md, Phase 5): a Crystal Frame portal lit with an Ember Heart leads to a realm of floating islands.
+  - New blocks: Crystal Frame, Voidstone, and Glimmer Moss. 1 obsidian and 4 crystals craft 2 Crystal Frames.
+  - A Crystal Frame portal follows the Ember frame rules. An Ember Heart lights it and is used up. The frame wakes only in the overworld. Elsewhere the click shows "The frame does not wake here" and keeps the heart.
+  - The pane is turquoise. Every overworld crystal portal leads to the arrival portal on the arena island.
+  - The arrival portal is always lit and cannot be broken. It leads back to the last overworld crystal portal used, or to the player's spawn when that portal is gone.
+  - The arena island sits at the origin with a flat moss top at y 96. Other islands and islets float beyond 72 blocks and taper to points underneath. Crystal clusters grow on their tops and undersides.
+  - The sky is violet with stars and slow aurora bands. A pale star gives a fixed light direction, so shadows still render. No mob spawns naturally.
 - Ember content (SPEC_realms.md, Phase 4): the Ember Realm now has fortresses, Emberite gear, and two new mobs.
   - Raw Emberite smelts into an Emberite Ingot. The Emberite tier adds a pickaxe, sword, axe, shovel, hoe, and 4 armor pieces. Each worn armor piece cuts lava damage by 20 %.
   - Ember Dust burns 60 s in a furnace. 4 Ember Dust craft 1 Ember Lamp.

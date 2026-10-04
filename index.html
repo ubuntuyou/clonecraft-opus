@@ -372,6 +372,8 @@ const B = {
   // Ember Realm (SPEC_realms, Phase 2)
   EMBER_ROCK: 176, ASH_SAND: 177, EMBER_LAMP: 178, EMBERITE_ORE: 179, EMBER_BRICKS: 180,
   PORTAL_EMBER: 181,  // the Ember portal pane (Phase 3); src/portals.js lights and removes it
+  // Crystal Realm (SPEC_realms, Phase 5)
+  PORTAL_CRYSTAL: 182, CRYSTAL_FRAME: 183, VOIDSTONE: 184, GLIMMER_MOSS: 185,
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
@@ -555,6 +557,17 @@ GLOWS[B.EMBERITE_ORE] = 1;
 defBlock(B.PORTAL_EMBER, { name: 'Ember Portal', shape: SHAPE.PORTAL, tex: all('portal_ember'), opaque: false, solid: false,
   skyFree: true, hardness: -1, emit: 11, replaceable: true, drop: null, noItem: true, sound: 'glass' });
 TARGETABLE[B.PORTAL_EMBER] = 0;
+// ---- Crystal Realm blocks (SPEC_realms, Phase 5). The crystal pane emits crystal light 11. It is not
+// replaceable: no placed block and no liquid enters it, so only the loss of a frame block removes it.
+// Glimmer Moss specks glow (red > 0.8 in its top tile).
+defBlock(B.PORTAL_CRYSTAL, { name: 'Crystal Portal', shape: SHAPE.PORTAL, tex: all('portal_crystal'), opaque: false, solid: false,
+  skyFree: true, hardness: -1, emitCry: 11, drop: null, noItem: true, sound: 'glass' });
+TARGETABLE[B.PORTAL_CRYSTAL] = 0;
+defBlock(B.CRYSTAL_FRAME, { name: 'Crystal Frame', tex: { top: 'crystal_frame_top', bottom: 'crystal_frame_top', side: 'crystal_frame' },
+  hardness: 8, tool: 'pickaxe', sound: 'glass' });
+defBlock(B.VOIDSTONE, { name: 'Voidstone', tex: all('voidstone'), hardness: 3, tool: 'pickaxe' });
+defBlock(B.GLIMMER_MOSS, { name: 'Glimmer Moss', tex: { top: 'glimmer_moss_top', bottom: 'voidstone', side: 'glimmer_moss_side' },
+  hardness: 0.6, tool: 'shovel', drop: B.VOIDSTONE, glows: true, sound: 'grass' });
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;
@@ -852,8 +865,9 @@ function setEnchantSeed(v) { enchantSeed = v; }
  * Pure portal geometry. No module state, no world access: every function reads blocks through
  * get(x, y, z), so Node tests call it with a plain map. src/portals.js applies the results.
  *
- * Frame: a vertical rectangle of obsidian along x or z. The opening is 2..4 wide and 3..5 tall
- * and holds only air. The sides, the bottom row, and the top row are obsidian. The 4 corner
+ * Frame: a vertical rectangle of frame blocks along x or z. The frame block is obsidian (the
+ * Ember portal) or Crystal Frame (the crystal portal, Phase 5). The opening is 2..4 wide and 3..5
+ * tall and holds only air. The sides, the bottom row, and the top row are frame blocks. The 4 corner
  * cells are optional. A frame is { axis, x0, y0, z0, w, h }: axis 'x' spans x (the pane lies in
  * the plane z = z0), axis 'z' spans z. (x0, y0, z0) is the low corner cell of the opening.
  *
@@ -871,29 +885,29 @@ const SITE_DY = 40;  // vertical reach of the site search, above and below the t
 // Cell (u, v) of a frame plane: u along the axis, v up. `d` offsets across the plane.
 const cellOf = (axis, x0, y0, z0, u, v, d = 0) => (axis === 'x' ? [x0 + u, y0 + v, z0 + d] : [x0 + d, y0 + v, z0 + u]);
 
-// True when the frame { axis, x0, y0, z0, w, h } is complete: an air opening in an obsidian ring.
-function frameOk(get, f) {
+// True when the frame { axis, x0, y0, z0, w, h } is complete: an air opening in a ring of `ring` blocks.
+function frameOk(get, f, ring = B.OBSIDIAN) {
   const { axis, x0, y0, z0, w, h } = f;
   const at = (u, v) => get(...cellOf(axis, x0, y0, z0, u, v));
   for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) if (at(u, v) !== B.AIR) return false;
-  for (let v = 0; v < h; v++) if (at(-1, v) !== B.OBSIDIAN || at(w, v) !== B.OBSIDIAN) return false;
-  for (let u = 0; u < w; u++) if (at(u, -1) !== B.OBSIDIAN || at(u, h) !== B.OBSIDIAN) return false;
+  for (let v = 0; v < h; v++) if (at(-1, v) !== ring || at(w, v) !== ring) return false;
+  for (let u = 0; u < w; u++) if (at(u, -1) !== ring || at(u, h) !== ring) return false;
   return true;
 }
 
-// The complete frame that holds obsidian cell (x, y, z) in its ring (corners count when present),
+// The complete frame that holds `ring` cell (x, y, z) in its ring (corners count when present),
 // or null. Smaller openings win when the cell belongs to more than one frame.
-function findFrame(get, x, y, z) {
-  if (get(x, y, z) !== B.OBSIDIAN) return null;
+function findFrame(get, x, y, z, ring = B.OBSIDIAN) {
+  if (get(x, y, z) !== ring) return null;
   for (let h = MIN_H; h <= MAX_H; h++) for (let w = MIN_W; w <= MAX_W; w++) for (const axis of ['x', 'z']) {
     const a = axis === 'x' ? x : z;   // the clicked cell's coordinate along the axis
     // (u, v) of the clicked cell in the frame: u in -1..w, v in -1..h, on the ring
     for (let v = -1; v <= h; v++) for (let u = -1; u <= w; u++) {
-      const ring = u === -1 || u === w || v === -1 || v === h;
-      if (!ring) continue;
+      const onRing = u === -1 || u === w || v === -1 || v === h;
+      if (!onRing) continue;
       const f = { axis, x0: axis === 'x' ? a - u : x, y0: y - v, z0: axis === 'z' ? a - u : z, w, h };
       if (f.y0 < 1 || f.y0 + h >= H) continue;
-      if (frameOk(get, f)) return f;
+      if (frameOk(get, f, ring)) return f;
     }
   }
   return null;
@@ -1423,6 +1437,56 @@ paintTile('portal_ember', (P, rng) => {
     const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
     const band = 0.5 + 0.5 * Math.sin(a * 2 + r * 0.9 + rng() * 0.6);
     P.set(x, y, mix3([96, 14, 18], [255, 170, 60], clamp(band * band * (1.1 - r / 14), 0, 1)));
+  });
+});
+// ---- Crystal Realm tiles (SPEC_realms, Phase 5). Only the moss specks and the frame's crystal
+// facets reach red > 0.8 (204); the moss specks glow, the frame does not (it sets no glows flag).
+function paintVoidstone(P, rng) {
+  const n = tileNoise(rng, 1), m = tileNoise(rng, 2);
+  P.fill((x, y) => {
+    const k = y * 16 + x;
+    let c = mix3([34, 28, 54], [70, 58, 100], n[k] + (rng() - 0.5) * 0.25);
+    if (m[k] > 0.82) c = shade(c, 0.7);
+    else if (m[k] < 0.08) c = [118, 92, 168];   // a faint violet vein
+    P.set(x, y, c);
+  });
+}
+paintTile('voidstone', paintVoidstone);
+// Glimmer Moss: deep violet-teal moss with pale glinting specks.
+function paintGlimmer(P, rng, x, y) {
+  const r = rng();
+  if (r < 0.016) return P.set(x, y, rng() < 0.5 ? [236, 214, 255] : [214, 255, 246]);
+  return P.set(x, y, mix3([46, 52, 104], [84, 118, 150], P.n[y * 16 + x] + (rng() - 0.5) * 0.3));
+}
+paintTile('glimmer_moss_top', (P, rng) => { P.n = tileNoise(rng, 1); P.fill((x, y) => paintGlimmer(P, rng, x, y)); });
+paintTile('glimmer_moss_side', (P, rng) => {
+  paintVoidstone(P, rng);
+  P.n = tileNoise(rng, 1);
+  const edge = Array.from({ length: 16 }, () => 2 + Math.floor(rng() * 3));
+  P.fill((x, y) => { if (y < edge[x]) paintGlimmer(P, rng, x, y); });
+});
+// Crystal Frame: an obsidian rim around a turquoise crystal facet.
+paintTile('crystal_frame', (P, rng) => {
+  P.copy('obsidian');
+  P.fill((x, y) => {
+    if (x < 3 || x > 12 || y < 3 || y > 12) return;
+    const d = Math.abs(x - 7.5) + Math.abs(y - 7.5);
+    if (d > 6.5) return;
+    const t = clamp(1 - d / 7 + (x < y ? 0.15 : -0.05) + (rng() - 0.5) * 0.1, 0, 1);
+    P.set(x, y, mix3([22, 104, 112], [200, 255, 246], t));
+  });
+  for (let i = 3; i < 13; i++) { P.set(i, 2, [110, 86, 160]); P.set(2, i, [110, 86, 160]); }
+});
+paintTile('crystal_frame_top', (P, rng) => {
+  P.copy('obsidian');
+  P.fill((x, y) => { if ((x === 7 || x === 8) && y > 2 && y < 13) P.set(x, y, mix3([40, 170, 170], [190, 250, 240], rng())); });
+});
+// Crystal portal: a spiral of turquoise and pale violet on deep indigo (break particles, fallback look).
+paintTile('portal_crystal', (P, rng) => {
+  P.fill((x, y) => {
+    const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const band = 0.5 + 0.5 * Math.sin(a * 2 + r * 0.9 + rng() * 0.6);
+    P.set(x, y, mix3([26, 16, 80], [120, 250, 236], clamp(band * band * (1.1 - r / 14), 0, 1)));
   });
 });
 paintTile('cracked_bricks', (P, rng) => {
@@ -2171,7 +2235,8 @@ function mobTexture(base, variance, painter, w = 16, h = 16) {
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
  * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
  * default), 'ember', or 'crystal'. emberChunk builds the Ember Realm cave world (SPEC_realms Phase 2).
- * The crystal generator is a flat stub until Phase 5. stampFortresses adds the Ember Fortresses (Phase 4).
+ * stampFortresses adds the Ember Fortresses (Phase 4). crystalChunk builds the Crystal Realm islands,
+ * the arena, and the arrival portal (Phase 5).
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -3307,25 +3372,113 @@ function WorldGenModule(SEED, K) {
     return { blocks, biomes, heights, features };
   }
 
-  // ---------------------------------------------------------------- crystal stub (SPEC_realms Phase 1)
-  // One stone disc of radius 44 at the origin, y 90 to 96, over a void. Phase 5 replaces it.
-  const CRYSTAL_TOP = 96, CRYSTAL_R = 44;
-  function stubChunk(cx, cz) {
+  // ---------------------------------------------------------------- crystal realm (SPEC_realms Phase 5)
+  // Floating islands over a void. The arena island sits at the origin: radius 44 at most, a flat
+  // Glimmer Moss top at y 96, and an underside that tapers to a point. A voidstone ring at radius 26
+  // marks the pillar ring (Phase 6). The arrival portal (CRYSTAL_ARRIVAL) stands on the arena at z 36,
+  // on a voidstone pad. Other islands sit on a 64-block jittered grid: 1 cell in 2 holds an island
+  // (radius 7..22), 1 in 5.5 an islet (radius 2..5). Their tops lie at y 70..110. An island whose
+  // reach (radius x ISLE_REACH) comes within ISLE_CLEAR blocks of the origin is dropped. Crystal
+  // clusters grow on the tops and hang from the undersides. No cell below y 20 holds a block.
+  // The noises take their own seeds, so the overworld noises do not change.
+  const CRYSTAL_TOP = 96, ARENA_R = 44, PILLAR_R = 26, ISLE_G = 64, ISLE_CLEAR = 72, ISLE_REACH = 1.25, ISLE_FLOOR = 21;
+  const CN = (k) => Simplex(hash3(SEED ^ 0xc7a5a1, k, 77));
+  const CA = CN(1), CB = CN(2), CH = CN(3);
+  // The arrival portal opening: 3 wide along x, 4 tall, in the plane z = 36. Its frame ring sits
+  // one cell around it, the bottom row flush with the arena floor.
+  const CRYSTAL_ARRIVAL = { axis: 'x', x0: -1, y0: CRYSTAL_TOP + 1, z0: 36, w: 3, h: 4 };
+  const isleCache = new Map();
+  // The island of grid cell (gx, gz): { x, z, r, top, hill, depth } or null. Pure and memoized.
+  function isleAt(gx, gz) {
+    const k = `${gx},${gz}`;
+    if (isleCache.has(k)) return isleCache.get(k);
+    const r = mulberry32(hash3(SEED ^ 0x15e1a, gx, gz));
+    const roll = r(), x = gx * ISLE_G + 12 + r() * 40, z = gz * ISLE_G + 12 + r() * 40;
+    const rad = roll < 0.5 ? 7 + r() * 15 : roll < 0.68 ? 2 + r() * 3 : 0;
+    let isle = null;
+    if (rad && Math.hypot(x, z) - rad * ISLE_REACH - 1 > ISLE_CLEAR)
+      isle = { x, z, r: rad, top: 70 + Math.floor(r() * 41), hill: r() * 5 * Math.min(1, rad / 10), depth: 1.1 + r() * 0.7 };
+    if (isleCache.size > 4096) isleCache.clear();
+    isleCache.set(k, isle);
+    return isle;
+  }
+  const n01 = (N, x, z) => Math.max(0, Math.min(1, 0.5 + 0.5 * N.n2(x, z)));
+  // The solid span [bottom, top] of island `isle` in column (wx, wz), with t (0 at the center, 1 at
+  // the rim), or null outside it.
+  function isleSpan(isle, wx, wz) {
+    const reach = isle.r * (0.85 + 0.4 * n01(CA, wx / 14, wz / 14));
+    const t = Math.hypot(wx + 0.5 - isle.x, wz + 0.5 - isle.z) / reach;
+    if (t >= 1) return null;
+    const top = Math.max(70, Math.min(110, isle.top + Math.floor(isle.hill * (1 - t * t) * (0.6 + 0.4 * n01(CH, wx / 9, wz / 9))) - (t > 0.88 ? 1 : 0)));
+    const deep = isle.r * isle.depth * (1 - t ** 1.5) ** 1.5 * (0.8 + 0.4 * n01(CB, wx / 5, wz / 5));
+    return [Math.max(ISLE_FLOOR, top - 2 - Math.floor(deep)), top, t];
+  }
+  function arenaSpan(wx, wz) {
+    const t = Math.hypot(wx, wz) / (ARENA_R * (1 - 0.05 * n01(CA, wx / 10 + 31, wz / 10)));
+    if (t >= 1) return null;
+    const deep = 48 * (1 - t ** 1.4) ** 1.3 * (0.8 + 0.4 * n01(CB, wx / 5, wz / 5));
+    return [Math.max(ISLE_FLOOR, CRYSTAL_TOP - 1 - Math.floor(deep)), CRYSTAL_TOP, t];
+  }
+  // True when (wx, y, wz) is a cell of the arrival portal's frame ring.
+  function arrivalRing(wx, y, wz) {
+    const a = CRYSTAL_ARRIVAL, u = wx - a.x0, v = y - a.y0;
+    return wz === a.z0 && u >= -1 && u <= a.w && v >= -1 && v <= a.h && (u === -1 || u === a.w || v === -1 || v === a.h);
+  }
+  function crystalChunk(cx, cz) {
     const blocks = new Uint8Array(CS * CS * H);
     const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
+    const x0 = cx * CS, z0 = cz * CS, idx = (x, y, z) => (y << 8) | (z << 4) | x;
+    const span = Math.ceil(22 * ISLE_REACH) + 2, isles = [];
+    for (let gz = Math.floor((z0 - span) / ISLE_G); gz <= Math.floor((z0 + CS + span) / ISLE_G); gz++)
+      for (let gx = Math.floor((x0 - span) / ISLE_G); gx <= Math.floor((x0 + CS + span) / ISLE_G); gx++) {
+        const i = isleAt(gx, gz);
+        if (i && Math.abs(i.x - x0 - 8) < i.r * ISLE_REACH + 10 && Math.abs(i.z - z0 - 8) < i.r * ISLE_REACH + 10) isles.push(i);
+      }
+    const arena = Math.hypot(x0 + 8, z0 + 8) < ARENA_R + 12;
     for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
-      const wx = cx * CS + x, wz = cz * CS + z;
-      if (wx * wx + wz * wz > CRYSTAL_R * CRYSTAL_R) continue;
-      for (let y = CRYSTAL_TOP - 6; y <= CRYSTAL_TOP; y++) blocks[(y << 8) | (z << 4) | x] = B.STONE;
-      heights[z * CS + x] = CRYSTAL_TOP;
+      const wx = x0 + x, wz = z0 + z, spans = [];
+      if (arena) { const a = arenaSpan(wx, wz); if (a) spans.push(a); }
+      for (const i of isles) { const s = isleSpan(i, wx, wz); if (s) spans.push(s); }
+      if (!spans.length) continue;
+      let high = 0;
+      for (const [b, t] of spans) { for (let y = b; y <= t; y++) blocks[idx(x, y, z)] = B.VOIDSTONE; if (t > high) high = t; }
+      // moss on every exposed top; clusters on tops (rims only on the arena) and under the undersides
+      for (const [b, t, r] of spans) {
+        if (blocks[idx(x, t + 1, z)] !== B.AIR) continue;
+        blocks[idx(x, t, z)] = B.GLIMMER_MOSS;
+        const onArena = arena && t === CRYSTAL_TOP && Math.hypot(wx, wz) <= ARENA_R;
+        if (hashF(SEED ^ 0x3c7a1, wx, wz) < (onArena ? (r > 0.9 ? 0.025 : 0) : r < 0.85 ? 0.015 : 0)) blocks[idx(x, t + 1, z)] = B.CRYSTAL;
+        if (b > ISLE_FLOOR - 1 && blocks[idx(x, b - 1, z)] === B.AIR && hashF(SEED ^ 0x3c7a2, wx, wz) < (onArena ? 0.03 : 0.05)) blocks[idx(x, b - 1, z)] = B.CRYSTAL + 1;
+        if (t + 1 > high && blocks[idx(x, t + 1, z)] !== B.AIR) high = t + 1;
+      }
+      heights[z * CS + x] = high;
+    }
+    if (arena) {
+      const a = CRYSTAL_ARRIVAL;
+      for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+        const wx = x0 + x, wz = z0 + z, i = idx(x, CRYSTAL_TOP, z);
+        if (blocks[i] !== B.GLIMMER_MOSS) continue;
+        const d = Math.hypot(wx, wz);
+        const pad = wx >= a.x0 - 2 && wx <= a.x0 + a.w + 1 && wz >= a.z0 - 4 && wz <= a.z0 + 2;
+        if (Math.abs(d - PILLAR_R) < 0.55 || pad) blocks[i] = B.VOIDSTONE;
+        if (blocks[i + 256] === B.CRYSTAL && pad) blocks[i + 256] = B.AIR;
+      }
+      // the arrival portal: a Crystal Frame ring with crystal panes, always lit
+      for (let v = -1; v <= a.h; v++) for (let u = -1; u <= a.w; u++) {
+        const wx = a.x0 + u, y = a.y0 + v, lx = wx - x0, lz = a.z0 - z0;
+        if (lx < 0 || lx >= CS || lz < 0 || lz >= CS) continue;
+        blocks[idx(lx, y, lz)] = arrivalRing(wx, y, a.z0) ? B.CRYSTAL_FRAME : B.PORTAL_CRYSTAL;
+        heights[lz * CS + lx] = Math.max(heights[lz * CS + lx], a.y0 + a.h);
+      }
     }
     return { blocks, biomes, heights, features: [] };
   }
   function generateChunk(cx, cz, realm = 'overworld', info) {
-    return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? stubChunk(cx, cz) : overworldChunk(cx, cz, info);
+    return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? crystalChunk(cx, cz) : overworldChunk(cx, cz, info);
   }
 
-  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID };
+  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID,
+    CRYSTAL_ARRIVAL, isleAt, ISLE_CLEAR, ARENA_R };
 }
 
 const GEN_CONSTS = { CS, H, SEA, B, BIOME };
@@ -3586,9 +3739,10 @@ class World {
   }
 
   // ---------------------------------------------------------------- edits
-  // Sets a block, records the override, relights, and remeshes touched chunks now.
+  // Sets a block, records the override, relights, and remeshes touched chunks now. A cell that
+  // locked(x, y, z) reports (the arrival portal, src/portals.js) refuses every edit.
   setBlock(x, y, z, id) {
-    if (y < 0 || y >= H) return false;
+    if (y < 0 || y >= H || (this.locked && this.locked(x, y, z))) return false;
     const c = this.chunkAt(x, z);
     if (!c || !c.lit) return false;
     const lx = x & 15, lz = z & 15, i = lidx(lx, y, lz);
@@ -3878,7 +4032,7 @@ class World {
  * ===================================================================================== */
 
 const PAD = 18, PSY = PAD * PAD, PVOL = PSY * (H + 2);
-const PB = new Uint8Array(PVOL), PS = new Uint8Array(PVOL), PL = new Uint8Array(PVOL), PC = new Uint8Array(PVOL);   // blocks, sky, block light, crystal light
+const PB = new Uint8Array(PVOL), PS = new Uint8Array(PVOL), PL = new Uint8Array(PVOL), PC$1 = new Uint8Array(PVOL);   // blocks, sky, block light, crystal light
 const pidx = (x, y, z) => (y + 1) * PSY + (z + 1) * PAD + (x + 1);
 const TINT_G = new Float32Array(PAD * PAD * 3), TINT_F = new Float32Array(PAD * PAD * 3), TINT_TMP = new Float32Array(PAD * PAD * 3);
 
@@ -3926,8 +4080,8 @@ const _vx = new Int32Array(12), _vuv = new Int32Array(8), _vl = new Uint8Array(1
 // furnace: bright texels ignore light but barely bloom), 232 = crystal (every texel glows and
 // keeps its facet shade), 160 = portal pane (the water pass draws the swirl). Plants sway only at
 // their top vertices, so their base stays in the ground.
-const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6;
-const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160];
+const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6, SWAY_PORTAL_CRY = 7;
+const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160, 172];
 const WET_ALPHA = 246;   // a still face whose neighbour cell is water: the shader draws caustics on it
 let swayMode = SWAY_NONE;
 let wetFace = false;   // emitCubeFace sets it per face
@@ -3963,15 +4117,15 @@ function emitCubeFace(buf, x, y, z, p, f, tile, tint, topH, smooth) {
     const uc = UV_CORNERS[k];
     const vTop = h < 16 && f !== 2 && f !== 3 ? (16 - h) * 16 : 0;
     _vuv[k * 2] = u0 + uc[0] * 254; _vuv[k * 2 + 1] = v0 + (uc[1] ? 254 : vTop);
-    let sk = PS[pf], bl = PL[pf], cr = PC[pf], ao = 3;
+    let sk = PS[pf], bl = PL[pf], cr = PC$1[pf], ao = 3;
     if (smooth) {
       const o = F.ao[k];
       const s1 = OPAQUE[PB[pf + o[0]]], s2 = OPAQUE[PB[pf + o[1]]], s3 = OPAQUE[PB[pf + o[2]]];
       ao = (s1 && s2) ? 0 : 3 - s1 - s2 - s3;
       let n = 1;
-      if (!s1) { sk += PS[pf + o[0]]; bl += PL[pf + o[0]]; cr += PC[pf + o[0]]; n++; }
-      if (!s2) { sk += PS[pf + o[1]]; bl += PL[pf + o[1]]; cr += PC[pf + o[1]]; n++; }
-      if (!s3 && !(s1 && s2)) { sk += PS[pf + o[2]]; bl += PL[pf + o[2]]; cr += PC[pf + o[2]]; n++; }
+      if (!s1) { sk += PS[pf + o[0]]; bl += PL[pf + o[0]]; cr += PC$1[pf + o[0]]; n++; }
+      if (!s2) { sk += PS[pf + o[1]]; bl += PL[pf + o[1]]; cr += PC$1[pf + o[1]]; n++; }
+      if (!s3 && !(s1 && s2)) { sk += PS[pf + o[2]]; bl += PL[pf + o[2]]; cr += PC$1[pf + o[2]]; n++; }
       sk /= n; bl /= n; cr /= n;
     }
     aos[k] = ao * 4 + (sk + Math.max(bl, cr)) * 0.01;
@@ -4162,7 +4316,7 @@ function stairMesh(buf, x, y, z, p, id) {
     const edge = F.n[ax] > 0 ? b[ax + 3] === 16 : b[ax] === 0;
     let q = p + F.off;
     if (OPAQUE[PB[q]]) { if (edge) return false; q = p; }
-    _fl[0] = PS[q]; _fl[1] = PL[q]; flatCry = PC[q];
+    _fl[0] = PS[q]; _fl[1] = PL[q]; flatCry = PC$1[q];
     return true;
   };
   for (const b of boxes) boxFit(buf, x, y, z, b, FACE_TILE[id * 6], 0, 0, face);
@@ -4172,7 +4326,7 @@ const DOOR_PANEL = [[0, 0, 0, 3, 16, 16], [0, 0, 0, 16, 16, 3], [13, 0, 0, 16, 1
 const doorBox = (id) => { const v = id - B.DOOR, f = v & 3; return DOOR_PANEL[(v >> 2) & 1 ? (f + 1) & 3 : f]; };
 
 function fillPadded(world, chunk) {
-  PB.fill(B.AIR); PS.fill(15); PL.fill(0); PC.fill(0);
+  PB.fill(B.AIR); PS.fill(15); PL.fill(0); PC$1.fill(0);
   // bottom padding row (y = -1) acts as opaque bedrock
   for (let i = 0; i < PSY; i++) { PB[i] = B.BEDROCK; PS[i] = 0; }
   for (let pz = 0; pz < PAD; pz++) for (let px = 0; px < PAD; px++) {
@@ -4188,7 +4342,7 @@ function fillPadded(world, chunk) {
     const cb = c.blocks, cs = c.sky, cl = c.blk, cc = c.cry;
     for (let y = 0; y < H; y++) {
       const s = (y << 8) | base, p = (y + 1) * PSY + bi;
-      PB[p] = cb[s]; PS[p] = cs[s]; PL[p] = cl[s]; PC[p] = cc[s];
+      PB[p] = cb[s]; PS[p] = cs[s]; PL[p] = cl[s]; PC$1[p] = cc[s];
     }
     // biome tint of this column
     const b = c.biomes[(sz << 4) | sx];
@@ -4226,7 +4380,7 @@ function buildChunkMesh(world, chunk) {
     if (id === B.AIR) continue;
     const shape = SHAPE_OF[id];
     const before = ob.n + wb.n;
-    flatCry = PC[p];
+    flatCry = PC$1[p];
     if (shape === SHAPE.CUBE) {
       const tintable = id === B.GRASS || (IS_LEAF[id] && LEAF_COLOR[id] === 0);   // colored leaves bake their color
       if (tintable) {
@@ -4333,7 +4487,7 @@ function buildChunkMesh(world, chunk) {
       const c = along ? [X, Y, Z + 8, X + 16, Y, Z + 8, X + 16, Y + 16, Z + 8, X, Y + 16, Z + 8]
         : [X + 8, Y, Z + 16, X + 8, Y, Z, X + 8, Y + 16, Z, X + 8, Y + 16, Z + 16];
       for (let i = 0; i < 12; i++) _corners[i] = c[i];
-      swayMode = SWAY_PORTAL;
+      swayMode = id === B.PORTAL_CRYSTAL ? SWAY_PORTAL_CRY : SWAY_PORTAL;
       emitFlat(wb, _corners, tileRect(FACE_TILE[id * 6], 0, 0, 16, 16), PS[p], PL[p], 0.8, WHITE);
       swayMode = SWAY_NONE;
     } else if (shape === SHAPE.CRYSTAL) {
@@ -4585,7 +4739,7 @@ const TERRAIN_VS = /* glsl */`
   varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
   void main() {
-    vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66);                                  // portal pane (alpha 160)
+    vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66) + 2.0 * step(0.665, aTint.a) * step(aTint.a, 0.69);   // pane: 1 ember (160), 2 crystal (172)
     vUv = aUv / 4096.0; vLight = aLight; vTint = aTint.rgb; vCry = aCry;
     vCrystal = step(0.88, aTint.a) * step(aTint.a, 0.94);                                // crystal faces glow
     vGlow = step(0.7, aTint.a) * step(aTint.a, 0.85) * (aTint.a > 0.82 ? 0.5 : 1.0);   // 1 glow, 0.5 soft glow
@@ -4665,22 +4819,24 @@ const TERRAIN_FS = /* glsl */`
   // Phase 3: the Ember portal pane. Two reads of the caustic net, bent by moving sine fields, flow
   // over a crimson-to-orange band pattern. The pane ignores light (it emits light 11), and its
   // bright streaks pass 1.0 in HDR, so the bloom pass gives them a halo.
-  vec4 portalPane(vec3 n) {
+  // Phase 5: the crystal pane (cry true) uses the same flow, slower, from deep indigo to turquoise
+  // with pale violet streaks.
+  vec4 portalPane(vec3 n, bool cry) {
     vec2 q = (abs(n.x) > abs(n.z) ? vWorld.zy : vWorld.xy) * 0.9;
-    float t = uTime * 0.6;
+    float t = uTime * (cry ? 0.4 : 0.6);
     vec2 w = vec2(sin(q.y * 2.3 + t * 1.3) + sin(q.x * 1.7 - t), cos(q.x * 2.1 - t * 1.1) + sin(q.y * 1.3 + t * 0.7));
     float a = texture2D(uCaus, q * 0.35 + w * 0.12 + vec2(t * 0.05, -t * 0.08)).r;
     float b = texture2D(uCaus, q * 0.6 - w * 0.1 + vec2(-t * 0.07, t * 0.04)).r;
     float s = 0.5 + 0.5 * sin(q.x * 3.0 + q.y * 2.0 + w.x * 2.0 + w.y + t * 2.0);
-    vec3 col = mix(vec3(0.42, 0.03, 0.05), vec3(1.0, 0.36, 0.06), s);
-    col += vec3(1.0, 0.72, 0.3) * (a * 1.3 + b * 0.7) * (0.9 + (uGlow - 1.0) * 0.5);
+    vec3 col = cry ? mix(vec3(0.06, 0.04, 0.3), vec3(0.1, 0.78, 0.74), s) : mix(vec3(0.42, 0.03, 0.05), vec3(1.0, 0.36, 0.06), s);
+    col += (cry ? vec3(0.78, 0.7, 1.0) : vec3(1.0, 0.72, 0.3)) * (a * 1.3 + b * 0.7) * (0.9 + (uGlow - 1.0) * 0.5);
     return vec4(col, clamp(0.68 + 0.25 * (a + b), 0.0, 0.95));
   }
   #endif
   void main() {
     #ifdef WATER
       if (vPortal > 0.5) {
-        vec4 pc = portalPane(normalize(cross(dFdx(vWorld), dFdy(vWorld))));
+        vec4 pc = portalPane(normalize(cross(dFdx(vWorld), dFdy(vWorld))), vPortal > 1.5);
         float pf = smoothstep(uFogNear, uFogFar, vDist);
         gl_FragColor = vec4(mix(pc.rgb, uFogColor, pf), mix(pc.a, 1.0, pf));
         return;
@@ -5766,6 +5922,13 @@ function useItem() {
     if (r === 'lit') { inv.consumeHeld(1); interacted(); } else if (r === 'open') hud.toast('The frame is not complete');
     return;
   }
+  if (stack.id === I.EMBER_HEART) {   // ignites a crystal portal frame, in the overworld only (SPEC_realms Phase 5)
+    if (t.id !== B.CRYSTAL_FRAME) return;
+    if (realm.current !== 'overworld') { hud.toast('The frame does not wake here'); return; }
+    const r = portals.ignite(t.x, t.y, t.z, B.PORTAL_CRYSTAL);
+    if (r === 'lit') { inv.consumeHeld(1); interacted(); } else if (r === 'open') hud.toast('The frame is not complete');
+    return;
+  }
   if (item.kind === 'bonemeal') {
     if (farming.boost(t.x, t.y, t.z)) { particles.grow(t.x, t.y, t.z); audio.pop(); inv.consumeHeld(1); interacted(); }
     return;
@@ -6363,7 +6526,7 @@ function updateInteraction(dt) {
       const lvl = BLOCKS[target.id].minLevel;
       if (lvl && breakTime(target.id, inv.held()) === Infinity) hud.toast(`Needs a ${pickaxeFor(lvl)} or better`);
     }
-    const bt = breakTime(target.id, inv.held());
+    const bt = world.locked && world.locked(target.x, target.y, target.z) ? Infinity : breakTime(target.id, inv.held());
     if (bt === Infinity) mining.progress = 0;
     else mining.progress += bt > 0 ? dt / bt : 1;
     mining.tickT -= dt;
@@ -6829,6 +6992,7 @@ shaped(['F', 'S', 'E'], { F: I.FLINT, S: I.STICK, E: I.FEATHER }, I.ARROW, 4);
 shaped([' TS', 'T S', ' TS'], { T: I.STICK, S: I.STRING }, I.BOW);
 ARMOR_TIERS.forEach((t, tier) => ARMOR_PIECES.forEach((p, piece) => shaped(p.shape, { M: t.item }, armorId(tier, piece))));
 shaped(['OCO', 'DMD', 'OCO'], { O: B.OBSIDIAN, C: B.CRYSTAL, D: I.DIAMOND, M: I.MAGMA_CORE }, B.ALTAR);
+shaped([' C ', 'COC', ' C '], { O: B.OBSIDIAN, C: B.CRYSTAL }, B.CRYSTAL_FRAME, 2);
 shaped(['P P', 'PPP'], { P: B.PLANKS }, I.BOAT);
 shaped(['S S', 'SXS', 'S S'], { S: I.STEEL, X: I.STICK }, B.RAIL, 16);
 shaped(['S S', 'SSS'], { S: I.STEEL }, I.MINECART);
@@ -8869,11 +9033,13 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });
     },
-    portal(x, y, z, alongX) {   // a spark drifts off an Ember portal pane (cell x, y, z)
+    portal(x, y, z, alongX, cry) {   // a spark drifts off a portal pane (cell x, y, z); cry: a crystal pane
       const off = randRange(-0.6, 0.6), c = Math.random();
+      const color = cry ? (c < 0.45 ? [0.3, 1, 0.92] : c < 0.8 ? [0.75, 0.95, 1] : [0.78, 0.55, 1])
+        : c < 0.45 ? [1, 0.5, 0.12] : c < 0.8 ? [1, 0.78, 0.3] : [0.95, 0.22, 0.4];
       emit(x + (alongX ? Math.random() : 0.5 + off * 0.2), y + Math.random(), z + (alongX ? 0.5 + off * 0.2 : Math.random()),
         alongX ? randRange(-0.15, 0.15) : off, randRange(-0.1, 0.35), alongX ? off : randRange(-0.15, 0.15),
-        { color: c < 0.45 ? [1, 0.5, 0.12] : c < 0.8 ? [1, 0.78, 0.3] : [0.95, 0.22, 0.4], life: randRange(0.8, 1.6),
+        { color, life: randRange(0.8, 1.6),
           size: randRange(0.04, 0.08), grav: -0.15, drag: 1.2, flags: 6 });
     },
     tntSpark(x, y, z) {   // sparks and smoke from a burning TNT fuse
@@ -9784,11 +9950,11 @@ function standNear(to) {
   return [x0 + 0.5, y0, z0 + 0.5];
 }
 
-// The default target of a travel without `to`. Crystal: the arena center. Else the player's point
-// in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the Ember Realm.
-// An ember y is the overworld y - 64, clamped to 33..110.
+// The default target of a travel without `to`. Crystal: the arrival portal's stand point. Else the
+// player's point in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the
+// Ember Realm. An ember y is the overworld y - 64, clamped to 33..110.
 function defaultTarget(name) {
-  if (name === 'crystal') return [0.5, 97, 0.5];
+  if (name === 'crystal') { const a = WG.CRYSTAL_ARRIVAL; return [a.x0 + (a.w >> 1) + 0.5, a.y0, a.z0 + 0.5]; }
   const p = player.pos;
   const o = realm.current === 'crystal' ? realm.portals.crystalBack || player.spawn.toArray()
     : realm.current === 'ember' ? [p.x * 8, p.y + 64, p.z * 8] : p.toArray();
@@ -9798,50 +9964,72 @@ function defaultTarget(name) {
 const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('travelBar').firstChild;
 
 /* =====================================================================================
- * PORTALS — living header (src/portals.js, SPEC_realms Phase 3)
+ * PORTALS — living header (src/portals.js, SPEC_realms Phases 3 and 5)
  * -------------------------------------------------------------------------------------
- * The Ember portal at run time. src/portal-frame.js holds the pure geometry (frame check,
- * nearest portal, build plan); this module applies it to the world.
+ * The portals at run time. src/portal-frame.js holds the pure geometry (frame check, nearest
+ * portal, build plan); this module applies it to the world. Two kinds exist (KINDS, keyed by pane):
+ * the Ember portal (obsidian frame, PORTAL_EMBER, lit by a Magma Core) and the crystal portal
+ * (Crystal Frame, PORTAL_CRYSTAL, lit by an Ember Heart, overworld only).
  *
- * Ignition: a Magma Core on a frame block fills the opening with PORTAL_EMBER (interact.js
- * calls ignite). Removal: world.onEdit reports every edit. An edit that changes a portal cell, or
- * that removes an obsidian cell next to one, removes every connected portal cell.
+ * Ignition: interact.js calls ignite with the pane id. It fills the opening of the frame that
+ * holds the clicked frame block. Removal: world.onEdit reports every edit. An edit that changes a
+ * pane cell, or that removes a frame block next to a pane of its kind, removes every connected pane cell.
  *
- * Travel: while the player's body touches a portal cell, the timer runs and an orange
- * vignette grows. At TRAVEL_T seconds the player travels. A step out resets the timer. Every
- * travel of any kind (and the load) disarms the portal until the player touches no portal cell. A rider
+ * Travel: while the player's body touches a pane cell, the timer runs and a vignette in the kind's
+ * colors grows. At TRAVEL_T seconds the player travels. A step out resets the timer. Every travel
+ * of any kind (and the load) disarms the portal until the player touches no pane cell. A rider
  * gets a toast and does not travel.
  *
- * Linking: the target point is realms.defaultTarget (1:8, ember y = overworld y - 64, held to
- * 33..110). The nearest portal cell in the target realm's overrides wins: within 16 blocks
- * horizontally in the Ember Realm, 128 in the overworld. Portal cells exist only as edits, so the
- * search needs no chunk. Without one, arrive() builds a portal at the target (buildPlan) once
- * the chunks there are meshed. A built portal is normal edits, so the save keeps it.
+ * Ember linking: the target point is realms.defaultTarget (1:8, ember y = overworld y - 64, held to
+ * 33..110). The nearest Ember pane in the target realm's overrides wins: within 16 blocks
+ * horizontally in the Ember Realm, 128 in the overworld. Without one, build() builds a portal at
+ * the target (buildPlan) once the chunks there are meshed. A built portal is normal edits.
  *
- * `cells` mirrors the portal cells of the loaded realm for particles and the hum. It rebuilds
- * when world.overrides changes identity (a realm switch or a load).
+ * Crystal linking: an overworld crystal portal records its foot cell in realm.portals.crystalBack
+ * and leads to the arrival portal (WG.CRYSTAL_ARRIVAL). A crystal pane in another realm leads back
+ * to the crystalBack portal when a crystal pane still stands there, else to the player's spawn.
+ *
+ * The arrival portal is generated terrain, not edits (ARCHITECTURE D52). world.locked refuses every
+ * edit to its frame and opening, so it is always lit and the player can never be stranded.
+ *
+ * `cells` maps "x,y,z" to the pane id of every pane cell in the loaded realm (the overrides, plus
+ * the arrival panes in the Crystal Realm), for the sparks and the hum. It rebuilds when
+ * world.overrides changes identity (a realm switch or a load).
  * ===================================================================================== */
 
 const TRAVEL_T = 2.5;               // seconds in the portal before travel
 const LINK_R = { ember: 16, overworld: 128 };
+const BACK_R = 3;                   // reach of the search for the crystalBack portal, in blocks
 const HUM_R = 12, SPARK_R = 16;     // reach of the hum and of the sparks, in blocks
-const P = B.PORTAL_EMBER;
+const PE = B.PORTAL_EMBER, PC = B.PORTAL_CRYSTAL;
+// The portal kinds, by pane id. vig: the vignette colors (rim, middle, edge).
+const KINDS = {
+  [PE]: { ring: B.OBSIDIAN, vig: ['255,120,30', '255,86,20', '110,8,12'] },
+  [PC]: { ring: B.CRYSTAL_FRAME, vig: ['80,240,225', '40,190,210', '34,12,92'] },
+};
+const PANE_OF = { [B.OBSIDIAN]: PE, [B.CRYSTAL_FRAME]: PC };   // frame block -> pane id
 const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+const A = WG.CRYSTAL_ARRIVAL;
+// The arrival portal: its stand point (the middle of the opening's floor) and its locked box.
+const ARRIVAL_STAND = [A.x0 + (A.w >> 1) + 0.5, A.y0, A.z0 + 0.5];
+const inArrival = (x, y, z) => z === A.z0 && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
 
 const portals = (() => {
-  const cells = new Set();          // "x,y,z" of every portal cell in the loaded realm
+  const cells = new Map();          // "x,y,z" -> pane id of every pane cell in the loaded realm
   let known = null;                 // the override map that `cells` mirrors
-  let t = 0, armed = false, warned = false, removing = false;
+  let t = 0, armed = false, warned = false, removing = false, kind = PE;
   const get = (x, y, z) => world.getBlock(x, y, z);
+  world.locked = (x, y, z) => world.realm === 'crystal' && inArrival(x, y, z);
 
   function sync() {
     if (known === world.overrides) return;
     known = world.overrides; cells.clear();
-    for (const [k, id] of known) if (id === P) cells.add(k);
+    for (const [k, id] of known) if (KINDS[id]) cells.set(k, id);
+    if (world.realm === 'crystal') for (const c of frameCells(A)) cells.set(c.join(','), PC);
   }
 
-  // Removes every portal cell connected to the cells in `seeds` (6-neighbour flood).
-  function removeFrom(seeds) {
+  // Removes every pane cell of id P connected to the cells in `seeds` (6-neighbour flood).
+  function removeFrom(seeds, P) {
     const seen = new Set(), q = seeds.filter((c) => get(...c) === P), out = [];
     for (const c of q) seen.add(c.join(','));
     while (q.length && out.length < 256) {
@@ -9865,52 +10053,71 @@ const portals = (() => {
   function onEdit(x, y, z, old, id) {
     sync();
     const k = `${x},${y},${z}`;
-    if (id === P) cells.add(k); else if (old === P) cells.delete(k);
-    if (removing) return;
-    if ((old === P && id !== P) || (old === B.OBSIDIAN && id !== B.OBSIDIAN)) removeFrom(N6.map(([dx, dy, dz]) => [x + dx, y + dy, z + dz]));
+    if (KINDS[id]) cells.set(k, id); else if (KINDS[old]) cells.delete(k);
+    if (removing || old === id) return;
+    const near = () => N6.map(([dx, dy, dz]) => [x + dx, y + dy, z + dz]);
+    if (KINDS[old]) removeFrom(near(), old);
+    if (PANE_OF[old]) removeFrom(near(), PANE_OF[old]);
   }
 
-  // A Magma Core on obsidian cell (x, y, z): 'lit' when it lights a frame, 'busy' when the cell
-  // already borders a portal, 'open' when no complete frame holds the cell.
-  function ignite(x, y, z) {
+  // Lights the frame that holds frame block (x, y, z) with panes of id P. Returns 'lit', 'busy'
+  // when the cell already borders a pane of P, or 'open' when no complete frame holds the cell.
+  function ignite(x, y, z, P = PE) {
     if (N6.some(([dx, dy, dz]) => get(x + dx, y + dy, z + dz) === P)) return 'busy';
-    const f = findFrame(get, x, y, z);
+    const f = findFrame(get, x, y, z, KINDS[P].ring);
     if (!f) return 'open';
     const own = !world.batch;
     if (own) world.beginBatch();
     for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P);
     if (own) world.endBatch();
-    const [cx, cy, cz] = frameCells(f)[0];
-    audio.noise({ ftype: 'lowpass', f0: 150, f1: 1600, q: 0.8, dur: 1.4, vol: 0.45, attack: 0.25, pos: { x: cx, y: cy, z: cz } });
-    audio.tone({ type: 'sine', f0: 70, f1: 150, dur: 1.4, vol: 0.25, attack: 0.2, pos: { x: cx, y: cy, z: cz } });
+    const [cx, cy, cz] = frameCells(f)[0], pos = { x: cx, y: cy, z: cz };
+    if (P === PC) {   // a rising glass chime
+      for (const [i, f0] of [[0, 660], [1, 880], [2, 1320]]) audio.tone({ type: 'sine', f0, f1: f0 * 1.5, dur: 1.2 + i * 0.3, vol: 0.18, attack: 0.05 + i * 0.12, pos });
+      audio.noise({ ftype: 'highpass', f0: 2000, f1: 6000, q: 0.6, dur: 1.2, vol: 0.2, attack: 0.3, pos });
+    } else {
+      audio.noise({ ftype: 'lowpass', f0: 150, f1: 1600, q: 0.8, dur: 1.4, vol: 0.45, attack: 0.25, pos });
+      audio.tone({ type: 'sine', f0: 70, f1: 150, dur: 1.4, vol: 0.25, attack: 0.2, pos });
+    }
     return 'lit';
   }
 
-  // True when the player's body box touches a portal cell.
+  // The first pane cell that the player's body box touches, as [x, y, z, id], or null.
   function touching() {
     const p = player.pos, r = 0.3;
     for (let y = Math.floor(p.y); y <= Math.floor(p.y + 1.79); y++)
       for (let z = Math.floor(p.z - r); z <= Math.floor(p.z + r); z++)
-        for (let x = Math.floor(p.x - r); x <= Math.floor(p.x + r); x++) if (get(x, y, z) === P) return true;
-    return false;
+        for (let x = Math.floor(p.x - r); x <= Math.floor(p.x + r); x++) { const id = get(x, y, z); if (KINDS[id]) return [x, y, z, id]; }
+    return null;
   }
 
-  // Starts the travel to the linked realm. Returns the realm.travel result.
-  function go() {
+  // Starts the travel through pane cell c = [x, y, z, id]. Returns the realm.travel result.
+  function go(c = touching()) {
+    if (!c) return false;
+    audio.noise({ ftype: 'bandpass', f0: 300, f1: 2400, q: 0.7, dur: 1.2, vol: 0.4, attack: 0.4 });
+    if (c[3] === PC) {
+      if (realm.current === 'overworld') {
+        const f = portalFoot(get, c, PC);
+        realm.portals.crystalBack = [f[0] + 0.5, f[1], f[2] + 0.5];
+        return realm.travel('crystal', ARRIVAL_STAND, () => { player.yaw = 0; player.pitch = 0; return ARRIVAL_STAND; });
+      }
+      const back = realm.portals.crystalBack, st = realm.stash.get('overworld');
+      const found = back && st ? nearestPortal(st.overrides, PC, back[0], back[1], back[2], BACK_R) : null;
+      if (found) return realm.travel('overworld', [found[0] + 0.5, found[1], found[2] + 0.5], () => arriveIn(found, PC));
+      return realm.travel('overworld', player.spawn.toArray());
+    }
     const name = realm.current === 'overworld' ? 'ember' : 'overworld';
     const to = defaultTarget(name), st = realm.stash.get(name);
-    const found = st ? nearestPortal(st.overrides, P, to[0], to[1], to[2], LINK_R[name]) : null;
-    audio.noise({ ftype: 'bandpass', f0: 300, f1: 2400, q: 0.7, dur: 1.2, vol: 0.4, attack: 0.4 });
-    if (found) return realm.travel(name, [found[0] + 0.5, found[1], found[2] + 0.5], () => arriveIn(found));
+    const found = st ? nearestPortal(st.overrides, PE, to[0], to[1], to[2], LINK_R[name]) : null;
+    if (found) return realm.travel(name, [found[0] + 0.5, found[1], found[2] + 0.5], () => arriveIn(found, PE));
     return realm.travel(name, to, build);
   }
   // Arrival in an existing portal: the floor of the found cell's column.
-  function arriveIn(c) {
+  function arriveIn(c, P) {
     if (get(...c) !== P) return null;   // gone: realm.travel stands the player at the target point
     const f = portalFoot(get, c, P);
     return [f[0] + 0.5, f[1], f[2] + 0.5];
   }
-  // Arrival with no portal: builds one at the target (the chunks there are meshed now).
+  // Arrival with no portal: builds an Ember portal at the target (the chunks there are meshed now).
   function build(to) {
     const plan = buildPlan(get, to[0], to[1], to[2]);
     const own = !world.batch;
@@ -9942,13 +10149,14 @@ const portals = (() => {
   const vignette = document.createElement('div');
   vignette.style.cssText = 'position:fixed;inset:0;opacity:0;pointer-events:none;z-index:3';
   document.body.appendChild(vignette);
-  let shown = -1;
+  let shown = -1, shownKind = 0;
   function showVignette(k) {
     const q = Math.round(k * 50) / 50;
-    if (q === shown) return;
-    shown = q;
+    if (q === shown && kind === shownKind) return;
+    shown = q; shownKind = kind;
+    const [a, b, c] = KINDS[kind].vig;
     vignette.style.opacity = String(Math.min(1, q * 1.2));
-    vignette.style.background = `radial-gradient(ellipse at center, rgba(255,120,30,0) ${Math.round(62 - 42 * q)}%, rgba(255,86,20,0.5) ${Math.round(88 - 28 * q)}%, rgba(110,8,12,0.92) 100%)`;
+    vignette.style.background = `radial-gradient(ellipse at center, rgba(${a},0) ${Math.round(62 - 42 * q)}%, rgba(${b},0.5) ${Math.round(88 - 28 * q)}%, rgba(${c},0.92) 100%)`;
   }
 
   // Each frame (main.js). dt is 0 while the simulation stops: the timer and the arming hold.
@@ -9956,20 +10164,22 @@ const portals = (() => {
     sync();
     // Every travel disarms (portal, respawn, or home), so no arrival in a portal re-triggers.
     if (!dt || game.state === 'travel') { humTo(0); if (game.state === 'travel') { t = 0; armed = false; showVignette(0); } return; }
-    if (player.dead || !touching()) { if (!player.dead) armed = true; t = 0; warned = false; }
+    const c = player.dead ? null : touching();
+    if (c && c[3] !== kind) { kind = c[3]; t = 0; }
+    if (!c) { if (!player.dead) armed = true; t = 0; warned = false; }
     else if (player.vehicle) {
       t = 0;
       if (!warned) { hud.toast(`Leave the ${player.vehicle.kind === 'boat' ? 'boat' : 'cart'} to travel`); warned = true; }
-    } else if (armed && (t += dt) >= TRAVEL_T) { t = 0; armed = false; go(); }
+    } else if (armed && (t += dt) >= TRAVEL_T) { t = 0; armed = false; go(c); }
     showVignette(t / TRAVEL_T);
     // sparks near the player, and the hum by the distance to the nearest portal cell
     const px = player.pos.x, py = player.pos.y + 1, pz = player.pos.z;
     let near = Infinity;
-    for (const k of cells) {
+    for (const [k, P] of cells) {
       const [x, y, z] = k.split(',').map(Number);
       const d = Math.hypot(x + 0.5 - px, y + 0.5 - py, z + 0.5 - pz);
       if (d < near) near = d;
-      if (d < SPARK_R && Math.random() < dt * 2.5) particles.portal(x, y, z, get(x + 1, y, z) === P || get(x - 1, y, z) === P);
+      if (d < SPARK_R && Math.random() < dt * 2.5) particles.portal(x, y, z, get(x + 1, y, z) === P || get(x - 1, y, z) === P, P === PC);
     }
     humTo(near < HUM_R ? 0.16 * (1 - near / HUM_R) ** 2 : 0);
   }
@@ -9980,7 +10190,7 @@ const portals = (() => {
     get humGain() { return hum ? hum.gain.gain.value : 0; },   // for tests: the hum's current volume
     get vignette() { return Number(vignette.style.opacity); },
     get lastBuild() { return lastBuild; },
-    TRAVEL_T,
+    TRAVEL_T, ARRIVAL_STAND,
   };
 })();
 
@@ -10001,7 +10211,8 @@ const portals = (() => {
  * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
  * a dark red dome, no sun, moon, stars, or clouds, close red fog, and a red-orange light floor
  * (uAmbient) at block light `def.ambient`. The day sky sets uAmbient to black. crystal: a violet dome with
- * full stars, a fixed light direction, and no sun disc or clouds. The day clock keeps running.
+ * full, larger stars, 3 slow aurora bands, a small pale star disc at the fixed light direction, and
+ * no clouds. The day clock keeps running.
  * ===================================================================================== */
 
 const sky = (() => {
@@ -10010,12 +10221,14 @@ const sky = (() => {
   const uniforms = {
     uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() },
     uGlow: { value: new THREE.Color(1, 0.45, 0.15) }, uGlowAmt: { value: 0 }, uSunDir: { value: new THREE.Vector3() },
+    uAurora: { value: 0 }, uTime: { value: 0 },
   };
   const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), new THREE.ShaderMaterial({
     uniforms, side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `
       uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uGlow; uniform float uGlowAmt; uniform vec3 uSunDir;
+      uniform float uAurora; uniform float uTime;
       varying vec3 vDir;
       void main() {
         vec3 d = normalize(vDir);
@@ -10023,7 +10236,23 @@ const sky = (() => {
         vec3 c = mix(uHorizon, uTop, smoothstep(-0.02, 0.45, h));
         c = mix(c, uHorizon * 0.55, smoothstep(0.0, -0.35, h));           // darker below the horizon
         float g = pow(max(dot(d, uSunDir), 0.0), 6.0) * uGlowAmt * smoothstep(0.55, -0.05, h);
-        gl_FragColor = vec4(mix(c, uGlow, clamp(g, 0.0, 1.0)), 1.0);
+        c = mix(c, uGlow, clamp(g, 0.0, 1.0));
+        // Aurora (Crystal Realm): 3 slow bands of curtains, teal low and violet high. Each band
+        // wanders in height with the azimuth; the curtains are thin vertical streaks that drift.
+        if (uAurora > 0.0) {
+          float az = atan(d.z, d.x), band = 0.0;
+          for (int i = 0; i < 3; i++) {
+            float fi = float(i);
+            float mid = 0.3 + 0.13 * fi + 0.06 * sin(az * (2.0 + fi) + uTime * (0.04 + 0.02 * fi) + fi * 1.7);
+            float w = 0.04 + 0.015 * sin(az * 5.0 + uTime * 0.08 + fi);
+            float y = (h - mid) / w;
+            float b = exp(-y * y) * (y < 0.0 ? 1.0 : exp(-y * 0.6));   // a sharp lower edge, a soft top
+            float curtain = 0.5 + 0.5 * sin(az * 31.0 + 2.0 * sin(az * 7.0 + uTime * 0.25) + uTime * 0.15 + fi * 3.0);
+            band += b * (0.35 + 0.65 * curtain) * (0.7 - 0.18 * fi);
+          }
+          c += mix(vec3(0.1, 0.9, 0.65), vec3(0.7, 0.3, 1.0), smoothstep(0.3, 0.62, h)) * band * uAurora;
+        }
+        gl_FragColor = vec4(c, 1.0);
       }`,
   }));
   dome.renderOrder = -10; dome.frustumCulled = false;
@@ -10194,6 +10423,8 @@ const sky = (() => {
     moon.position.copy(sunDir).multiplyScalar(-700); moon.lookAt(camera.position);
     sun.material.opacity = THREE.MathUtils.smoothstep(elev, -0.15, 0.05) * (1 - wk) * Math.exp(-sunCloud * 6);
     sun.material.color.setScalar(glowGain * glowGain);      // 4 in HDR: a white-hot disc with a wide bloom
+    sun.scale.setScalar(1); halo.material.color.setScalar(1); uniforms.uAurora.value = 0;
+    uniforms.uTime.value += dt;
     moon.material.color.setScalar(glowGain);
     moon.material.opacity = THREE.MathUtils.smoothstep(-elev, -0.15, 0.05) * (1 - 0.9 * day) * (1 - wk) * Math.exp(-moonCloud * 6);   // faint by day, as in Fable
     starMat.uniforms.uOpacity.value = clamp(1 - day * 1.6, 0, 1) * (1 - wk);
@@ -10261,7 +10492,7 @@ const sky = (() => {
   // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
   const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
   const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
-  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize();
+  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize(), CRYSTAL_STAR = C(0.86, 0.84, 1.0);
   const EMBER_AMBIENT = C(1, 0.52, 0.32);   // the tint of the ember light floor
   // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
   const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
@@ -10271,6 +10502,14 @@ const sky = (() => {
     uniforms.uHorizon.value.copy(ember ? EMBER_HOR : CRYSTAL_HOR);
     uniforms.uGlowAmt.value = 0;
     sun.material.opacity = halo.material.opacity = moon.material.opacity = 0;
+    if (!ember) {   // the pale star: a small lavender disc and halo at the fixed light direction, and the aurora
+      sun.position.copy(CRYSTAL_SUN).multiplyScalar(700); sun.lookAt(camera.position);
+      halo.position.copy(CRYSTAL_SUN).multiplyScalar(690); halo.lookAt(camera.position);
+      sun.scale.setScalar(0.45); sun.material.opacity = 1; sun.material.color.copy(CRYSTAL_STAR).multiplyScalar(glowGain * glowGain);
+      halo.material.color.copy(CRYSTAL_STAR); halo.material.opacity = 0.4;
+      uniforms.uAurora.value = 0.5;
+      starMat.uniforms.uSize.value = 2.8 * renderer.getPixelRatio();
+    }
     starMat.uniforms.uOpacity.value = ember ? 0 : 1;
     stars.visible = !ember;
     clouds$1.visible = false;

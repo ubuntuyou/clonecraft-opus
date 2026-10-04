@@ -6,7 +6,8 @@
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
  * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
  * default), 'ember', or 'crystal'. emberChunk builds the Ember Realm cave world (SPEC_realms Phase 2).
- * The crystal generator is a flat stub until Phase 5. stampFortresses adds the Ember Fortresses (Phase 4).
+ * stampFortresses adds the Ember Fortresses (Phase 4). crystalChunk builds the Crystal Realm islands,
+ * the arena, and the arrival portal (Phase 5).
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -1142,25 +1143,113 @@ function WorldGenModule(SEED, K) {
     return { blocks, biomes, heights, features };
   }
 
-  // ---------------------------------------------------------------- crystal stub (SPEC_realms Phase 1)
-  // One stone disc of radius 44 at the origin, y 90 to 96, over a void. Phase 5 replaces it.
-  const CRYSTAL_TOP = 96, CRYSTAL_R = 44;
-  function stubChunk(cx, cz) {
+  // ---------------------------------------------------------------- crystal realm (SPEC_realms Phase 5)
+  // Floating islands over a void. The arena island sits at the origin: radius 44 at most, a flat
+  // Glimmer Moss top at y 96, and an underside that tapers to a point. A voidstone ring at radius 26
+  // marks the pillar ring (Phase 6). The arrival portal (CRYSTAL_ARRIVAL) stands on the arena at z 36,
+  // on a voidstone pad. Other islands sit on a 64-block jittered grid: 1 cell in 2 holds an island
+  // (radius 7..22), 1 in 5.5 an islet (radius 2..5). Their tops lie at y 70..110. An island whose
+  // reach (radius x ISLE_REACH) comes within ISLE_CLEAR blocks of the origin is dropped. Crystal
+  // clusters grow on the tops and hang from the undersides. No cell below y 20 holds a block.
+  // The noises take their own seeds, so the overworld noises do not change.
+  const CRYSTAL_TOP = 96, ARENA_R = 44, PILLAR_R = 26, ISLE_G = 64, ISLE_CLEAR = 72, ISLE_REACH = 1.25, ISLE_FLOOR = 21;
+  const CN = (k) => Simplex(hash3(SEED ^ 0xc7a5a1, k, 77));
+  const CA = CN(1), CB = CN(2), CH = CN(3);
+  // The arrival portal opening: 3 wide along x, 4 tall, in the plane z = 36. Its frame ring sits
+  // one cell around it, the bottom row flush with the arena floor.
+  const CRYSTAL_ARRIVAL = { axis: 'x', x0: -1, y0: CRYSTAL_TOP + 1, z0: 36, w: 3, h: 4 };
+  const isleCache = new Map();
+  // The island of grid cell (gx, gz): { x, z, r, top, hill, depth } or null. Pure and memoized.
+  function isleAt(gx, gz) {
+    const k = `${gx},${gz}`;
+    if (isleCache.has(k)) return isleCache.get(k);
+    const r = mulberry32(hash3(SEED ^ 0x15e1a, gx, gz));
+    const roll = r(), x = gx * ISLE_G + 12 + r() * 40, z = gz * ISLE_G + 12 + r() * 40;
+    const rad = roll < 0.5 ? 7 + r() * 15 : roll < 0.68 ? 2 + r() * 3 : 0;
+    let isle = null;
+    if (rad && Math.hypot(x, z) - rad * ISLE_REACH - 1 > ISLE_CLEAR)
+      isle = { x, z, r: rad, top: 70 + Math.floor(r() * 41), hill: r() * 5 * Math.min(1, rad / 10), depth: 1.1 + r() * 0.7 };
+    if (isleCache.size > 4096) isleCache.clear();
+    isleCache.set(k, isle);
+    return isle;
+  }
+  const n01 = (N, x, z) => Math.max(0, Math.min(1, 0.5 + 0.5 * N.n2(x, z)));
+  // The solid span [bottom, top] of island `isle` in column (wx, wz), with t (0 at the center, 1 at
+  // the rim), or null outside it.
+  function isleSpan(isle, wx, wz) {
+    const reach = isle.r * (0.85 + 0.4 * n01(CA, wx / 14, wz / 14));
+    const t = Math.hypot(wx + 0.5 - isle.x, wz + 0.5 - isle.z) / reach;
+    if (t >= 1) return null;
+    const top = Math.max(70, Math.min(110, isle.top + Math.floor(isle.hill * (1 - t * t) * (0.6 + 0.4 * n01(CH, wx / 9, wz / 9))) - (t > 0.88 ? 1 : 0)));
+    const deep = isle.r * isle.depth * (1 - t ** 1.5) ** 1.5 * (0.8 + 0.4 * n01(CB, wx / 5, wz / 5));
+    return [Math.max(ISLE_FLOOR, top - 2 - Math.floor(deep)), top, t];
+  }
+  function arenaSpan(wx, wz) {
+    const t = Math.hypot(wx, wz) / (ARENA_R * (1 - 0.05 * n01(CA, wx / 10 + 31, wz / 10)));
+    if (t >= 1) return null;
+    const deep = 48 * (1 - t ** 1.4) ** 1.3 * (0.8 + 0.4 * n01(CB, wx / 5, wz / 5));
+    return [Math.max(ISLE_FLOOR, CRYSTAL_TOP - 1 - Math.floor(deep)), CRYSTAL_TOP, t];
+  }
+  // True when (wx, y, wz) is a cell of the arrival portal's frame ring.
+  function arrivalRing(wx, y, wz) {
+    const a = CRYSTAL_ARRIVAL, u = wx - a.x0, v = y - a.y0;
+    return wz === a.z0 && u >= -1 && u <= a.w && v >= -1 && v <= a.h && (u === -1 || u === a.w || v === -1 || v === a.h);
+  }
+  function crystalChunk(cx, cz) {
     const blocks = new Uint8Array(CS * CS * H);
     const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
+    const x0 = cx * CS, z0 = cz * CS, idx = (x, y, z) => (y << 8) | (z << 4) | x;
+    const span = Math.ceil(22 * ISLE_REACH) + 2, isles = [];
+    for (let gz = Math.floor((z0 - span) / ISLE_G); gz <= Math.floor((z0 + CS + span) / ISLE_G); gz++)
+      for (let gx = Math.floor((x0 - span) / ISLE_G); gx <= Math.floor((x0 + CS + span) / ISLE_G); gx++) {
+        const i = isleAt(gx, gz);
+        if (i && Math.abs(i.x - x0 - 8) < i.r * ISLE_REACH + 10 && Math.abs(i.z - z0 - 8) < i.r * ISLE_REACH + 10) isles.push(i);
+      }
+    const arena = Math.hypot(x0 + 8, z0 + 8) < ARENA_R + 12;
     for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
-      const wx = cx * CS + x, wz = cz * CS + z;
-      if (wx * wx + wz * wz > CRYSTAL_R * CRYSTAL_R) continue;
-      for (let y = CRYSTAL_TOP - 6; y <= CRYSTAL_TOP; y++) blocks[(y << 8) | (z << 4) | x] = B.STONE;
-      heights[z * CS + x] = CRYSTAL_TOP;
+      const wx = x0 + x, wz = z0 + z, spans = [];
+      if (arena) { const a = arenaSpan(wx, wz); if (a) spans.push(a); }
+      for (const i of isles) { const s = isleSpan(i, wx, wz); if (s) spans.push(s); }
+      if (!spans.length) continue;
+      let high = 0;
+      for (const [b, t] of spans) { for (let y = b; y <= t; y++) blocks[idx(x, y, z)] = B.VOIDSTONE; if (t > high) high = t; }
+      // moss on every exposed top; clusters on tops (rims only on the arena) and under the undersides
+      for (const [b, t, r] of spans) {
+        if (blocks[idx(x, t + 1, z)] !== B.AIR) continue;
+        blocks[idx(x, t, z)] = B.GLIMMER_MOSS;
+        const onArena = arena && t === CRYSTAL_TOP && Math.hypot(wx, wz) <= ARENA_R;
+        if (hashF(SEED ^ 0x3c7a1, wx, wz) < (onArena ? (r > 0.9 ? 0.025 : 0) : r < 0.85 ? 0.015 : 0)) blocks[idx(x, t + 1, z)] = B.CRYSTAL;
+        if (b > ISLE_FLOOR - 1 && blocks[idx(x, b - 1, z)] === B.AIR && hashF(SEED ^ 0x3c7a2, wx, wz) < (onArena ? 0.03 : 0.05)) blocks[idx(x, b - 1, z)] = B.CRYSTAL + 1;
+        if (t + 1 > high && blocks[idx(x, t + 1, z)] !== B.AIR) high = t + 1;
+      }
+      heights[z * CS + x] = high;
+    }
+    if (arena) {
+      const a = CRYSTAL_ARRIVAL;
+      for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+        const wx = x0 + x, wz = z0 + z, i = idx(x, CRYSTAL_TOP, z);
+        if (blocks[i] !== B.GLIMMER_MOSS) continue;
+        const d = Math.hypot(wx, wz);
+        const pad = wx >= a.x0 - 2 && wx <= a.x0 + a.w + 1 && wz >= a.z0 - 4 && wz <= a.z0 + 2;
+        if (Math.abs(d - PILLAR_R) < 0.55 || pad) blocks[i] = B.VOIDSTONE;
+        if (blocks[i + 256] === B.CRYSTAL && pad) blocks[i + 256] = B.AIR;
+      }
+      // the arrival portal: a Crystal Frame ring with crystal panes, always lit
+      for (let v = -1; v <= a.h; v++) for (let u = -1; u <= a.w; u++) {
+        const wx = a.x0 + u, y = a.y0 + v, lx = wx - x0, lz = a.z0 - z0;
+        if (lx < 0 || lx >= CS || lz < 0 || lz >= CS) continue;
+        blocks[idx(lx, y, lz)] = arrivalRing(wx, y, a.z0) ? B.CRYSTAL_FRAME : B.PORTAL_CRYSTAL;
+        heights[lz * CS + lx] = Math.max(heights[lz * CS + lx], a.y0 + a.h);
+      }
     }
     return { blocks, biomes, heights, features: [] };
   }
   function generateChunk(cx, cz, realm = 'overworld', info) {
-    return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? stubChunk(cx, cz) : overworldChunk(cx, cz, info);
+    return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? crystalChunk(cx, cz) : overworldChunk(cx, cz, info);
   }
 
-  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID };
+  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID,
+    CRYSTAL_ARRIVAL, isleAt, ISLE_CLEAR, ARENA_R };
 }
 
 export { WorldGenModule };

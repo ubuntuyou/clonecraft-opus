@@ -109,7 +109,7 @@ function updateInteraction(dt) {
       const lvl = BLOCKS[target.id].minLevel;
       if (lvl && breakTime(target.id, inv.held()) === Infinity) hud.toast(`Needs a ${pickaxeFor(lvl)} or better`);
     }
-    const bt = breakTime(target.id, inv.held());
+    const bt = world.locked && world.locked(target.x, target.y, target.z) ? Infinity : breakTime(target.id, inv.held());
     if (bt === Infinity) mining.progress = 0;
     else mining.progress += bt > 0 ? dt / bt : 1;
     mining.tickT -= dt;

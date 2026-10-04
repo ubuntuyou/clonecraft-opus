@@ -443,6 +443,13 @@ function useItem() {
     if (r === 'lit') { inv.consumeHeld(1); interacted(); } else if (r === 'open') hud.toast('The frame is not complete');
     return;
   }
+  if (stack.id === I.EMBER_HEART) {   // ignites a crystal portal frame, in the overworld only (SPEC_realms Phase 5)
+    if (t.id !== B.CRYSTAL_FRAME) return;
+    if (realm.current !== 'overworld') { hud.toast('The frame does not wake here'); return; }
+    const r = portals.ignite(t.x, t.y, t.z, B.PORTAL_CRYSTAL);
+    if (r === 'lit') { inv.consumeHeld(1); interacted(); } else if (r === 'open') hud.toast('The frame is not complete');
+    return;
+  }
   if (item.kind === 'bonemeal') {
     if (farming.boost(t.x, t.y, t.z)) { particles.grow(t.x, t.y, t.z); audio.pop(); inv.consumeHeld(1); interacted(); }
     return;

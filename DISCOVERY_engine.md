@@ -111,10 +111,15 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - The tool id formula `base + tier` collides at tier 8 (pickaxe 208 is `BONE_MEAL`). Emberite tools take ids 270..274 instead.
 - A flyer's hover is relative to the floor below it. Without the chase height rule (ARCHITECTURE D51), a wisp over the lava sea sinks below the bridge deck, loses line of sight, and stops firing.
 - Ember spawn pressure: the natural spawn uses the overworld rate (1 try per 0.35 s up to `MAX_HOSTILE`). The realm is dark almost everywhere, so the cap fills in about 6 s.
+- The mesher tells the shader the pane kind through the tint alpha (`SWAY_ALPHA`): 160 is the Ember pane, 172 is the crystal pane. The shader decodes it in narrow bands (`vPortal` 1 or 2). A new alpha code must not fall inside 153..176.
+- `PORTAL_CRYSTAL` is not replaceable, unlike `PORTAL_EMBER`. No placed block and no liquid enters a crystal pane. Only the loss of a frame block removes it.
+- `world.locked(x, y, z)` makes `setBlock` return false. Every edit path must check the return value before it spends an item or drops a block.
+- `frameOk` and `findFrame` default the ring to obsidian. A crystal portal call must pass `B.CRYSTAL_FRAME`, or the frame check fails.
+- In the Crystal Realm, `sky.js` writes the fixed star direction to `terrainUniforms.uSunDir`. The shadow pass reads that uniform. The exported `sky.sunDir` is still the day-clock vector, so do not use it for crystal light.
 
 ## Pointers
 
-- Realm QA: `clonecraft.realm.travel('ember')`, `('crystal')`, or `('overworld')` switches the realm. Crystal stub terrain loads too fast to see the travel screen. To hold it, set `clonecraft.world.update = () => {}` before the travel, then `delete clonecraft.world.update`.
+- Realm QA: `clonecraft.realm.travel('ember')`, `('crystal')`, or `('overworld')` switches the realm. Crystal terrain can load too fast to see the travel screen. To hold it, set `clonecraft.world.update = () => {}` before the travel, then `delete clonecraft.world.update`.
 - Ember content QA: `clonecraft` exposes `Mob`, `mobs`, `projectiles`, `spawners` (`.live`), `looted`, `featureAt`, `emberType`, `WG`, and `respawn`. On seed 12345, fortress cell (0, 0) has its keep centre at (40, 40), the floor at y 84, the spawner at (40, 85, 40), and the heart chest at (36, 85, 36).
 - Mob QA in headless Chromium: a per-frame health refill does not stop a death. Set `player.invuln = 99` every frame instead. After a death, `setState('playing')` hides the death screen but leaves `player.dead` true. Call `respawn()`, wait for the 'travel' state to end, then travel back.
 - Portal QA: `clonecraft.portals` exposes `t`, `armed`, `cells`, `humGain`, `vignette`, `lastBuild`, `touching()`, and `go()`. `clonecraft.vehicles.spawn(kind, x, y, z, yaw)` plus `mount(v)` seat the player for the rider test.

@@ -281,6 +281,14 @@ Generation never makes `PORTAL_EMBER`. So every portal cell is an override, and 
 Removal runs from `world.onEdit`. An edit that changes a portal cell, or that removes obsidian next to one, floods the connected portal cells to air. Placing a block into the pane works because the pane is replaceable.
 The pane is one double-sided quad in the water pass, so it blends with the transparent geometry and casts no shadow.
 Every 'travel' state disarms the portal: portal travel, respawn, and home travel. The player must step out of the pane before the timer runs again. So an arrival inside a portal never sends the player straight back.
+The same functions serve the crystal portal. `frameOk` and `findFrame` take the ring block as an argument: obsidian or Crystal Frame. D52 amends the edit-only rule for one portal.
+
+### D52. The crystal arrival portal is generated and locked
+
+The arrival portal is part of the arena island. The crystal generator writes its Crystal Frame ring and its `PORTAL_CRYSTAL` opening (`WG.CRYSTAL_ARRIVAL`). So it exists in every world without an edit or a save field, and the link to it needs no search.
+`world.locked(x, y, z)` refuses every edit inside the arrival frame and its opening. `setBlock` returns false there, so mining, TNT, placement, and portal removal all fail. Targeting reports a break time of Infinity for a locked cell. So the player can never break the only way home.
+`portals.cells` adds the arrival panes to the override panes when the Crystal Realm loads, for the sparks and the hum.
+The return link is one saved cell: `portals.crystalBack`, the foot of the last overworld crystal portal used. The return leads there when a crystal pane still stands within 3 blocks of that cell. Otherwise it leads to the player's spawn.
 
 ### D50. Ember fortresses sit on a 96-block grid with parity offsets
 
@@ -308,7 +316,7 @@ A fireball is a `projectiles` entry with `kind: 'fireball'`. It flies straight w
 | world to mobs | `onChunkLoaded(chunk)` and `onChunkUnloaded(chunk)` hooks. |
 | block edits | `world.setBlock(x, y, z, id)` is the only write path. `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
 | world to liquids, leaves, farming, and grass | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, `farming.onEdit()`, and `grass.onEdit()`. |
-| block edits to portals | `targeting.js` calls `portals.onEdit(x, y, z, old, id)` after every edit. `interact.js` calls `portals.ignite(x, y, z)` for a Magma Core on obsidian. `portals.update(dt)` runs once per frame (D49). |
+| block edits to portals | `targeting.js` calls `portals.onEdit(x, y, z, old, id)` after every edit. `interact.js` calls `portals.ignite(x, y, z)` for a Magma Core on obsidian or an Ember Heart on a Crystal Frame. `portals.update(dt)` runs once per frame (D49). `world.locked(x, y, z)` guards the arrival portal (D52). |
 | realms to the scoped modules | `realm.leave()` takes each scoped module's `save()` and clears it. `realm.enter(stash)` calls each `load(d)`. New realm-scoped state joins both. |
 | containers | `tileEntity(x, y, z)` returns or creates the furnace or chest state. `openInventory(mode, target)` opens its screen. |
 | save | `persist.save()` writes the save. `persist.apply(SAVE)` restores it at boot. |

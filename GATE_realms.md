@@ -118,13 +118,20 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 5: Crystal Realm
 
-- [ ] Two Crystal Frames craft from 1 obsidian and 4 crystals through the recipe book.
-- [ ] A Crystal Frame portal lights with an Ember Heart and uses the heart. A Magma Core does not light it. In the Ember Realm, the click shows "The frame does not wake here" and keeps the heart.
-- [ ] The crystal portal leads to the arrival portal on the arena island. The arrival portal leads back to the last overworld crystal portal used. With that portal broken, it leads to the overworld spawn.
-- [ ] The same seed gives the same Crystal Realm chunks. Nothing exists below y 20. No island other than the arena lies within 72 blocks of the origin. (Node test.)
-- [ ] Islands taper underneath, carry Glimmer Moss on top, and hold crystal clusters. The violet sky, the stars, the aurora, the fog, and fixed-direction shadows render. (Screenshots.)
-- [ ] Voidstone and Glimmer Moss break with their tools and drop their spec items.
-- [ ] No mob spawns naturally in the Crystal Realm.
+- [x] Two Crystal Frames craft from 1 obsidian and 4 crystals through the recipe book.
+  Note (Phase 5): Node test for the shape. Playwright: real recipe-book clicks turned 1 obsidian and 4 crystals into 2 Crystal Frames (183).
+- [x] A Crystal Frame portal lights with an Ember Heart and uses the heart. A Magma Core does not light it. In the Ember Realm, the click shows "The frame does not wake here" and keeps the heart.
+  Note (Phase 5): Playwright: an incomplete frame showed "The frame is not complete". A Magma Core did nothing. The heart lit all 6 panes and was used. In the Ember Realm the click showed "The frame does not wake here", and the heart stack stayed at 2.
+- [x] The crystal portal leads to the arrival portal on the arena island. The arrival portal leads back to the last overworld crystal portal used. With that portal broken, it leads to the overworld spawn.
+  Note (Phase 5): Playwright: the portal led to the arrival stand (0.5, 97, 36.5). The return landed at the overworld portal used last. With that portal broken, the return landed at spawn (−11.5, 138, 21.5). The arrival frame is locked (ARCHITECTURE D52): breaks, edits, and a TNT blast left it whole, and 20 frames of held mining made no progress.
+- [x] The same seed gives the same Crystal Realm chunks. Nothing exists below y 20. No island other than the arena lies within 72 blocks of the origin. (Node test.)
+  Note (Phase 5): Node tests in `tests/worldgen.test.js` pass: equal bytes for the same seed, no block below y 20, and no island within 72 blocks of the origin.
+- [x] Islands taper underneath, carry Glimmer Moss on top, and hold crystal clusters. The violet sky, the stars, the aurora, the fog, and fixed-direction shadows render. (Screenshots.)
+  Note (Phase 5): screenshots: tapered islands, moss tops, clusters on tops and undersides, the violet sky, stars, aurora, and fog. A shadows-on and shadows-off diff shows the arrival frame's cast shadow on the moss. Joe has not reviewed the look.
+- [x] Voidstone and Glimmer Moss break with their tools and drop their spec items.
+  Note (Phase 5): Node test for hardness, tools, and drops. Playwright: moss broke in 0.45 s, the pure `breakTime` value, and dropped Voidstone. Voidstone dropped itself with a pickaxe, and a bare hand did not harvest it.
+- [x] No mob spawns naturally in the Crystal Realm.
+  Note (Phase 5): Playwright: 400 spawn calls and 20 s of play left 0 mobs.
 
 ## Phase 6: Prism Colossus
 

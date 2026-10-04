@@ -68,8 +68,8 @@ const _vx = new Int32Array(12), _vuv = new Int32Array(8), _vl = new Uint8Array(1
 // furnace: bright texels ignore light but barely bloom), 232 = crystal (every texel glows and
 // keeps its facet shade), 160 = portal pane (the water pass draws the swirl). Plants sway only at
 // their top vertices, so their base stays in the ground.
-const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6;
-const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160];
+const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6, SWAY_PORTAL_CRY = 7;
+const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160, 172];
 const WET_ALPHA = 246;   // a still face whose neighbour cell is water: the shader draws caustics on it
 let swayMode = SWAY_NONE;
 let wetFace = false;   // emitCubeFace sets it per face
@@ -475,7 +475,7 @@ function buildChunkMesh(world, chunk) {
       const c = along ? [X, Y, Z + 8, X + 16, Y, Z + 8, X + 16, Y + 16, Z + 8, X, Y + 16, Z + 8]
         : [X + 8, Y, Z + 16, X + 8, Y, Z, X + 8, Y + 16, Z, X + 8, Y + 16, Z + 16];
       for (let i = 0; i < 12; i++) _corners[i] = c[i];
-      swayMode = SWAY_PORTAL;
+      swayMode = id === B.PORTAL_CRYSTAL ? SWAY_PORTAL_CRY : SWAY_PORTAL;
       emitFlat(wb, _corners, tileRect(FACE_TILE[id * 6], 0, 0, 16, 16), PS[p], PL[p], 0.8, WHITE);
       swayMode = SWAY_NONE;
     } else if (shape === SHAPE.CRYSTAL) {

@@ -38,6 +38,8 @@ const B = {
   // Ember Realm (SPEC_realms, Phase 2)
   EMBER_ROCK: 176, ASH_SAND: 177, EMBER_LAMP: 178, EMBERITE_ORE: 179, EMBER_BRICKS: 180,
   PORTAL_EMBER: 181,  // the Ember portal pane (Phase 3); src/portals.js lights and removes it
+  // Crystal Realm (SPEC_realms, Phase 5)
+  PORTAL_CRYSTAL: 182, CRYSTAL_FRAME: 183, VOIDSTONE: 184, GLIMMER_MOSS: 185,
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
@@ -221,6 +223,17 @@ GLOWS[B.EMBERITE_ORE] = 1;
 defBlock(B.PORTAL_EMBER, { name: 'Ember Portal', shape: SHAPE.PORTAL, tex: all('portal_ember'), opaque: false, solid: false,
   skyFree: true, hardness: -1, emit: 11, replaceable: true, drop: null, noItem: true, sound: 'glass' });
 TARGETABLE[B.PORTAL_EMBER] = 0;
+// ---- Crystal Realm blocks (SPEC_realms, Phase 5). The crystal pane emits crystal light 11. It is not
+// replaceable: no placed block and no liquid enters it, so only the loss of a frame block removes it.
+// Glimmer Moss specks glow (red > 0.8 in its top tile).
+defBlock(B.PORTAL_CRYSTAL, { name: 'Crystal Portal', shape: SHAPE.PORTAL, tex: all('portal_crystal'), opaque: false, solid: false,
+  skyFree: true, hardness: -1, emitCry: 11, drop: null, noItem: true, sound: 'glass' });
+TARGETABLE[B.PORTAL_CRYSTAL] = 0;
+defBlock(B.CRYSTAL_FRAME, { name: 'Crystal Frame', tex: { top: 'crystal_frame_top', bottom: 'crystal_frame_top', side: 'crystal_frame' },
+  hardness: 8, tool: 'pickaxe', sound: 'glass' });
+defBlock(B.VOIDSTONE, { name: 'Voidstone', tex: all('voidstone'), hardness: 3, tool: 'pickaxe' });
+defBlock(B.GLIMMER_MOSS, { name: 'Glimmer Moss', tex: { top: 'glimmer_moss_top', bottom: 'voidstone', side: 'glimmer_moss_side' },
+  hardness: 0.6, tool: 'shovel', drop: B.VOIDSTONE, glows: true, sound: 'grass' });
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;
