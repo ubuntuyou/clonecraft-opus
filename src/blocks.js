@@ -35,6 +35,8 @@ const B = {
   // structures (Batch 17). Id 140 is the door item, so the bricks skip it.
   COBWEB: 129, MOSSY_COBBLE: 138, STONE_BRICKS: 139, MOSSY_BRICKS: 141, CRACKED_BRICKS: 142,
   SANDSTONE: 143, CHISELED_SANDSTONE: 144, SPAWNER: 249,
+  // Ember Realm (SPEC_realms, Phase 2)
+  EMBER_ROCK: 176, ASH_SAND: 177, EMBER_LAMP: 178, EMBERITE_ORE: 179, EMBER_BRICKS: 180,
 };
 // Growth direction of each crystal variant. The crystal hangs on the cell opposite its growth.
 // Walls follow DIR4: variant 2 + k grows toward DIR4[k], like TORCH_WALL + k.
@@ -127,6 +129,7 @@ const ORE_DEFS = [
   [B.GOLD_ORE, 'Gold Ore', 'gold_ore', 3, 'RAW_GOLD', 1, 1],
   [B.RUBY_ORE, 'Ruby Ore', 'ruby_ore', 3, 'RUBY', 1, 2],
   [B.DIAMOND_ORE, 'Diamond Ore', 'diamond_ore', 4, 'DIAMOND', 1, 1],
+  [B.EMBERITE_ORE, 'Emberite Ore', 'emberite_ore', 5, 'RAW_EMBERITE', 1, 1],   // Ember Realm only
 ];
 const IS_ORE = new Set(ORE_DEFS.map((r) => r[0]));
 for (const [id, name, tile, lvl] of ORE_DEFS) defBlock(id, { name, tex: all(tile), hardness: 3, tool: 'pickaxe', minLevel: lvl });
@@ -204,6 +207,13 @@ defBlock(B.COBWEB, { name: 'Cobweb', shape: SHAPE.CROSS, tex: all('cobweb'), opa
   tool: 'sword', harvestTool: 'sword', noItem: true, sound: 'cloth' });
 defBlock(B.SPAWNER, { name: 'Monster Spawner', tex: all('spawner'), opaque: false, skyFree: true, hardness: 5, tool: 'pickaxe',
   drop: null, noItem: true, sound: 'glass' });
+// ---- Ember Realm blocks (SPEC_realms, Phase 2). Ash Sand slows walking to 40 % (player.js, ASH_SLOW).
+// An Ember Lamp emits light 15 and its bright texels glow. Emberite Ore glows too, but emits no light.
+defBlock(B.EMBER_ROCK, { name: 'Ember Rock', tex: all('ember_rock'), hardness: 0.4, tool: 'pickaxe' });
+defBlock(B.ASH_SAND, { name: 'Ash Sand', tex: all('ash_sand'), hardness: 0.5, tool: 'shovel', sound: 'sand' });
+defBlock(B.EMBER_LAMP, { name: 'Ember Lamp', tex: all('ember_lamp'), hardness: 0.3, emit: 15, glows: true, sound: 'glass' });
+defBlock(B.EMBER_BRICKS, { name: 'Ember Bricks', tex: all('ember_bricks'), hardness: 2, tool: 'pickaxe' });
+GLOWS[B.EMBERITE_ORE] = 1;
 const IS_SAPLING = (id) => id >= B.SAPLING && id < B.SAPLING + 7;
 const IS_CROP = (id) => id >= B.WHEAT && id < B.WHEAT + 4;
 const IS_FARMLAND = (id) => id === B.FARMLAND || id === B.FARMLAND_WET;
@@ -288,6 +298,7 @@ const I = {
   BUCKET: 167, WATER_BUCKET: 168, LAVA_BUCKET: 169, SEEDS: 170, WHEAT: 171, BREAD: 172, APPLE: 173, GOLDEN_APPLE: 174,
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
+  RAW_EMBERITE: 256, EMBER_DUST: 259,
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -306,8 +317,11 @@ defItem(I.GOLD, { name: 'Gold Ingot' });
 defItem(I.RUBY, { name: 'Ruby' });
 defItem(I.DIAMOND, { name: 'Diamond' });
 defItem(I.DOOR, { name: 'Door', kind: 'door', maxStack: 16 });
+defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
+defItem(I.EMBER_DUST, { name: 'Ember Dust' });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
+BLOCKS[B.EMBER_LAMP].drop = [I.EMBER_DUST, 2, 4];
 // Tool tiers. `level` is the harvest level that minLevel checks; a higher tier mines faster.
 const TIERS = [null,
   { name: 'Wooden', level: 1, speed: 2, dur: 59, mat: 'wood' },

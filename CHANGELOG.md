@@ -13,6 +13,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Ember Realm terrain (SPEC_realms.md, Phase 2): the Ember Realm is now a large cave world under a bedrock roof, with a lava sea at y 31 and below.
+  - New blocks: Ember Rock, Ash Sand, Ember Lamp, Emberite Ore, and Ember Bricks. New items: Raw Emberite and Ember Dust.
+  - Ember Lamps hang from the roof and give light 15. Emberite Ore needs a diamond pickaxe. A vein of 1 to 3 ore forms about once per 2 chunks.
+  - Ash Sand slows walking to 40 %.
+  - Unlit caves show a red-orange light floor (level 9). Red fog ends at 72 blocks. Ash flakes and glowing embers drift around the camera.
+  - A water bucket in the Ember Realm boils away with steam and a fizz. The bucket empties and places no water.
 - Realm core (SPEC_realms.md, Phase 1): the game now has three realms: the overworld, the Ember Realm, and the Crystal Realm. Only the current realm loads.
   - Each realm keeps its own block edits, chests and furnaces, homes, liquids, leaf decay, farming, vehicles, and looted chests. Dropped items wait frozen in their realm for the session.
   - A realm change shows a travel screen ("Entering the Ember Realm…") and removes all mobs. Passive overworld mobs come back on return.
@@ -20,7 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
   - The Ember Realm has a dark red sky and fog. The Crystal Realm has a violet sky with stars and a void below y 0. Below y −32 the void deals 4 damage every 0.5 s, and armor does not reduce it.
   - Weather, clouds, and fireflies show only in the overworld. The compass spins outside the overworld.
   - The save holds `realm`, `realms`, `portals`, and `boss`. An older save loads in the overworld unchanged.
-  - The new realms use flat stub terrain until Phases 2 and 5. `clonecraft.realm.travel('ember')` is the debug travel handle until the portals exist.
+  - The Crystal Realm uses flat stub terrain until Phase 5. `clonecraft.realm.travel('ember')` is the debug travel handle until the portals exist.
 - Grass spread (SPEC_expansion.md, "Grass spread"): grass grows back over exposed dirt, and covered grass turns to dirt.
   - Lit dirt next to grass (1 block to the side, from 1 below to 3 above) turns to grass after about 40 s on average. Sky light counts at night.
   - Grass under an opaque block, water, or lava turns to dirt. Darkness alone does not kill grass.

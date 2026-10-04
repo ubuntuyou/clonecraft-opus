@@ -99,23 +99,82 @@ test('dungeons: 2 to 4 rooms, solid ground under every floor, 1 spawner, support
   assert.deepEqual([...kinds].sort(), ['ladder', 'stairs']);
 });
 
-// SPEC_realms Phase 1: the stub terrain of the Ember and Crystal Realms. Phase 2 and Phase 6 replace it.
-test('realm stubs: deterministic, equal in a worker copy, and the overworld unchanged by the realm argument', () => {
+// SPEC_realms: the realm generators. Ember is Phase 2. Crystal is a stub until Phase 5.
+test('realms: deterministic, equal in a worker copy, and the overworld unchanged by the realm argument', () => {
   const Copy = new Function(`return ${WorldGenModule.toString()}`)();
-  const a = WorldGenModule(12345, K), b = Copy(12345, K);
-  for (const realm of ['ember', 'crystal']) for (const [cx, cz] of [[0, 0], [2, -1], [-3, 2], [9, 9]]) {
-    assert.equal(hashChunk(a.generateChunk(cx, cz, realm)), hashChunk(b.generateChunk(cx, cz, realm)), `${realm} ${cx},${cz}`);
+  const a = WorldGenModule(12345, K), b = Copy(12345, K), a2 = WorldGenModule(12345, K);
+  for (const realm of ['ember', 'crystal']) for (const [cx, cz] of [[0, 0], [2, -1], [-3, 2], [9, 9], [-40, 27]]) {
+    const h = hashChunk(a.generateChunk(cx, cz, realm));
+    assert.equal(h, hashChunk(b.generateChunk(cx, cz, realm)), `${realm} ${cx},${cz}: worker copy`);
+    assert.equal(h, hashChunk(a2.generateChunk(cx, cz, realm)), `${realm} ${cx},${cz}: second instance`);
   }
+  assert.notEqual(hashChunk(a.generateChunk(0, 0, 'ember')), hashChunk(WorldGenModule(999, K).generateChunk(0, 0, 'ember')));
   assert.equal(hashChunk(a.generateChunk(5, -3, 'overworld')), GOLDEN[1][2]);
-  const e = a.generateChunk(1, 1, 'ember');
   const at = (c, x, y, z) => c.blocks[(y << 8) | (z << 4) | x];
-  assert.equal(at(e, 4, 0, 4), B.BEDROCK);
-  assert.equal(at(e, 4, 40, 4), B.STONE);
-  assert.equal(at(e, 4, 41, 4), B.AIR);
-  assert.equal(at(e, 4, 124, 4), B.BEDROCK);
   const c0 = a.generateChunk(0, 0, 'crystal'), far = a.generateChunk(6, 6, 'crystal');
   assert.equal(at(c0, 0, 96, 0), B.STONE);
   assert.equal(at(c0, 0, 97, 0), B.AIR);
   assert.equal(at(c0, 0, 0, 0), B.AIR);              // the void: no bedrock floor
   assert.ok(far.blocks.every((id) => id === B.AIR));   // outside the disc
+});
+
+// Ember Realm terrain over 17 x 17 = 289 chunks (gate Phase 2, items 2 and 3).
+test('ember: bedrock shell, roof bumps to y 116, lava sea, the 4 blocks, and the Emberite vein rate', () => {
+  const W = WorldGenModule(12345, K), R = 8, N = (2 * R + 1) ** 2;
+  const count = {}, ore = new Map(), lamps = [];
+  let lowestRoof = H, open = 0, openLow = 0, lavaHigh = 0;
+  for (let cz = -R; cz <= R; cz++) for (let cx = -R; cx <= R; cx++) {
+    const c = W.generateChunk(cx, cz, 'ember'), where = `chunk ${cx}, ${cz}`;
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+      const id = (y) => c.blocks[(y << 8) | (z << 4) | x];
+      assert.equal(id(0), B.BEDROCK, `${where}: y 0`);
+      for (let y = 124; y < H; y++) assert.equal(id(y), B.BEDROCK, `${where}: roof at y ${y}`);
+      let roof = 124;
+      while (id(roof - 1) === B.BEDROCK) roof--;
+      assert.ok(roof >= 116, `${where}: the roof hangs below y 116`);
+      lowestRoof = Math.min(lowestRoof, roof);
+      for (let y = 1; y < roof; y++) {
+        const b = id(y);
+        assert.notEqual(b, B.BEDROCK, `${where}: bedrock inside at y ${y}`);
+        count[b] = (count[b] || 0) + 1;
+        if (b === B.AIR) { open++; if (y <= 31) openLow++; }
+        if (b === B.LAVA && y > 31) lavaHigh++;
+        if (b === B.EMBERITE_ORE) {
+          assert.ok(y >= 8 && y <= 110, `${where}: Emberite at y ${y}`);
+          ore.set(`${cx * CS + x},${y},${cz * CS + z}`, 1);
+        }
+        if (b === B.EMBER_LAMP) lamps.push([id(y + 1), y]);
+      }
+    }
+  }
+  assert.equal(lowestRoof, 116, 'some roof bump reaches y 116');
+  assert.equal(openLow, 0, 'every open cell at y 31 and below holds lava');
+  assert.equal(lavaHigh, 0, 'no lava above y 31');
+  assert.ok(count[B.LAVA] > N * 256, 'a lava sea: more than 1 lava cell per column');
+  assert.ok(open > N * CS * CS * 40, 'a large cave world: more than 40 open cells per column');
+  for (const id of [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE]) assert.ok(count[id] > 0, `block ${id} generates`);
+  assert.ok(count[B.EMBER_ROCK] > count[B.ASH_SAND] * 20, 'Ember Rock is the main rock');
+  assert.equal(count[B.STONE] || 0, 0, 'no overworld stone');
+  // A lamp hangs: from rock, bedrock, or another lamp.
+  for (const [up, y] of lamps) assert.ok([B.EMBER_ROCK, B.BEDROCK, B.EMBER_LAMP].includes(up), `a lamp at y ${y} hangs from ${up}`);
+  // Emberite veins: 6-connected groups of ore cells.
+  const veins = [];
+  for (const k of ore.keys()) {
+    if (ore.get(k) !== 1) continue;
+    let size = 0;
+    const q = [k];
+    ore.set(k, 2);
+    while (q.length) {
+      const [x, y, z] = q.pop().split(',').map(Number);
+      size++;
+      for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+        const n = `${x + dx},${y + dy},${z + dz}`;
+        if (ore.get(n) === 1) { ore.set(n, 2); q.push(n); }
+      }
+    }
+    veins.push(size);
+  }
+  const rate = veins.length / N;
+  assert.ok(rate >= 0.35 && rate <= 0.65, `about 1 vein per 2 chunks: ${rate.toFixed(2)}`);
+  assert.ok(veins.filter((s) => s > 3).length <= veins.length * 0.03, `veins of 1 to 3: ${veins.filter((s) => s > 3)}`);
 });

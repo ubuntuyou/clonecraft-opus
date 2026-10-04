@@ -13,7 +13,8 @@
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
  * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
- * a dark red dome, no sun, moon, stars, or clouds, and close red fog. crystal: a violet dome with
+ * a dark red dome, no sun, moon, stars, or clouds, close red fog, and a red-orange light floor
+ * (uAmbient) at block light `def.ambient`. The day sky sets uAmbient to black. crystal: a violet dome with
  * full stars, a fixed light direction, and no sun disc or clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
@@ -274,6 +275,7 @@ const sky = (() => {
     clouds.scale.set(cloudUniforms.uFar.value, 1, cloudUniforms.uFar.value);
     clouds.visible = !player.headInWater && !player.headInLava;
     const def = REALMS[realm.current];
+    terrainUniforms.uAmbient.value.setRGB(0, 0, 0);
     if (def.sky !== 'day') realmSky(def, far);
   }
 
@@ -281,6 +283,9 @@ const sky = (() => {
   const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
   const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
   const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize();
+  const EMBER_AMBIENT = C(1, 0.52, 0.32);   // the tint of the ember light floor
+  // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
+  const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
   function realmSky(def, far) {
     const ember = def.sky === 'ember';
     uniforms.uTop.value.copy(ember ? EMBER_TOP : CRYSTAL_TOP);
@@ -296,6 +301,7 @@ const sky = (() => {
     terrainUniforms.uSkyLight.value.copy(ember ? EMBER_LIGHT : CRYSTAL_LIGHT);
     terrainUniforms.uSunDir.value.copy(CRYSTAL_SUN);
     terrainUniforms.uSunAmt.value = ember ? 0 : 0.6;
+    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(EMBER_AMBIENT).multiplyScalar(curveB(def.ambient));
     if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
     const fog = terrainUniforms.uFogColor.value;
     fog.setHex(def.fog.color);

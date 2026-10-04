@@ -6,7 +6,8 @@
  *   -> unloaded (beyond renderDistance + 3; meshes disposed).
  * Realms: `world.realm` names the realm of the loaded chunks. `reset()` unloads every chunk,
  * then switches the realm and the override maps (SPEC_realms). An `onChunkUnloaded` hook
- * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air.
+ * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air. `ambient`
+ * is the realm's light floor: brightnessAt never reads below it (the shader uses uAmbient).
  * ===================================================================================== */
 import { ckey, CONFIG, CS, H, lidx, UNLOADED, VOL } from './config.js';
 import { ATTEN, B, EMIT, EMIT_CRY, LIGHT_STOP, OPAQUE, SKY_FREE, SOLID } from './blocks.js';
@@ -78,16 +79,17 @@ class World {
     this.batch = null;                   // Set of chunks to remesh while batching edits
     this.onEdit = null;                  // (x, y, z, oldId, newId) after every setBlock (liquids wake here)
     this.voidBelow = false;              // true in the Crystal Realm: a cell below y 0 is air, not bedrock
+    this.ambient = 0;                    // the realm's light floor (0..15) for brightnessAt (9 in the Ember Realm)
   }
 
   // Realm switch (SPEC_realms): unloads every chunk (each calls onChunkUnloaded), drops the
   // pending generation, and swaps in the target realm's override maps. The next update()
   // requests the chunks around the player again.
-  reset(realm, overrides, overridesByChunk, voidBelow) {
+  reset(realm, overrides, overridesByChunk, voidBelow, ambient = 0) {
     for (const c of [...this.chunks.values()]) this.unload(c);
     this.gen.setRealm(realm);
     this.overrides = overrides; this.overridesByChunk = overridesByChunk;
-    this.voidBelow = voidBelow;
+    this.voidBelow = voidBelow; this.ambient = ambient;
     this.touched.clear(); this.batch = null;
     this.lastRequest.cx = 1e9; this.center = null;
   }
@@ -126,7 +128,7 @@ class World {
   }
   // Brightness 0..1 of a cell (used to shade mobs, items, the held item).
   brightnessAt(x, y, z, daylight) {
-    const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), heldLight.levelAt(x, y, z));
+    const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), heldLight.levelAt(x, y, z), this.ambient);
     return Math.max(0.04, Math.pow(0.83, 15 - s), Math.pow(0.85, 15 - b));   // block light falls off slower (shader curveB)
   }
   surfaceY(x, z) {                       // highest solid block, or -1 if unloaded

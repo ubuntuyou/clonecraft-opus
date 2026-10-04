@@ -8,6 +8,7 @@ const terrainUniforms = {
   map: { value: atlasTexture },
   uDaylight: { value: 1 },
   uSkyLight: { value: new THREE.Color(1, 1, 1) },
+  uAmbient: { value: new THREE.Color(0, 0, 0) },                           // realm light floor (sky.js; the Ember Realm)
   uTorch: { value: 1 },
   uFogColor: { value: new THREE.Color(0.6, 0.75, 1) },
   uFogNear: { value: 80 }, uFogFar: { value: 120 },
@@ -103,7 +104,7 @@ const TERRAIN_VS = /* glsl */`
     gl_Position = projectionMatrix * mv;
   }`;
 const TERRAIN_FS = /* glsl */`
-  uniform sampler2D map; uniform float uDaylight; uniform vec3 uSkyLight; uniform float uTorch; uniform float uTime;
+  uniform sampler2D map; uniform float uDaylight; uniform vec3 uSkyLight; uniform vec3 uAmbient; uniform float uTorch; uniform float uTime;
   uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar; uniform vec3 uSunDir; uniform float uSunAmt; uniform float uGlow;
   uniform highp sampler2DShadow uShadowMap; uniform mat4 uShadowMat; uniform float uShadowOn; uniform float uShadowBias; uniform float uShadowTexel;
   uniform sampler2D uCaus; uniform sampler2D uRipple;
@@ -214,7 +215,7 @@ const TERRAIN_FS = /* glsl */`
     float blk = curveB(max(vLight.y, held)) * uTorch;
     vec3 light = max(sky * uSkyLight, blk * vec3(1.0, 0.86, 0.64));
     light = max(light, curveB(vCry) * vec3(0.3, 0.92, 0.86));                              // crystal light: soft turquoise
-    light = max(light, vec3(0.018));
+    light = max(light, max(uAmbient, vec3(0.018)));                                      // the realm floor, then the minimum
     float ao = mix(0.42, 1.0, vLight.z);
     col *= light * ao * vLight.w;
     #ifndef WATER

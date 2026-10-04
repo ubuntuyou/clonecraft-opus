@@ -268,6 +268,11 @@ The save keeps the overworld slice in the old top-level fields, so an old save l
 A worker can still hold a chunk of the old realm at the switch. `GenService.setRealm` starts a new epoch, and `_done` drops a result from an older epoch. Without the epoch, a late overworld chunk could enter the Ember Realm.
 State 'travel' stops the simulation while the target loads, as 'loading' does at boot. Damage, Esc, and the inventory keys do nothing in that state, so no screen can interrupt the switch.
 
+### D48. The Ember Realm is a density field with its own seeds; its light floor lives in two places
+
+`emberChunk` in `worldgen.js` builds the Ember Realm from a 3D density field: two simplex octaves, a floor height, and a ceiling height. The field is sampled on a 4×4×4 grid and interpolated, so one chunk costs about 1.2 ms. Every ember noise takes its own seed (`SEED ^ 0xe3be5`), never `S()`. So the overworld noise sequence, and its golden hashes, do not change.
+The bedrock roof keeps sky light at 0 in the whole realm. The realm needs a light floor instead, so unlit caves are not black. The floor is `REALMS.ember.ambient` (block light level 9). It applies in two places, and both read the same number. `sky.js` sets the terrain uniform `uAmbient` (curveB of the level, tinted red-orange). `world.brightnessAt` never returns less than the level, so mobs, drops, particles, and the held item match the terrain. `realm.enter` copies the level into `world.ambient`.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.

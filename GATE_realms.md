@@ -48,15 +48,24 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 2: Ember Realm terrain
 
-- [ ] The same seed gives the same Ember Realm chunks. A worker instance equals the main-thread instance. (Node test.)
-- [ ] Bedrock at y 0 and from y 124 up; the roof hangs down to y 116 in bumps. Open cells at y 31 and below hold lava. (Node scan.)
-- [ ] Ember Rock, Ash Sand, Ember Lamps, and Emberite Ore generate. Emberite: about 1 vein per 2 chunks, veins of 1–3, y 8 to 110. (Node scan over 289 chunks.)
-- [ ] Each new block breaks with its tool at its spec hardness and drops its spec item. Emberite Ore drops nothing to a ruby pickaxe and Raw Emberite to a diamond pickaxe.
-- [ ] Ash Sand slows walking to 40 %.
-- [ ] An Ember Lamp lights its area at level 15. An unlit cave shows the red-orange ambient floor, not black. (Screenshots.)
-- [ ] Red fog ends at 72 blocks at render distance 8. Ash particles drift around the camera. (Screenshots.)
-- [ ] A water bucket in the Ember Realm makes steam and a hiss, empties, and places no water.
-- [ ] The realm looks right: a large cave world with a lava sea, glowing lamps, and no sky. (Screenshots.)
+- [x] The same seed gives the same Ember Realm chunks. A worker instance equals the main-thread instance. (Node test.)
+  Note (Phase 2): `tests/worldgen.test.js` checks 5 ember chunks against a second instance and a worker copy. A different seed differs. The overworld golden hashes still pass.
+- [x] Bedrock at y 0 and from y 124 up; the roof hangs down to y 116 in bumps. Open cells at y 31 and below hold lava. (Node scan.)
+  Note (Phase 2): The 17×17 chunk scan finds bedrock at y 0 and y 124+ in every column, a lowest roof of exactly y 116, no air at y ≤ 31, and no lava above y 31.
+- [x] Ember Rock, Ash Sand, Ember Lamps, and Emberite Ore generate. Emberite: about 1 vein per 2 chunks, veins of 1–3, y 8 to 110. (Node scan over 289 chunks.)
+  Note (Phase 2): The 289-chunk scan finds all 4 blocks and no stone. Emberite: 141 veins, 0.49 per chunk (sizes: 49 of 1, 53 of 2, 39 of 3), all at y 8..110.
+- [x] Each new block breaks with its tool at its spec hardness and drops its spec item. Emberite Ore drops nothing to a ruby pickaxe and Raw Emberite to a diamond pickaxe.
+  Note (Phase 2): `tests/blocks.test.js` checks the hardness, the tool, and the drop of each block. Lamp dust is 2..4 over 200 draws. Emberite gives Infinity (no drop) to a ruby pickaxe and Raw Emberite to a diamond pickaxe.
+- [x] Ash Sand slows walking to 40 %.
+  Note (Phase 2): Playwright, a held W key on built strips: 4.33 blocks/s on Ember Rock, 1.70 on Ash Sand. The ratio is 0.394.
+- [x] An Ember Lamp lights its area at level 15. An unlit cave shows the red-orange ambient floor, not black. (Screenshots.)
+  Note (Phase 2): The lamp cell at (13, 46, 11) reads light 15; the cells below read 14, 13, 12, 11, 10, 9. Screenshots show the lit lamp cluster and red-orange unlit rock. The ambient level is 9, not the spec's first 6: level 6 read near-black on screenshots. SPEC_realms now says 9.
+- [x] Red fog ends at 72 blocks at render distance 8. Ash particles drift around the camera. (Screenshots.)
+  Note (Phase 2): At render distance 8, `scene.fog.far` and `uFogFar` read 72 (near 21.6), color 0x4a1409. Screenshots show grey flakes and orange embers. Samples 1 s apart show a flake moved; the pool stays within 20 blocks across and 12 up and down. Ash hides in the overworld.
+- [x] A water bucket in the Ember Realm makes steam and a hiss, empties, and places no water.
+  Note (Phase 2): Playwright: `useItem` with a water bucket aimed at the floor made 34 steam particles and 1 fizz. The slot became an empty bucket, and no water block appeared nearby. The same bucket placed water at (-540, 77, 196) in the overworld.
+- [x] The realm looks right: a large cave world with a lava sea, glowing lamps, and no sky. (Screenshots.)
+  Note (Phase 2): Wide screenshots from (-67, 42, 24) show the lava sea, rock islands, the cave roof, hanging lamps, red fog, and no sky. Reload, overworld round trip, and return keep ambient 9, the fog, and the ash. 0 console errors and 0 warnings.
 
 ## Phase 3: Ember portal
 

@@ -8,7 +8,7 @@
 // In Chrome and Brave (Joe's report), a lock taken on the Esc keydown ends at once.
 // An unlock within 300 ms of a soft lock shows #resume, not the pause screen.
 import {
-  BOB_RATE, clamp, CLIMB_V, CONFIG, EYE, FLY_SPEED, FLY_V, GRAVITY, JUMP_V, LEAF_SPEED, randRange,
+  BOB_RATE, clamp, CLIMB_V, CONFIG, EYE, FLY_SPEED, FLY_V, GRAVITY, JUMP_V, LEAF_SPEED, ASH_SPEED, randRange,
   SPRINT_MULT, WALK_SPEED,
 } from './config.js';
 import { B, BLOCKS, CLIMB, enchLevel, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_WATER } from './blocks.js';
@@ -156,6 +156,7 @@ function updatePlayer(dt) {
   p.climbing = !p.flying && !riding && touchesAny(p, CLIMB);
   p.sinking = game.state === 'playing' && !riding && keyDown('ShiftLeft', 'ShiftRight');
   if (!p.flying && touchesAny(p, IS_LEAF)) speed *= LEAF_SPEED;
+  if (!p.flying && p.onGround && world.getBlock(Math.floor(p.pos.x), Math.floor(p.pos.y - 0.05), Math.floor(p.pos.z)) === B.ASH_SAND) speed *= ASH_SPEED;
   const swim = p.inWater || p.inLava;
   const accel = p.flying ? 7 : p.onGround ? 16 : swim ? 6 : 5;
   const a = 1 - Math.exp(-accel * dt);

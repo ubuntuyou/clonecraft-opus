@@ -45,7 +45,7 @@ import { weather } from './order.js';
 // { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
 const REALMS = {
   overworld: { name: 'overworld', label: 'the Overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
-  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 6, fog: { color: 0x2e0a05, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
+  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
   crystal: { name: 'crystal', label: 'the Crystal Realm', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
 };
 const SLICE_FIELDS = ['edits', 'te', 'homes', 'liquids', 'leaves', 'farm', 'vehicles', 'looted'];
@@ -134,7 +134,7 @@ const realm = {
   // Makes a stash live: resets the world to its override maps and loads the other modules.
   enter(s) {
     const def = REALMS[this.current];
-    world.reset(def.name, s.overrides, s.overridesByChunk, def.voidBelow);
+    world.reset(def.name, s.overrides, s.overridesByChunk, def.voidBelow, def.ambient);
     for (const m of mobs) m.remove();
     mobs.length = 0;
     for (const [k, id] of world.overrides) {

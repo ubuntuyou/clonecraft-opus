@@ -11,6 +11,7 @@ const PLAYER_W = 0.6, PLAYER_H = 1.8, EYE = 1.62;
 const WALK_SPEED = 4.317, SPRINT_MULT = 1.5;
 const GRAVITY = 32, JUMP_V = 8.7;
 const CLIMB_V = 3, LEAF_SPEED = 0.6, LEAF_CATCH_V = 10;   // climbing m/s; walk speed factor inside leaves; fall speed a canopy top lets in
+const ASH_SPEED = 0.4;   // walk speed factor on Ash Sand (the Ember Realm)
 const FLY_SPEED = 10.9, FLY_V = 7.5;        // flight: horizontal (x2 when sprinting) and vertical m/s
 const BOB_RATE = 0.6;                       // walk-bob cycles per block walked (one footstep per cycle)
 const MAX_HOSTILE = 18, MAX_PASSIVE = 40, MAX_ANIMALS_PER_CHUNK = 4;
@@ -91,7 +92,7 @@ function setGlowGain(v) { glowGain = v; }
 
 export {
   BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
-  LEAF_CATCH_V, LEAF_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
+  LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
   PLAYER_W, randInt, randRange, REACH, SAVE, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
   storage, UNLOADED, VOID_Y, VOL, WALK_SPEED,
 };

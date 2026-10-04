@@ -63,7 +63,8 @@
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
  *      by biome and height pools, lightning, the rain loop; weather.dim scales game.daylight (clearDaylight keeps
- *      the clock); fireflies (dusk to dawn over grass in plains, forest, and rainforest)
+ *      the clock); fireflies (dusk to dawn over grass in plains, forest, and rainforest);
+ *      ash (flakes and embers around the camera in the Ember Realm)
  *  18. Start and frame loop: boot (spawn search, start), shadows (sun or moon shadow map,
  *      G3), held-light (a held torch flood-fills light into a 32^3 texture, G4), post (bloom,
  *      light shafts), main (frame loop, window.clonecraft)
@@ -124,6 +125,7 @@ export { realm, REALMS } from './realms.js';
 import './sky.js';
 export { weather } from './weather.js';
 import './fireflies.js';
+import './ash.js';
 import './boot.js';
 import './shadows.js';
 export { heldLight } from './held-light.js';

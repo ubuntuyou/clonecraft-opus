@@ -23,7 +23,7 @@ import { keyDown } from './player.js';
 import { cellBlockedByEntity, stairBoxesAt } from './collision.js';
 import {
   farming, spawnDrop, viewModel, dropStack, inv, spillTileEntity, openInventory, mobs, vehicles, projectiles,
-  primeTnt, particles, audio, hud,
+  primeTnt, particles, audio, hud, realm,
 } from './order.js';
 
 const SEL_BOX = [];
@@ -486,6 +486,7 @@ function useItem() {
 
 // An empty bucket takes the source the eye ray meets first. A full bucket places its source in
 // the cell on the clicked face (or in a replaceable target cell) and becomes an empty bucket.
+// In the Ember Realm, water boils away: steam and a fizz, an empty bucket, and no water block.
 function useBucket(item) {
   camera.getWorldDirection(_dir);
   const p = camera.position;
@@ -506,6 +507,12 @@ function useBucket(item) {
   if (y < 0 || y >= H) return;
   const cur = world.getBlock(x, y, z);
   if (cur === UNLOADED || !REPLACEABLE[cur] || cur === item.liquid) return;
+  if (item.liquid === B.WATER && realm.current === 'ember') {
+    particles.steam(x, y, z); audio.fizz(x + 0.5, y + 0.5, z + 0.5);
+    inv.slots[inv.sel] = { id: I.BUCKET, count: 1 };
+    inv.changed(); interacted();
+    return;
+  }
   if (!world.setBlock(x, y, z, item.liquid)) return;
   inv.slots[inv.sel] = { id: I.BUCKET, count: 1 };
   inv.changed(); audio.splash(); interacted();

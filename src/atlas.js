@@ -350,6 +350,60 @@ function paintBricks(P, rng) {
 paintTile('mossy_cobble', (P, rng) => { P.copy('cobble'); paintMoss(P, rng, 0.4); });
 paintTile('stone_bricks', paintBricks);
 paintTile('mossy_bricks', (P, rng) => { paintBricks(P, rng); paintMoss(P, rng, 0.35); });
+// ---- Ember Realm tiles (SPEC_realms, Phase 2). Only the lamp and the ore flecks reach red > 0.8
+// (204), so only they glow; the rock, ash, and bricks keep red below 204.
+function paintEmberRock(P, rng) {
+  const n = tileNoise(rng, 1), m = tileNoise(rng, 2);
+  P.fill((x, y) => {
+    const k = y * 16 + x;
+    let c = mix3([70, 22, 18], [118, 42, 30], n[k] + (rng() - 0.5) * 0.25);
+    if (m[k] > 0.8) c = shade(c, 0.72);
+    else if (m[k] < 0.1) c = [156, 62, 36];   // a hot vein
+    P.set(x, y, c);
+  });
+}
+paintTile('ember_rock', paintEmberRock);
+paintTile('ash_sand', (P, rng) => {
+  const n = tileNoise(rng, 1);
+  P.fill((x, y) => {
+    let c = mix3([82, 74, 72], [124, 114, 108], n[y * 16 + x]);
+    const r = rng();
+    if (r < 0.08) c = [56, 50, 50];
+    else if (r < 0.1) c = [150, 82, 52];   // a dull ember
+    P.set(x, y, shade(c, 0.95 + rng() * 0.1));
+  });
+});
+// Ember Lamp: hot cells (yellow at the center, orange at the rim) in dark crimson seams.
+paintTile('ember_lamp', (P, rng) => {
+  const vor = tileVoronoi(rng, 7);
+  P.fill((x, y) => {
+    const k = y * 16 + x, e = vor.edge[k];
+    if (e < 0.9) { P.set(x, y, mix3([70, 18, 10], [120, 36, 16], rng())); return; }
+    const t = clamp((e - 0.9) / 3.2 + (rng() - 0.5) * 0.2, 0, 1);
+    P.set(x, y, mix3([236, 110, 30], [255, 224, 130], t));
+  });
+});
+paintTile('emberite_ore', (P, rng) => {
+  paintEmberRock(P, rng);
+  const C = [[255, 178, 64], [222, 108, 34], [255, 232, 160]];
+  for (let c = 0; c < 4; c++) {
+    const cx = 2 + Math.floor(rng() * 12), cy = 2 + Math.floor(rng() * 12);
+    P.set(cx, cy, [40, 10, 8]); P.set(cx + 1, cy + 1, [40, 10, 8]);   // a dark socket under each fleck
+    for (let i = 0; i < 4; i++) P.set(cx + Math.floor(rng() * 2), cy + Math.floor(rng() * 2) - 1, C[Math.floor(rng() * 3)]);
+  }
+});
+// Ember Bricks: stone-brick layout in deep red with dark mortar and a lit top-left edge.
+paintTile('ember_bricks', (P, rng) => {
+  const n = tileNoise(rng, 1);
+  P.fill((x, y) => {
+    const row = y >> 3, jx = row ? 8 : 0, ly = y & 7, lx = (x - jx) & 15;
+    let c = mix3([88, 26, 22], [122, 38, 28], n[y * 16 + x] + (rng() - 0.5) * 0.2);
+    if (ly === 7 || lx === 0) c = [34, 10, 10];
+    else if (ly === 0 || lx === 1) c = [150, 58, 40];
+    else if (ly === 6 || lx === 15) c = shade(c, 0.78);
+    P.set(x, y, c);
+  });
+});
 paintTile('cracked_bricks', (P, rng) => {
   paintBricks(P, rng);
   for (let c = 0; c < 3; c++) {   // cracks: short random walks in dark gray
@@ -954,6 +1008,20 @@ ITEM_PIX[I.BOW] = pixArt((set) => {
 ITEM_PIX[I.MAGMA_CORE] = blobPix([[110, 24, 8], [214, 84, 18], [255, 196, 70]], 8, 8, 5.2, 5.2, (set, r) => {
   for (let i = 0; i < 6; i++) set(5 + (r() * 6 | 0), 5 + (r() * 6 | 0), [60, 16, 8]);
   set(7, 7, [255, 240, 170]); set(8, 7, [255, 240, 170]);
+});
+// Ember Realm items (SPEC_realms, Phase 2): a dark red nugget with gold flecks, and a heap of glowing dust.
+ITEM_PIX[I.RAW_EMBERITE] = blobPix([[60, 16, 14], [120, 38, 28], [176, 70, 44]], 8, 8.5, 5, 4.4, (set, r) => {
+  for (let i = 0; i < 6; i++) set(5 + (r() * 6 | 0), 6 + (r() * 5 | 0), i & 1 ? [255, 178, 64] : [255, 226, 150]);
+});
+ITEM_PIX[I.EMBER_DUST] = pixArt((set) => {
+  const rng = mulberry32(0xe3b);
+  for (let y = 7; y < 14; y++) for (let x = 2; x < 14; x++) {
+    const dx = (x + 0.5 - 8) / 6, dy = (y + 0.5 - 13.5) / 6.2;
+    if (dx * dx + dy * dy > 1 || rng() < 0.12) continue;
+    const t = 1 - (y - 7) / 7;
+    set(x, y, rng() < 0.2 ? [255, 236, 160] : t > 0.5 ? [255, 168, 56] : [214, 84, 24]);
+  }
+  for (const [x, y] of [[4, 5], [11, 4], [8, 3], [13, 6]]) set(x, y, [255, 196, 90]);
 });
 // Travel icons (Batch 16): a boat and a minecart from the side, a compass from above.
 ITEM_PIX[I.BOAT] = pixArt((set) => {

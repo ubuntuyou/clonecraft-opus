@@ -223,6 +223,13 @@ const particles = (() => {
           { color: [g, g, g], life: randRange(0.5, 1), size: randRange(0.12, 0.22), grow: 0.1, grav: -0.3, drag: 2, flags: 4 });
       }
     },
+    steam(x, y, z) {   // water boils away in the Ember Realm: a tall white plume
+      for (let i = 0; i < 34; i++) {
+        const g = randRange(0.8, 1);
+        emit(x + randRange(0.15, 0.85), y + randRange(0, 0.6), z + randRange(0.15, 0.85), randRange(-0.35, 0.35), randRange(0.8, 2), randRange(-0.35, 0.35),
+          { color: [g, g, g], life: randRange(0.9, 1.8), size: randRange(0.15, 0.28), grow: 0.3, grav: -0.5, drag: 1.2, flags: 4 });
+      }
+    },
     fire(x, y, z, w = 0.6) {
       emit(x + randRange(-w, w) / 2, y, z + randRange(-w, w) / 2, 0, randRange(0.4, 1), 0,
         { color: Math.random() < 0.5 ? [1, 0.75, 0.25] : [1, 0.4, 0.08], life: randRange(0.25, 0.5), size: randRange(0.1, 0.18), grav: -0.5, drag: 1, flags: 6 });

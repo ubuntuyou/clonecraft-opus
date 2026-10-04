@@ -63,7 +63,7 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
   - Ember Lamp: clusters that hang from the roof and from ledges. It emits block light 15. It drops 2–4 Ember Dust; a pickaxe is not needed.
   - Emberite Ore: veins of 1–3 in Ember Rock at y 8 to 110, about 1 vein per 2 chunks. It needs a diamond pickaxe and drops Raw Emberite.
   - Ember Bricks: the fortress block. Hardness 2, pickaxe.
-- Light: no sky light reaches inside. An ambient floor of level 6, tinted red-orange, keeps unlit caves visible. Lava and Ember Lamps give block light.
+- Light: no sky light reaches inside. An ambient floor of level 9, tinted red-orange, keeps unlit caves visible. (Phase 2 raised it from 6: level 6 read as near-black on screenshots.) Lava and Ember Lamps give block light.
 - Fog is dark red and ends at 72 blocks or the render distance, whichever is nearer. Ash particles drift in the air around the camera.
 - Water: a water bucket used in the Ember Realm makes steam particles and a hiss. The bucket empties, and no water appears. Ice and snow do not exist there.
 - Hostile spawns ignore day and night. A mob spawns where block light is 11 or less. Weights: Magma Brute 35 %, Ember Wisp 45 %, Cinder Knight 20 % (Cinder Knights spawn only inside fortress bounds).

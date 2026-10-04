@@ -4,7 +4,7 @@ import './host-stub.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ARMOR_PIECES, ARMOR_TIERS, armorId, B, BLOCKS, I, IDS_VERSION, ITEMS, migrateIds } from '../src/blocks.js';
+import { ARMOR_PIECES, ARMOR_TIERS, armorId, B, blockDrop, BLOCKS, breakTime, I, IDS_VERSION, ITEMS, migrateIds, toolId } from '../src/blocks.js';
 import { UNLOADED } from '../src/config.js';
 
 const bIds = Object.values(B), iIds = Object.values(I);
@@ -37,10 +37,45 @@ test('armor ids are 300..323 and follow 300 + 4 * tier + piece', () => {
   assert.equal(Math.min(...ids), 300);
   assert.equal(Math.max(...ids), 323);
 });
-test('ids 176..199 hold no block and no item', () => {
+// Ids 176..186 are the realm blocks; each phase adds its own. 181..199 stay empty until then.
+test('ids 176..199 hold only the realm blocks and their block items', () => {
+  const realm = [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE, B.EMBER_BRICKS];
   const used = [];
   for (let id = 176; id <= 199; id++) if (BLOCKS[id] || ITEMS[id]) used.push(id);
-  assert.deepEqual(used, []);
+  assert.deepEqual(used, realm);
+  for (const id of realm) assert.equal(ITEMS[id].kind, 'block');
+});
+
+// SPEC_realms Phase 2 (gate item 4): tool, hardness, and drop of each Ember Realm block.
+test('Ember Realm blocks: tools, hardness, and drops', () => {
+  const pick = (tier) => ({ id: toolId('pickaxe', tier), count: 1 }), shovel = { id: toolId('shovel', 7), count: 1 };
+  const spec = [[B.EMBER_ROCK, 0.4, 'pickaxe'], [B.ASH_SAND, 0.5, 'shovel'], [B.EMBER_LAMP, 0.3, null],
+    [B.EMBERITE_ORE, 3, 'pickaxe'], [B.EMBER_BRICKS, 2, 'pickaxe']];
+  for (const [id, hardness, tool] of spec) {
+    assert.equal(BLOCKS[id].hardness, hardness, BLOCKS[id].name);
+    assert.equal(BLOCKS[id].tool, tool, BLOCKS[id].name);
+  }
+  assert.deepEqual(blockDrop(B.EMBER_ROCK), [B.EMBER_ROCK, 1]);
+  assert.deepEqual(blockDrop(B.ASH_SAND), [B.ASH_SAND, 1]);
+  assert.deepEqual(blockDrop(B.EMBER_BRICKS), [B.EMBER_BRICKS, 1]);
+  assert.deepEqual(blockDrop(B.EMBERITE_ORE), [I.RAW_EMBERITE, 1]);
+  for (let k = 0; k < 200; k++) {
+    const [item, n] = blockDrop(B.EMBER_LAMP);
+    assert.equal(item, I.EMBER_DUST);
+    assert.ok(n >= 2 && n <= 4);
+  }
+  // A pickaxe mines the rock faster than a hand. A shovel mines ash faster.
+  assert.ok(breakTime(B.EMBER_ROCK, pick(1)) < breakTime(B.EMBER_ROCK, null));
+  assert.ok(breakTime(B.ASH_SAND, shovel) < breakTime(B.ASH_SAND, null));
+  // The lamp needs no tool: a hand takes the harvest rate (1.5 x hardness).
+  assert.equal(breakTime(B.EMBER_LAMP, null), 0.3 * 1.5);
+  // Emberite Ore: a ruby pickaxe (level 4) cannot break it, so nothing drops; a diamond pickaxe can.
+  assert.equal(breakTime(B.EMBERITE_ORE, pick(6)), Infinity);
+  assert.equal(breakTime(B.EMBERITE_ORE, null), Infinity);
+  assert.ok(Number.isFinite(breakTime(B.EMBERITE_ORE, pick(7))));
+  assert.equal(BLOCKS[B.EMBER_LAMP].emit, 15);
+  assert.equal(ITEMS[I.RAW_EMBERITE].name, 'Raw Emberite');
+  assert.equal(ITEMS[I.EMBER_DUST].name, 'Ember Dust');
 });
 
 // The fixture is a real save from the build before Phase 0 (HEAD c40ebc4, seed 12345). It holds

@@ -5,7 +5,8 @@
  * The game serializes it with Function.prototype.toString() into Blob Web Workers, and
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
  * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
- * default), 'ember', or 'crystal'. The ember and crystal generators are flat stubs (SPEC_realms Phase 1).
+ * default), 'ember', or 'crystal'. emberChunk builds the Ember Realm cave world (SPEC_realms Phase 2).
+ * The crystal generator is a flat stub until Phase 5.
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -911,31 +912,131 @@ function WorldGenModule(SEED, K) {
     return { blocks, biomes, heights, features };
   }
 
-  // ---------------------------------------------------------------- realm stubs (SPEC_realms Phase 1)
-  // Ember: bedrock at y 0 and from y 124 up, stone from y 1 to 40, air between. Phase 2 replaces it.
-  // Crystal: one stone disc of radius 44 at the origin, y 90 to 96, over a void. Phase 5 replaces it.
-  const EMBER_FLOOR = 40, EMBER_ROOF = 124, CRYSTAL_TOP = 96, CRYSTAL_R = 44;
-  function stubChunk(cx, cz, realm) {
+  // ---------------------------------------------------------------- Ember Realm (SPEC_realms Phase 2)
+  // An enclosed cave world. y 0 is bedrock. The bedrock roof fills y 124 up and hangs down to
+  // y 116 in bumps. Between them, a density field carves the caves: 3D noise plus a pull to rock
+  // under a floor height and over a ceiling height (2D noise each). The field is sampled on a
+  // 4-block grid and interpolated. Open cells at y 31 and below hold lava (the lava sea).
+  // Ash Sand covers floor patches near the sea. Ember Lamps hang in clusters from ceilings.
+  // Emberite Ore: about 1 vein per 2 chunks, 1..3 cells, y 8..110, only in Ember Rock.
+  // The noises take their own seeds: a new S() call would change every overworld noise.
+  const EMBER_ROOF = 124, EMBER_HANG = 8, EMBER_SEA = 31, EG = 4, EGY = EMBER_ROOF / EG;
+  const EN = (k) => Simplex(hash3(SEED ^ 0xe3be5, k, 77));
+  const EA = EN(1), EB = EN(2), EF = EN(3), EC = EN(4), ER = EN(5), EP = EN(6);
+  // Density at one point: > 0 is rock.
+  function emberSample(x, y, z) {
+    const floor = 20 + fbm(EF, x / 90, z / 90, 2) * 18, ceil = 106 + fbm(EC, x / 80, z / 80, 2) * 22;
+    let d = EA.n3(x / 64, y / 40, z / 64) * 0.62 + EB.n3(x / 22, y / 16, z / 22) * 0.3 - 0.1;
+    if (y < floor) d += (floor - y) / 5;
+    if (y > ceil) d += (y - ceil) / 7;
+    return d;
+  }
+  // The interpolated density at cell (x, y, z), as emberChunk computes it. For cells off the chunk.
+  function emberDensity(x, y, z) {
+    const gx = Math.floor(x / EG), gy = y >> 2, gz = Math.floor(z / EG);
+    const fx = (x - gx * EG) / EG, fy = (y & 3) / EG, fz = (z - gz * EG) / EG;
+    const c = (i, j, k) => emberSample((gx + i) * EG, (gy + j) * EG, (gz + k) * EG);
+    return lerp(lerp(lerp(c(0, 0, 0), c(1, 0, 0), fx), lerp(c(0, 0, 1), c(1, 0, 1), fx), fz),
+      lerp(lerp(c(0, 1, 0), c(1, 1, 0), fx), lerp(c(0, 1, 1), c(1, 1, 1), fx), fz), fy);
+  }
+  // Bedrock bump of column (x, z): 0..EMBER_HANG cells below the roof.
+  const emberBump = (x, z) => Math.floor(smoothstep(0.05, 0.75, ER.n2(x / 16, z / 16) * 0.75 + ER.n2(x / 5, z / 5) * 0.25) * (EMBER_HANG + 0.99));
+
+  function emberChunk(cx, cz) {
+    const x0 = cx * CS, z0 = cz * CS;
+    const blocks = new Uint8Array(CS * CS * H), biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
+    const idx = (x, y, z) => (y << 8) | (z << 4) | x;
+    // 1. density grid: (CS / EG + 1)^2 columns of EGY + 1 samples
+    const NG = CS / EG + 1, NY = EGY + 1, grid = new Float32Array(NG * NG * NY);
+    for (let gz = 0; gz < NG; gz++) for (let gx = 0; gx < NG; gx++) for (let gy = 0; gy < NY; gy++)
+      grid[(gz * NG + gx) * NY + gy] = emberSample(x0 + gx * EG, gy * EG, z0 + gz * EG);
+    const g = (gx, gy, gz) => grid[(gz * NG + gx) * NY + gy];
+    // 2. rock, lava, air, and bedrock
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+      const gx = x >> 2, gz = z >> 2, fx = (x & 3) / EG, fz = (z & 3) / EG, roof = EMBER_ROOF - emberBump(x0 + x, z0 + z);
+      for (let y = 0; y < H; y++) {
+        let id;
+        if (y === 0 || y >= roof) id = B.BEDROCK;
+        else {
+          const gy = y >> 2, fy = (y & 3) / EG;
+          const d = lerp(lerp(lerp(g(gx, gy, gz), g(gx + 1, gy, gz), fx), lerp(g(gx, gy, gz + 1), g(gx + 1, gy, gz + 1), fx), fz),
+            lerp(lerp(g(gx, gy + 1, gz), g(gx + 1, gy + 1, gz), fx), lerp(g(gx, gy + 1, gz + 1), g(gx + 1, gy + 1, gz + 1), fx), fz), fy);
+          id = d > 0 ? B.EMBER_ROCK : y <= EMBER_SEA ? B.LAVA : B.AIR;
+        }
+        blocks[idx(x, y, z)] = id;
+      }
+    }
+    // 3. Ash Sand: a floor cell at y 32..44 (rock under air) in an ash patch turns to ash, 1..3 deep
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+      const wx = x0 + x, wz = z0 + z;
+      if (EP.n2(wx / 26, wz / 26) + EP.n2(wx / 7, wz / 7) * 0.25 < 0.12) continue;
+      for (let y = EMBER_SEA + 1; y <= EMBER_SEA + 13; y++) {
+        if (blocks[idx(x, y, z)] !== B.EMBER_ROCK || blocks[idx(x, y + 1, z)] !== B.AIR) continue;
+        const deep = 1 + Math.floor(hashF(SEED ^ 0xa54, wx, wz) * 3);
+        for (let k = 0; k < deep && blocks[idx(x, y - k, z)] === B.EMBER_ROCK; k++) blocks[idx(x, y - k, z)] = B.ASH_SAND;
+      }
+    }
+    // 4. Ember Lamps: patch centres from the 3x3 chunk neighbourhood. An air cell near a centre
+    //    under a ceiling (rock or bedrock) takes a lamp when a world hash passes. A lamp may drip:
+    //    the air cell under a lamp takes one more on a second hash. Top-down, so drips chain.
+    const LAMP_PATCHES = 3, LAMP_DENSITY = 0.75, LAMP_DRIP = 0.45;
+    const ceilAt = (i) => blocks[i] === B.EMBER_ROCK || blocks[i] === B.BEDROCK;
+    for (let ncz = cz - 1; ncz <= cz + 1; ncz++) for (let ncx = cx - 1; ncx <= cx + 1; ncx++) {
+      const r = mulberry32(hash3(SEED ^ 0x1a3b, ncx, ncz));
+      for (let n = 0; n < LAMP_PATCHES; n++) {
+        const px = ncx * CS + Math.floor(r() * CS), py = 44 + Math.floor(r() * 76), pz = ncz * CS + Math.floor(r() * CS);
+        const R = 4 + Math.floor(r() * 3);
+        for (let y = Math.min(EMBER_ROOF - 1, py + R); y >= Math.max(EMBER_SEA + 2, py - R); y--)
+          for (let lz = Math.max(0, pz - R - z0); lz <= Math.min(CS - 1, pz + R - z0); lz++)
+            for (let lx = Math.max(0, px - R - x0); lx <= Math.min(CS - 1, px + R - x0); lx++) {
+              const wx = x0 + lx, wz = z0 + lz, d = Math.hypot(wx - px, y - py, wz - pz), i = idx(lx, y, lz);
+              if (d > R || blocks[i] !== B.AIR) continue;
+              const up = idx(lx, y + 1, lz);
+              if (ceilAt(up) ? hashF(SEED ^ 0x1a4c, wx * 31 + y, wz) < LAMP_DENSITY * (1 - d / (R + 1))
+                : blocks[up] === B.EMBER_LAMP && hashF(SEED ^ 0x1a5d, wx, y * 131 + wz) < LAMP_DRIP) blocks[i] = B.EMBER_LAMP;
+            }
+      }
+    }
+    // 5. Emberite Ore: a neighbour chunk holds a vein 1 time in 2. The start is the first of
+    //    8 tries that the density field calls rock. The vein walks 1..3 cells and takes only
+    //    Ember Rock cells of this chunk.
+    for (let ncz = cz - 1; ncz <= cz + 1; ncz++) for (let ncx = cx - 1; ncx <= cx + 1; ncx++) {
+      const r = mulberry32(hash3(SEED ^ 0xe3b0, ncx, ncz));
+      if (r() >= 0.5) continue;
+      let x = 0, y = 0, z = 0, ok = false;
+      for (let t = 0; t < 8 && !ok; t++) {
+        x = ncx * CS + Math.floor(r() * CS); y = 8 + Math.floor(r() * 103); z = ncz * CS + Math.floor(r() * CS);
+        ok = emberDensity(x, y, z) > 0;
+      }
+      if (!ok) continue;
+      const size = 1 + Math.floor(r() * 3);
+      for (let s = 0; s < size; s++) {
+        const lx = x - x0, lz = z - z0;
+        if (lx >= 0 && lx < CS && lz >= 0 && lz < CS && blocks[idx(lx, y, lz)] === B.EMBER_ROCK) blocks[idx(lx, y, lz)] = B.EMBERITE_ORE;
+        const d = Math.floor(r() * 6);
+        if (d === 0) x++; else if (d === 1) x--; else if (d === 2) z++; else if (d === 3) z--; else if (d === 4 && y < 110) y++; else if (y > 8) y--;
+      }
+    }
+    heights.fill(H - 1);   // the roof tops every column
+    return { blocks, biomes, heights, features: [] };
+  }
+
+  // ---------------------------------------------------------------- crystal stub (SPEC_realms Phase 1)
+  // One stone disc of radius 44 at the origin, y 90 to 96, over a void. Phase 5 replaces it.
+  const CRYSTAL_TOP = 96, CRYSTAL_R = 44;
+  function stubChunk(cx, cz) {
     const blocks = new Uint8Array(CS * CS * H);
     const biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
     for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
-      let top = 0;
-      if (realm === 'ember') {
-        for (let y = 0; y < H; y++) blocks[(y << 8) | (z << 4) | x] = y === 0 || y >= EMBER_ROOF ? B.BEDROCK : y <= EMBER_FLOOR ? B.STONE : B.AIR;
-        top = H - 1;
-      } else {
-        const wx = cx * CS + x, wz = cz * CS + z;
-        if (wx * wx + wz * wz <= CRYSTAL_R * CRYSTAL_R) {
-          for (let y = CRYSTAL_TOP - 6; y <= CRYSTAL_TOP; y++) blocks[(y << 8) | (z << 4) | x] = B.STONE;
-          top = CRYSTAL_TOP;
-        }
-      }
-      heights[z * CS + x] = top;
+      const wx = cx * CS + x, wz = cz * CS + z;
+      if (wx * wx + wz * wz > CRYSTAL_R * CRYSTAL_R) continue;
+      for (let y = CRYSTAL_TOP - 6; y <= CRYSTAL_TOP; y++) blocks[(y << 8) | (z << 4) | x] = B.STONE;
+      heights[z * CS + x] = CRYSTAL_TOP;
     }
     return { blocks, biomes, heights, features: [] };
   }
   function generateChunk(cx, cz, realm = 'overworld', info) {
-    return realm === 'overworld' ? overworldChunk(cx, cz, info) : stubChunk(cx, cz, realm);
+    return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? stubChunk(cx, cz) : overworldChunk(cx, cz, info);
   }
 
   return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan };
