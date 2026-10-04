@@ -7,7 +7,7 @@
 // A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
 // on the player, on a solid or liquid cell, or after FIREBALL_FLIGHT s. It breaks no block.
 // A crystal shard (Phase 6) is a bolt like the fireball: kind 'shard', SHARD_SPEED, armored 'shard'
-// damage. The Prism Colossus fires it (src/boss.js).
+// damage. The Jewel Titan fires it (src/boss.js).
 // A player arrow that meets a Resonance Pylon breaks the pylon and shatters (Phase 6).
 import { THREE } from './three.js';
 import { H, UNLOADED } from './config.js';

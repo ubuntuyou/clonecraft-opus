@@ -681,7 +681,7 @@ const I = {
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
   RAW_EMBERITE: 256, EMBERITE: 257, EMBER_HEART: 258, EMBER_DUST: 259,
-  PRISM_HEART: 260,   // the boss trophy (Phase 6)
+  JEWEL_HEART: 260,   // the boss trophy (Phase 6)
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -704,7 +704,7 @@ defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
 defItem(I.EMBERITE, { name: 'Emberite Ingot' });
 defItem(I.EMBER_HEART, { name: 'Ember Heart', maxStack: 16 });
 defItem(I.EMBER_DUST, { name: 'Ember Dust' });
-defItem(I.PRISM_HEART, { name: 'Prism Heart', maxStack: 1 });
+defItem(I.JEWEL_HEART, { name: 'Jewel Heart', maxStack: 1 });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
 BLOCKS[B.EMBER_LAMP].drop = [I.EMBER_DUST, 2, 4];
@@ -2176,8 +2176,8 @@ ITEM_PIX[I.EMBER_HEART] = pixArt((set) => {
   }
   set(5, 5, [255, 210, 170]);
 });
-// Phase 6: the Prism Heart, a faceted heart of pale crystal with a violet core.
-ITEM_PIX[I.PRISM_HEART] = pixArt((set) => {
+// Phase 6: the Jewel Heart, a faceted heart of pale crystal with a violet core.
+ITEM_PIX[I.JEWEL_HEART] = pixArt((set) => {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
     const u = (x + 0.5 - 8) / 6.4, v = (8.6 - (y + 0.5)) / 6.4;
     const f = (u * u + v * v - 1) ** 3 - u * u * v * v * v;
@@ -7673,8 +7673,8 @@ function fillRecipe(r, row) {
  * keeps 8..16 blocks from the player, and shoots a fireball every 3 s
  * while it sees the player. The Cinder Knight is a melee mob with half knockback and half arrow
  * damage (`def.arrowRes`, read in projectiles.js).
- * Crystal Realm mobs (SPEC_realms Phase 6): the Shardling is a plain melee mob. The Prism Colossus type
- * holds the model and the stats; class Colossus in src/boss.js extends Mob and replaces its update.
+ * Crystal Realm mobs (SPEC_realms Phase 6): the Shardling is a plain melee mob. The Jewel Titan type
+ * holds the model and the stats; class Titan in src/boss.js extends Mob and replaces its update.
  * ===================================================================================== */
 
 const mobs = [];
@@ -7761,7 +7761,7 @@ const MOB_TEXTURES = {
   }),
   ck_trim: () => mtex('ck_trim', [128, 66, 34], 0.2),
   ck_plume: () => mtex('ck_plume', [210, 60, 22], 0.25, (set, r) => { for (let i = 0; i < 20; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 150, 40]); }),
-  // Crystal Realm mobs (Phase 6): the Prism Colossus and the Shardling
+  // Crystal Realm mobs (Phase 6): the Jewel Titan and the Shardling
   pc_body: () => mtex('pc_body', [52, 40, 86], 0.2, (set, r) => {
     for (let i = 0; i < 3; i++) { let x = r() * 16 | 0, y = 0; while (y < 16) { set(x, y, [90, 230, 222]); y++; if (r() < 0.4) x = (x + (r() < 0.5 ? 1 : 15)) & 15; } }
     for (let i = 0; i < 12; i++) set(r() * 16 | 0, r() * 16 | 0, [30, 22, 52]);
@@ -7940,7 +7940,7 @@ const MOB_TYPES = {
       return { head, legs, arms };
     },
   },
-  // Shardling (SPEC_realms Phase 6): the Prism Colossus summons it. A small, fast crystal biter.
+  // Shardling (SPEC_realms Phase 6): the Jewel Titan summons it. A small, fast crystal biter.
   shardling: {
     hostile: true, hp: 8, w: 0.55, h: 0.7, speed: 4, sound: null, damage: 3, reach: 1.0, sense: 32, fireproof: true,
     glow: 0.9, kill: 'was cut by a Shardling',
@@ -7953,11 +7953,11 @@ const MOB_TYPES = {
       return { head, legs };
     },
   },
-  // Prism Colossus (SPEC_realms Phase 6): the arena boss. src/boss.js owns its behavior (class Colossus).
-  colossus: {
+  // Jewel Titan (SPEC_realms Phase 6): the arena boss. src/boss.js owns its behavior (class Titan).
+  titan: {
     hostile: true, hp: 300, w: 2.4, h: 4.5, speed: 2.5, sound: null, kbRes: 1, fireproof: true, flies: true, glow: 1,
-    kill: 'was crushed by the Prism Colossus',
-    drops: () => [[I.PRISM_HEART, 1], [B.CRYSTAL, randInt(8, 16)], [I.EMBERITE, randInt(2, 4)]],
+    kill: 'was crushed by the Jewel Titan',
+    drops: () => [[I.JEWEL_HEART, 1], [B.CRYSTAL, randInt(8, 16)], [I.EMBERITE, randInt(2, 4)]],
     build(root, M) {
       const torso = limb(root, M, 2.0, 1.7, 1.2, 'pc_body', 0, 2.7, 0);
       limb(torso, M, 0.5, 0.5, 0.12, 'pc_core', 0, 0.1, 0.62);
@@ -8107,6 +8107,7 @@ class Mob {
         if (this.fuse >= 1.5) { explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3); return false; }
       } else if (dist < (def.reach || 1.1) && Math.abs(dy) < 1.6 && this.attackCD <= 0) {
         damagePlayer(def.damage, def.kill, this.pos, 'mob');
+        if (this.type === 'knight') audio.knightHit(this.pos);
         this.attackCD = 1; this.armT = 0.3;
       }
       if (def.climbs && this.onGround && this.leapCD <= 0 && dist > 2 && dist < 4 && Math.abs(dy) < 1.5) {
@@ -8557,7 +8558,7 @@ const vehicles = (() => {
 // A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
 // on the player, on a solid or liquid cell, or after FIREBALL_FLIGHT s. It breaks no block.
 // A crystal shard (Phase 6) is a bolt like the fireball: kind 'shard', SHARD_SPEED, armored 'shard'
-// damage. The Prism Colossus fires it (src/boss.js).
+// damage. The Jewel Titan fires it (src/boss.js).
 // A player arrow that meets a Resonance Pylon breaks the pylon and shatters (Phase 6).
 
 const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10, FIREBALL_SPEED = 12, FIREBALL_FLIGHT = 6, SHARD_SPEED = 15;
@@ -9265,6 +9266,9 @@ const particles = (() => {
 })();
 
 // ---- audio --------------------------------------------------------------------------------
+// Procedural WebAudio sounds. `tone` and `noise` are the primitives; `out` gives the positional
+// gain (silent beyond 32 blocks). The realm sounds (knightHit, shard, slamCharge, slam, roar,
+// shatter) sit before `mob`. The portal hum and the travel whoosh live in portals.js.
 
 const audio = {
   ctx: null, master: null, noiseBuf: null, _v: new THREE.Vector3(), _r: new THREE.Vector3(),
@@ -9457,6 +9461,47 @@ const audio = {
     this.noise({ ftype: 'lowpass', f0: 1400, f1: 60, q: 0.4, dur: 1.8, vol: 1.2, attack: 0.005, pos });
     this.tone({ f0: 70, f1: 25, dur: 1.2, vol: 0.9, pos });
     this.noise({ ftype: 'bandpass', f0: 400, f1: 100, q: 0.5, dur: 0.9, vol: 0.5, delay: 0.1, pos });
+  },
+  // ---- realm sounds (SPEC_realms Phase 7). The portal hum and the travel whoosh live in portals.js.
+  // A Cinder Knight's sword strike: a steel clang over a dull thud.
+  knightHit(pos) {
+    const p = { x: pos.x, y: pos.y + 1.4, z: pos.z };
+    this.noise({ ftype: 'bandpass', f0: 3400, f1: 2600, q: 14, dur: 0.22, vol: 0.45, pos: p });
+    this.tone({ type: 'square', f0: 1900, f1: 1650, dur: 0.18, vol: 0.06, filter: 4000, pos: p });
+    this.noise({ ftype: 'lowpass', f0: 600, f1: 150, dur: 0.12, vol: 0.35, pos: p });
+  },
+  // A Titan shard fan: a glassy ping per shard, staggered, over an airy rush.
+  shard(pos, n = 3) {
+    for (let i = 0; i < n; i++) this.tone({ type: 'sine', f0: randRange(2200, 3000), f1: randRange(1300, 1700), dur: 0.35, vol: 0.12, delay: i * 0.03, pos });
+    this.noise({ ftype: 'highpass', f0: 2500, f1: 6000, q: 0.5, dur: 0.4, vol: 0.25, attack: 0.03, pos });
+  },
+  // The slam wind-up: a rising crystal whine with a growing tremble, as long as the warning.
+  slamCharge(pos, dur) {
+    this.tone({ type: 'sawtooth', f0: 180, f1: 720, dur, vol: 0.12, attack: dur * 0.8, filter: 1800, vib: [9, 14], pos });
+    this.tone({ type: 'sine', f0: 900, f1: 2400, dur, vol: 0.08, attack: dur * 0.8, pos });
+  },
+  // The slam lands: a deep boom, a crunch, and a ringing crystal tail.
+  slam(pos) {
+    this.tone({ f0: 90, f1: 28, dur: 1.0, vol: 1.0, pos });
+    this.noise({ ftype: 'lowpass', f0: 900, f1: 80, q: 0.5, dur: 0.7, vol: 0.9, pos });
+    this.noise({ ftype: 'bandpass', f0: 1800, f1: 600, q: 0.8, dur: 0.25, vol: 0.4, pos });
+    for (const [i, f] of [[0, 1320], [1, 1760], [2, 2490]]) this.tone({ type: 'sine', f0: f, f1: f * 0.98, dur: 1.4 - i * 0.3, vol: 0.07, delay: 0.05, pos });
+  },
+  // The Titan roar (waking, each phase change). It carries over the whole arena, so it is not positional.
+  // big: the deeper phase-3 roar.
+  roar(big = false) {
+    const k = big ? 0.8 : 1, dur = big ? 2.2 : 1.6;
+    this.tone({ type: 'sawtooth', f0: 110 * k, f1: 62 * k, dur, vol: 0.5, attack: 0.25, filter: 700, vib: [7, 9] });
+    this.tone({ type: 'sawtooth', f0: 165 * k, f1: 92 * k, dur: dur * 0.9, vol: 0.3, attack: 0.3, filter: 900, vib: [5.5, 12] });
+    this.noise({ ftype: 'bandpass', f0: 700, f1: 260, q: 0.8, dur, vol: 0.4, attack: 0.25 });
+    this.tone({ type: 'sine', f0: 1480 * k, f1: 1180 * k, dur: dur * 0.8, vol: 0.06, attack: 0.4, vib: [11, 30] });
+  },
+  // Crystal breaking apart: a cascade of short high pings over a bright crash. big: the Titan.
+  shatter(x, y, z, big = false) {
+    const pos = { x, y, z }, n = big ? 22 : 9;
+    this.noise({ ftype: 'highpass', f0: 2000, f1: 7000, q: 0.4, dur: big ? 1.2 : 0.5, vol: big ? 0.8 : 0.45, pos });
+    for (let i = 0; i < n; i++) this.tone({ type: 'triangle', f0: randRange(1800, 4200), f1: randRange(900, 1500), dur: randRange(0.08, 0.3), vol: 0.1, delay: Math.pow(i / n, 1.5) * (big ? 1.1 : 0.45), pos });
+    if (big) this.tone({ f0: 70, f1: 30, dur: 1.4, vol: 0.8, pos });
   },
   mob(type, pos, hurt) {
     const p = { x: pos.x, y: pos.y + 1, z: pos.z }, h = hurt ? 1.35 : 1;
@@ -10459,15 +10504,15 @@ const portals = (() => {
 })();
 
 /* =====================================================================================
- * boss.js — the Prism Colossus fight (SPEC_realms Phase 6). Living header.
+ * boss.js — the Jewel Titan fight (SPEC_realms Phase 6). Living header.
  * -------------------------------------------------------------------------------------
  * The arena: worldgen puts 6 pillars on the ring of radius 26 around the Crystal Realm origin.
  * A Resonance Pylon (B.PYLON) sits on each pillar top (WG.PYLONS). A pylon is a plain block, so a
  * broken pylon is a block override and stays broken with no extra state. A pylon cell in an
  * unloaded chunk counts as standing.
  *
- * The boss is class Colossus, a Mob in `mobs[]`. Melee, arrows, and the crosshair reach it like any
- * mob. Its stats and model are MOB_TYPES.colossus (mobs.js). Colossus replaces Mob.update:
+ * The boss is class Titan, a Mob in `mobs[]`. Melee, arrows, and the crosshair reach it like any
+ * mob. Its stats and model are MOB_TYPES.titan (mobs.js). Titan replaces Mob.update:
  *  - 'sleep': it hovers at HOME. It wakes when the player comes within WAKE_R of the center.
  *  - 'fight': phase 1 while any pylon stands (shielded, 3-shard fan every 3 s). Phase 2 with no
  *    pylon and HP above 50 % (hunts at 2.5, slams, 3-shard fan every 4 s). Phase 3 at 50 % or
@@ -10478,6 +10523,9 @@ const portals = (() => {
  *    player on the floor as its edge passes, so a jump over the edge avoids it.
  *  - 'dying': it spins and cracks for DEATH_T s, then shatters, drops its loot, and builds the
  *    exit portal (built lit) at the arena center.
+ * Sounds (audio.js): a roar when it wakes and when the phase rises (a deeper one into phase 3),
+ * a shard ping per fan, a rising whine through the slam warning, a boom when the slam lands, and a
+ * crystal shatter for each broken pylon and for the death.
  * A fight resets on the player's death (full HP, Shardlings gone, sleep, the toast may show again).
  * Leaving the realm clears `mobs[]` (realm.enter), so the next visit spawns a fresh boss.
  *
@@ -10506,15 +10554,16 @@ const pylonStands = ([x, y, z]) => { const id = world.getBlock(x, y, z); return 
 const standingPylons = () => PYLONS.filter(pylonStands);
 const shardlings = () => mobs.filter((m) => m.type === 'shardling' && !m.dead);
 
-class Colossus extends Mob {
+class Titan extends Mob {
   constructor() {
-    super('colossus', HOME.x, HOME.y, HOME.z);
+    super('titan', HOME.x, HOME.y, HOME.z);
     this.state = 'sleep';
     this.toasted = false;                       // "The pylons shield it" shows once per fight
     this.fanT = 3; this.summonT = SUMMON_T; this.slamT = 0; this.slamCD = 0; this.shieldT = 0; this.crackT = 0;
     this.wave = null;                            // the live slam shockwave, or null
     this.yaw = Math.PI;                          // it faces the arrival portal (+z)
     this.phase = 1;
+    this.lastPhase = 1;                         // a rise above it while awake roars
     // the shield: a faint turquoise shell while a pylon stands; it flashes when a hit lands
     this.shield = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({
       color: 0x7ff6ea, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -10534,7 +10583,7 @@ class Colossus extends Mob {
   hurt(dmg) {
     if (this.dead || this.state === 'dying' || this.invuln > 0) return;
     this.invuln = 0.5;
-    if (this.state === 'sleep') this.state = 'fight';
+    if (this.state === 'sleep') this.wake();
     if (this.phase === 1) {
       this.shieldT = 0.4;
       audio.dig('glass', 0.8, this.pos.x, this.pos.y + 2, this.pos.z);
@@ -10547,6 +10596,8 @@ class Colossus extends Mob {
     if (this.hp <= 0) { this.hp = 0; this.state = 'dying'; this.deathT = 0; this.vel.set(0, 0, 0); }
   }
 
+  wake() { this.state = 'fight'; audio.roar(); }
+
   // A fan of n shards at the player's chest, spread over the horizontal plane.
   fan(n) {
     const p = player, ex = this.pos.x, ey = this.pos.y + 2.7, ez = this.pos.z;
@@ -10558,7 +10609,7 @@ class Colossus extends Mob {
       projectiles.shard(ex + dx * 1.6, ey + dy * 1.6, ez + dz * 1.6, dx, dy, dz, SHARD_DMG, this);
     }
     particles.crystalBurst(ex, ey, ez, 8, 2);
-    audio.fireballShoot({ x: ex, y: ey, z: ez });
+    audio.shard({ x: ex, y: ey, z: ez }, n);
     this.armT = 0.4;
   }
 
@@ -10576,7 +10627,7 @@ class Colossus extends Mob {
   // The slam lands. The damage is the shockwave (shockwave()), which starts at the boss's rim now.
   slam() {
     particles.crystalBurst(this.pos.x, FLOOR + 0.3, this.pos.z, 24, 3);
-    audio.explode(this.pos.x, FLOOR, this.pos.z);
+    audio.slam({ x: this.pos.x, y: FLOOR, z: this.pos.z });
     this.wave = { x: this.pos.x, z: this.pos.z, prev: -1, r: WAVE_R0, hit: false };
     this.shockwave(0);
   }
@@ -10613,6 +10664,8 @@ class Colossus extends Mob {
     this.invuln -= dt; this.hurtT -= dt; this.shieldT -= dt; this.armT -= dt; this.slamCD -= dt;
     const p = player, standing = standingPylons().length;
     this.phase = standing > 0 ? 1 : this.hp > this.def.hp / 2 ? 2 : 3;
+    if (this.phase > this.lastPhase && this.state !== 'sleep' && this.state !== 'dying') audio.roar(this.phase === 3);
+    this.lastPhase = this.phase;
     const cx = p.pos.x - HOME.x, cz = p.pos.z - HOME.z, fromCenter = Math.hypot(cx, cz);
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z, dist = Math.hypot(dx, dz);
     let ty = HOME.y, mx = 0, mz = 0, speed = 0, face = null;
@@ -10620,7 +10673,7 @@ class Colossus extends Mob {
     if (this.wave) { if (this.state === 'dying') this.wave = null; else this.shockwave(dt); }
     if (this.state === 'dying') return this.dying(dt);
     if (this.state === 'sleep') {
-      if (!p.dead && fromCenter < WAKE_R) this.state = 'fight';
+      if (!p.dead && fromCenter < WAKE_R) this.wake();
       mx = HOME.x - this.pos.x; mz = HOME.z - this.pos.z; speed = Math.min(2.5, Math.hypot(mx, mz) * 2);
     } else if (fromCenter >= SLEEP_R) {
       this.state = 'sleep';
@@ -10651,7 +10704,7 @@ class Colossus extends Mob {
         speed = SPEED[this.phase];
         if (dist > 2.5) { mx = dx; mz = dz; }
         const onFloor = p.pos.y < FLOOR + 3 && p.pos.y > FLOOR - 2;   // the slam reaches only the floor
-        if (dist < SLAM_NEAR && onFloor && this.slamCD <= 0 && !p.dead) { this.state = 'slam'; this.slamT = 0; audio.hiss({ x: this.pos.x, y: this.pos.y + 2, z: this.pos.z }); }
+        if (dist < SLAM_NEAR && onFloor && this.slamCD <= 0 && !p.dead) { this.state = 'slam'; this.slamT = 0; audio.slamCharge({ x: this.pos.x, y: this.pos.y + 2, z: this.pos.z }, SLAM_WARN); }
       }
     }
 
@@ -10716,7 +10769,7 @@ class Colossus extends Mob {
     const x = this.pos.x, y = this.pos.y + 2, z = this.pos.z;
     particles.crystalBurst(x, y, z, 160, 10);
     particles.explosion(x, y, z, 2);
-    audio.explode(x, y, z);
+    audio.shatter(x, y, z, true);
     for (const m of shardlings()) { m.dead = true; m.deathT = 0; }   // they fall and poof, with no drops
     // the loot lands in front of the exit portal (the arrival side, +z) when the boss dies near it
     const dz = Math.abs(x - 0.5) < 4 && Math.abs(z) < 3 ? 3.5 - z : 0;
@@ -10747,9 +10800,10 @@ beamGeo.translate(0, 0, 0.5);
 const beamMat = new THREE.MeshBasicMaterial({ color: 0x8ff8ee, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
 const beams = PYLONS.map(() => { const m = new THREE.Mesh(beamGeo, beamMat); m.visible = false; m.frustumCulled = false; scene.add(m); return m; });
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+const pylonWas = PYLONS.map(() => null);   // each pylon cell's id last frame (null outside the Crystal Realm)
 
 const boss = {
-  col: null,                 // the live Colossus, or null
+  titan: null,               // the live Titan, or null
   hp: null,                  // the HP of a boss whose chunk unloaded; the next spawn keeps it
   victoryPending: false,     // the kill ended; the victory screen waits for the 'playing' state
   wasDead: false,
@@ -10758,28 +10812,32 @@ const boss = {
 
   update(dt) {
     const crystal = realm.current === 'crystal';
-    if (this.col && !mobs.includes(this.col)) this.col = null;   // realm.enter or a chunk unload removed it, or the death ended
+    if (this.titan && !mobs.includes(this.titan)) this.titan = null;   // realm.enter or a chunk unload removed it, or the death ended
     if (!crystal) this.hp = null;                                 // a new visit starts a full fight
-    if (crystal && !realm.boss.defeated && !this.col) {
+    if (crystal && !realm.boss.defeated && !this.titan) {
       const c = world.chunkAt(Math.floor(HOME.x), Math.floor(HOME.z));
-      if (c && c.lit) { this.col = new Colossus(); if (this.hp) this.col.hp = this.hp; mobs.push(this.col); }
+      if (c && c.lit) { this.titan = new Titan(); if (this.hp) this.titan.hp = this.hp; mobs.push(this.titan); }
     }
-    if (this.col && this.col.state !== 'dying') this.hp = this.col.hp;
-    const col = this.col;
+    if (this.titan && this.titan.state !== 'dying') this.hp = this.titan.hp;
+    const titan = this.titan;
     // the player's death resets the fight
-    if (player.dead && !this.wasDead && col && col.state !== 'dying') {
-      col.reset();
+    if (player.dead && !this.wasDead && titan && titan.state !== 'dying') {
+      titan.reset();
       for (const m of shardlings()) { particles.crystalBurst(m.pos.x, m.pos.y + 0.3, m.pos.z, 8, 2); m.remove(); mobs.splice(mobs.indexOf(m), 1); }
     }
     this.wasDead = player.dead;
     // the beams
-    const alive = col && col.state !== 'dying';
+    const alive = titan && titan.state !== 'dying';
     PYLONS.forEach(([x, y, z], i) => {
-      const b = beams[i], on = alive && world.getBlock(x, y, z) === B.PYLON;
+      const id = crystal ? world.getBlock(x, y, z) : null;
+      // a pylon that was standing and is now gone (an arrow, a hit, or an explosion) shatters
+      if (pylonWas[i] === B.PYLON && id !== B.PYLON && id !== UNLOADED && id !== null) audio.shatter(x + 0.5, y + 0.5, z + 0.5);
+      pylonWas[i] = id;
+      const b = beams[i], on = alive && id === B.PYLON;
       b.visible = !!on;
       if (!on) return;
       _a.set(x + 0.5, y + 0.5, z + 0.5);
-      _b.set(col.group.position.x, col.group.position.y + 2.7, col.group.position.z);
+      _b.set(titan.group.position.x, titan.group.position.y + 2.7, titan.group.position.z);
       b.position.copy(_a); b.lookAt(_b);
       const len = _a.distanceTo(_b), w = 1 + Math.sin(game.clock * 6 + i) * 0.25;
       b.scale.set(w, w, len);
@@ -10790,7 +10848,7 @@ const boss = {
     });
     // the boss bar: it shows while the boss is awake and the player is within SLEEP_R of the center
     const p = player, near = Math.hypot(p.pos.x - HOME.x, p.pos.z - HOME.z) < SLEEP_R;
-    if (crystal && col && near && col.state !== 'sleep') hud.bossBar(col.hp / col.def.hp, col.phase === 1);
+    if (crystal && titan && near && titan.state !== 'sleep') hud.bossBar(titan.hp / titan.def.hp, titan.phase === 1);
     else hud.bossBar(null);
     // the victory screen, once the kill has ended and no other screen shows
     if (this.victoryPending && game.state === 'playing' && !p.dead) { this.victoryPending = false; showVictory(); }
@@ -12157,7 +12215,7 @@ const post = (() => {
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes, realms (the realm table, travel, the stash of the realms that are
  *      not current, the void), portals (Ember portal
- *      ignition, removal, the travel timer, linking, and building), boss (the Prism Colossus:
+ *      ignition, removal, the travel timer, linking, and building), boss (the Jewel Titan:
  *      the pylons, the beams, the fight, the boss bar, the exit portal, the victory)
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow
@@ -12279,7 +12337,7 @@ requestAnimationFrame(frame);</script>
   <div id="resume">Click to resume · Esc for the menu</div>
   <div id="miningbar"><i></i></div>
   <div id="debug"></div>
-  <div id="bossbar"><span>Prism Colossus</span><div class="bar"><i></i></div></div>
+  <div id="bossbar"><span>Jewel Titan</span><div class="bar"><i></i></div></div>
   <div id="toast"></div>
   <div id="itemname"></div>
   <div id="hearts"></div>
@@ -12441,7 +12499,7 @@ requestAnimationFrame(frame);</script>
 </div>
 
 <div id="victory" class="screen">
-  <h1>The Prism Colossus is defeated</h1>
+  <h1>The Jewel Titan is defeated</h1>
   <p id="victoryTime"></p>
   <button class="btn" id="victoryBtn">Continue</button>
 </div>

@@ -1121,8 +1121,8 @@ ITEM_PIX[I.EMBER_HEART] = pixArt((set) => {
   }
   set(5, 5, [255, 210, 170]);
 });
-// Phase 6: the Prism Heart, a faceted heart of pale crystal with a violet core.
-ITEM_PIX[I.PRISM_HEART] = pixArt((set) => {
+// Phase 6: the Jewel Heart, a faceted heart of pale crystal with a violet core.
+ITEM_PIX[I.JEWEL_HEART] = pixArt((set) => {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
     const u = (x + 0.5 - 8) / 6.4, v = (8.6 - (y + 0.5)) / 6.4;
     const f = (u * u + v * v - 1) ** 3 - u * u * v * v * v;

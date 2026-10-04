@@ -134,7 +134,7 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 - [x] No mob spawns naturally in the Crystal Realm.
   Note (Phase 5): Playwright: 400 spawn calls and 20 s of play left 0 mobs.
 
-## Phase 6: Prism Colossus
+## Phase 6: Jewel Titan
 
 - [x] The arena has 6 pillars on a ring of radius 26 with a pylon on each. Each pylon emits crystal light 15 and shows a beam to the boss.
   Note (Phase 6): Node test for the ring. Playwright: 6 pylons at radius 26, heights 107..112 on seed 1234. Screenshots show the pillars, the pylons, the light, and the beams to the boss.
@@ -154,8 +154,8 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
   Note (Phase 6): Playwright: a Shardling hits for 3. The drop roll gave a crystal 17 times in 40. HP 8 and speed 4 are in the mob table.
 - [x] Death of the player resets the fight: full HP, Shardlings gone, broken pylons stay broken. Leaving the realm does the same.
   Note (Phase 6): Playwright: after a death and after leaving, the boss has full HP, the Shardlings are gone, and the broken pylons stay broken.
-- [x] The boss death plays for 3 s, then drops the Prism Heart, 8–16 crystals, and 2–4 Emberite Ingots, and builds the lit exit portal at the center.
-  Note (Phase 6): Playwright: the death plays for 3 s. Two kills dropped 1 Prism Heart each, 10 and 9 crystals, and 2 and 4 Emberite Ingots. Both fall in the ranges 8..16 and 2..4. The exit portal at x -1..1, y 97..100, z 0 is lit. Fix in QA: drops shift off the exit pane.
+- [x] The boss death plays for 3 s, then drops the Jewel Heart, 8–16 crystals, and 2–4 Emberite Ingots, and builds the lit exit portal at the center.
+  Note (Phase 6): Playwright: the death plays for 3 s. Two kills dropped 1 Jewel Heart each, 10 and 9 crystals, and 2 and 4 Emberite Ingots. Both fall in the ranges 8..16 and 2..4. The exit portal at x -1..1, y 97..100, z 0 is lit. Fix in QA: drops shift off the exit pane.
 - [x] The exit portal leads like the arrival portal.
   Note (Phase 6): Playwright: without `crystalBack` the exit portal leads to the spawn. In the flow run it led to the `crystalBack` portal at (323.5, 131, 348.5).
 - [x] After a reload, the boss does not return, and the exit portal stays.
@@ -163,23 +163,33 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 - [x] The victory screen shows on the first kill only, with the time played and a Continue button. The world pauses behind it. Continue and Esc both return to play.
   Note (Phase 6): Playwright: the screen shows the title, the time played, and Continue. The game clock delta is 0 behind it. Continue and Esc both return to play. The boss spawns only while `realm.boss.defeated` is false, so a world has one kill.
 - [x] The full flow works without the debug handle: craft and light an ember portal, find a fortress, take the Ember Heart, build and light a crystal portal, kill the boss, and return home. (One Playwright run may use creative-style item grants for materials only.)
-  Note (Phase 6): Playwright, seed 1234, a fresh save, real input. Grants were materials only (diamonds, sticks, planks, string, flint, feathers, crystals, obsidian, a Magma Core, bread). The run crafted the gear and frames in the recipe book and lit an obsidian portal with the Magma Core. It took the Ember Heart from the heart chest of fortress (1, 0) at (132, 45, 51), built and lit a Crystal Frame portal, broke 6 pylons, and killed the boss in 27 s with a diamond sword. It took the Prism Heart and returned through the exit portal. The game logged no errors. The console showed only `favicon.ico` 404s from the QA static server. The QA script died 3 times on the way (a fall, a wisp, and a fall after pointer lock was lost on travel). Each death was a script error, and the game behaved correctly.
+  Note (Phase 6): Playwright, seed 1234, a fresh save, real input. Grants were materials only (diamonds, sticks, planks, string, flint, feathers, crystals, obsidian, a Magma Core, bread). The run crafted the gear and frames in the recipe book and lit an obsidian portal with the Magma Core. It took the Ember Heart from the heart chest of fortress (1, 0) at (132, 45, 51), built and lit a Crystal Frame portal, broke 6 pylons, and killed the boss in 27 s with a diamond sword. It took the Jewel Heart and returned through the exit portal. The game logged no errors. The console showed only `favicon.ico` 404s from the QA static server. The QA script died 3 times on the way (a fall, a wisp, and a fall after pointer lock was lost on travel). Each death was a script error, and the game behaved correctly.
 
 ## Phase 7: finish
 
-- [ ] Sounds: portal hum, travel whoosh, wisp fireball, knight hit, boss shard, slam, roar, and shatter play. Audio for Joe: owner review.
-- [ ] The Ember Realm holds 60 fps (vsync) at 1280×720 and render distance 8. The Crystal Realm does too. The overworld keeps its own rate. (Mean over 600 frames, each realm.)
-- [ ] Chromium: 0 console errors and 0 warnings across all phases. `npm run check` exits 0.
-- [ ] `ARCHITECTURE.md`, `CHANGELOG.md`, `DISCOVERY_engine.md`, and the living headers describe the realms, the portals, the boss, and the id plan.
+- [x] Sounds: portal hum, travel whoosh, wisp fireball, knight hit, boss shard, slam, roar, and shatter play. Audio for Joe: owner review.
+  Note (Phase 7, 2026-10-04): Playwright, an analyser on `audio.master` and spies on the `audio` methods, real game events. Peak levels: hum 0.141 at 3 blocks (gain 0.0985); whoosh 0.18 on an Ember travel; wisp shot and hit 0.169; knight strike 0.31 (HP 20 to 18.8); wake roar and shard fan 0.335; 6 pylon shatters and the phase 2 roar 0.399; slam charge and slam 0.454; phase 3 deep roar 0.425; death shatter 0.578. Nothing clips. rsh designed the sounds; Joe has not heard them.
+- [x] The Ember Realm holds 60 fps (vsync) at 1280×720 and render distance 8. The Crystal Realm does too. The overworld keeps its own rate. (Mean over 600 frames, each realm.)
+  Note (Phase 7, 2026-10-04): 1280×720 canvas, device pixel ratio 1, RD 8, shadows and bloom on, AA Off, quiet Mac. Ember 60.0 fps (p99 17.6 ms). Crystal 60.0 fps (p99 17.7 ms). Crystal during a live phase 3 fight with 3 mobs 60.0 fps (p99 17.6 ms). Overworld 60.0 fps twice (p99 17.7 and 17.6 ms) once streaming settles. Right after a travel, streaming gave 57.1 fps; GATE_game.md:400 records the same dip.
+- [x] Chromium: 0 console errors and 0 warnings across all phases. `npm run check` exits 0.
+  Note (Phase 7, 2026-10-04): 0 errors and 0 warnings across the Phase 7 page (sounds, fps in three realms, a boss fight, two victory screens, the homes cycle), the old-save load, the Jewel Titan rename run, and the seed 1234 reload. Earlier phases have their own notes. `npm run check` exits 0. The old-save fixture (`tests/fixtures/save-before-ids2.json`) loads again in Chromium at Phase 7: armor 320, 309 (Protection II), and 303, inventory 300 and 323 (Feather Falling III), the loose stack as 317, the chest's 312, the furnace, the edits, and Old Home.
+- [x] `ARCHITECTURE.md`, `CHANGELOG.md`, `DISCOVERY_engine.md`, and the living headers describe the realms, the portals, the boss, and the id plan.
+  Note (Phase 7, 2026-10-04): ARCHITECTURE D47 (realms), D48 (Ember), D49 and D52 (portals), D53 (boss), the id plan, and D12 (realm sounds). CHANGELOG [Unreleased] lists every phase and the realm sounds. DISCOVERY_engine has realm, boss, portal, audio, and fps QA pointers. The living headers of realms.js, portals.js, blocks.js (the save id plan), portal-frame.js, boss.js, mobs.js, audio.js, and order.js name their parts. Joe renamed the boss to Jewel Titan and its drop to Jewel Heart on 2026-10-04 14:57 CT; code, docs, and this file use the new names.
 
 ## UI (ui-guidelines, pointer row)
 
-- [ ] No text below 14 px on the boss bar, the victory screen, the loading screen, and toasts. Body text is 16 px (R2).
-- [ ] No low-contrast text on the boss bar or the victory screen against the Ember and Crystal skies, checked on screenshots (R2, R11).
-- [ ] The victory Continue button is at least 24 px tall, with an 8 px gap to any other target (R3).
-- [ ] R4–R10: no forward-search field, text field, reveal, delete, edit screen, or new list in this spec. The homes list keeps its empty-state message when the current realm has no homes (R10).
+- [x] No text below 14 px on the boss bar, the victory screen, the loading screen, and toasts. Body text is 16 px (R2).
+  Note (Phase 7, 2026-10-04): computed styles in Chromium. Boss bar name 16 px. Victory: title 40 px, time 18 px, Continue 16 px. Travel screen title 32 px. Toast 18 px. Homes empty state 14 px.
+- [x] No low-contrast text on the boss bar or the victory screen against the Ember and Crystal skies, checked on screenshots (R2, R11).
+  Note (Phase 7, 2026-10-04): white text, worst backing pixel on 1280×720 screenshots. Boss bar label: Crystal 7.50:1 (over pale crystal), Ember 20.0:1. Victory title and time: Crystal 7.54 and 7.15:1, Ember 11.65 and 13.21:1. Continue face #707070: 4.95:1. Worst case over a pure white scene: bar label 5.74:1, victory centre 5.94:1.
+- [x] The victory Continue button is at least 24 px tall, with an 8 px gap to any other target (R3).
+  Note (Phase 7, 2026-10-04): 220×44 px. It is the only target on the screen; the time text sits 24 px above it. A click on Continue returns to 'playing' in both realms.
+- [x] R4–R10: no forward-search field, text field, reveal, delete, edit screen, or new list in this spec. The homes list keeps its empty-state message when the current realm has no homes (R10).
+  Note (Phase 7, 2026-10-04): Playwright, real clicks and keys. Ember homes showed "No homes yet." Set home here added Home 1. The Crystal list then showed "No homes yet." Back in Ember, Home 1 was listed; Delete, then Confirm, removed it, and "No homes yet." returned.
 
 ## Owner review (Joe)
+
+Open until Joe plays. rsh picked the sound design and the Phase 2..6 numbers.
 
 - [ ] The look of the Ember Realm.
 - [ ] The look of the Crystal Realm.

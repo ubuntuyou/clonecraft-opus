@@ -71,7 +71,7 @@ test('Resonance Pylon: breaks at once, drops nothing, emits crystal light 15', (
   assert.equal(breakTime(B.PYLON, null), 0);
   assert.equal(BLOCKS[B.PYLON].drop, null);
   assert.equal(EMIT_CRY[B.PYLON], 15);
-  assert.equal(ITEMS[I.PRISM_HEART].name, 'Prism Heart');
+  assert.equal(ITEMS[I.JEWEL_HEART].name, 'Jewel Heart');
 });
 
 // SPEC_realms Phase 2 (gate item 4): tool, hardness, and drop of each Ember Realm block.

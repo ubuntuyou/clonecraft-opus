@@ -292,11 +292,11 @@ The return link is one saved cell: `portals.crystalBack`, the foot of the last o
 
 ### D53. The boss is a `Mob`; the fight keeps one save field
 
-`boss.js` holds the Prism Colossus fight. The Colossus is a `Mob` subclass in `mobs[]`, so melee, arrows, and the crosshair reach it with no new code path. It replaces `Mob.update` with its own states: sleep, fight, slam, and dying. Its stats and model live in `MOB_TYPES.colossus`.
+`boss.js` holds the Jewel Titan fight. The Titan is a `Mob` subclass in `mobs[]`, so melee, arrows, and the crosshair reach it with no new code path. It replaces `Mob.update` with its own states: sleep, fight, slam, and dying. Its stats and model live in `MOB_TYPES.titan`.
 A pylon is a plain block (`B.PYLON`) that worldgen places (`WG.PYLONS`). A broken pylon is a block override, so it stays broken with no extra state. The phase is derived each frame from the standing pylons and the HP, never stored. A pylon cell in an unloaded chunk counts as standing.
 The save holds one field for the fight: `realm.boss.defeated`. `boss.update` spawns the boss only while it is false. The exit portal is ordinary edits (`buildExitPortal`), so the save keeps it. The HP is not saved. Leaving the realm clears `mobs[]`, so every visit starts a full fight.
 The kill sets `victoryPending`. The victory screen waits until the state is 'playing' and the player is alive, so it never covers the death screen or the inventory.
-The slam and the shard fan are separate timers. The fan and summon timers run during a slam, so a slam never delays them. The slam shockwave is boss state (`col.wave`), not a particle. The sparks are drawn at the hit edge every frame, so the visible ring and the damage cannot drift apart.
+The slam and the shard fan are separate timers. The fan and summon timers run during a slam, so a slam never delays them. The slam shockwave is boss state (`titan.wave`), not a particle. The sparks are drawn at the hit edge every frame, so the visible ring and the damage cannot drift apart.
 
 ### D54. Anti-aliasing lives in `post`; settings are a view, not a state
 
@@ -323,6 +323,7 @@ A fireball is a `projectiles` entry with `kind: 'fireball'`. It flies straight w
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
+The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the knight strike, the shard fan, the slam charge, the slam, the roar, and the shatter. The callers own the timing: `boss.js` plays the Titan sounds, and `mobs.js` plays the knight strike. The portal hum is a looped node, so `portals.js` owns it and the travel whoosh. The roar is not positional, because it must carry over the whole arena.
 `particles` is one `THREE.Points` pool with typed arrays. Its shader shares the fog uniforms with the terrain, caps the point size, and fades points that reach the camera.
 
 ## Seams
@@ -340,7 +341,7 @@ A fireball is a `projectiles` entry with `kind: 'fireball'`. It flies straight w
 | light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |
 | player damage | `damagePlayer(amount, cause, from, kind)` is the only damage path for the player. `kind` selects armor (D24). |
 | projectiles | `projectiles.shoot(x, y, z, vx, vy, vz, dmg, shooter)` launches an arrow. `projectiles.fireball(x, y, z, dx, dy, dz, dmg, shooter)` launches a fireball along a unit direction (D51). `projectiles.shard(...)` takes the same arguments and launches a crystal shard (D53). `projectiles.update(dt)` runs once per frame. |
-| boss | `boss.update(dt)` runs once per frame. It spawns the Colossus, draws the pylon beams, and drives `hud.bossBar(fraction, shielded)` and `showVictory()` (D53). |
+| boss | `boss.update(dt)` runs once per frame. It spawns the Titan, draws the pylon beams, and drives `hud.bossBar(fraction, shielded)` and `showVictory()` (D53). |
 | enchantments | `enchLevel(stack, key)` returns 0..3. Each effect site (mining, drops, attack, wear, armor, bow, fall) reads it (D26). |
 | vehicles | `vehicles.update(dt)` runs once per frame before `updatePlayer`. `vehicles.mount(v)`, `dismount()`, and `placeHeld(item)` are the entry points (D27). |
 | structure loot | `lootChest(x, y, z)` returns the filled tile entity of an unfilled generated chest, or null. `tileEntity()` and the chest spill call it (D28). |

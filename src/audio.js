@@ -1,4 +1,7 @@
 // ---- audio --------------------------------------------------------------------------------
+// Procedural WebAudio sounds. `tone` and `noise` are the primitives; `out` gives the positional
+// gain (silent beyond 32 blocks). The realm sounds (knightHit, shard, slamCharge, slam, roar,
+// shatter) sit before `mob`. The portal hum and the travel whoosh live in portals.js.
 import { THREE } from './three.js';
 import { clamp, CONFIG, randRange } from './config.js';
 import { camera } from './engine.js';
@@ -194,6 +197,47 @@ const audio = {
     this.noise({ ftype: 'lowpass', f0: 1400, f1: 60, q: 0.4, dur: 1.8, vol: 1.2, attack: 0.005, pos });
     this.tone({ f0: 70, f1: 25, dur: 1.2, vol: 0.9, pos });
     this.noise({ ftype: 'bandpass', f0: 400, f1: 100, q: 0.5, dur: 0.9, vol: 0.5, delay: 0.1, pos });
+  },
+  // ---- realm sounds (SPEC_realms Phase 7). The portal hum and the travel whoosh live in portals.js.
+  // A Cinder Knight's sword strike: a steel clang over a dull thud.
+  knightHit(pos) {
+    const p = { x: pos.x, y: pos.y + 1.4, z: pos.z };
+    this.noise({ ftype: 'bandpass', f0: 3400, f1: 2600, q: 14, dur: 0.22, vol: 0.45, pos: p });
+    this.tone({ type: 'square', f0: 1900, f1: 1650, dur: 0.18, vol: 0.06, filter: 4000, pos: p });
+    this.noise({ ftype: 'lowpass', f0: 600, f1: 150, dur: 0.12, vol: 0.35, pos: p });
+  },
+  // A Titan shard fan: a glassy ping per shard, staggered, over an airy rush.
+  shard(pos, n = 3) {
+    for (let i = 0; i < n; i++) this.tone({ type: 'sine', f0: randRange(2200, 3000), f1: randRange(1300, 1700), dur: 0.35, vol: 0.12, delay: i * 0.03, pos });
+    this.noise({ ftype: 'highpass', f0: 2500, f1: 6000, q: 0.5, dur: 0.4, vol: 0.25, attack: 0.03, pos });
+  },
+  // The slam wind-up: a rising crystal whine with a growing tremble, as long as the warning.
+  slamCharge(pos, dur) {
+    this.tone({ type: 'sawtooth', f0: 180, f1: 720, dur, vol: 0.12, attack: dur * 0.8, filter: 1800, vib: [9, 14], pos });
+    this.tone({ type: 'sine', f0: 900, f1: 2400, dur, vol: 0.08, attack: dur * 0.8, pos });
+  },
+  // The slam lands: a deep boom, a crunch, and a ringing crystal tail.
+  slam(pos) {
+    this.tone({ f0: 90, f1: 28, dur: 1.0, vol: 1.0, pos });
+    this.noise({ ftype: 'lowpass', f0: 900, f1: 80, q: 0.5, dur: 0.7, vol: 0.9, pos });
+    this.noise({ ftype: 'bandpass', f0: 1800, f1: 600, q: 0.8, dur: 0.25, vol: 0.4, pos });
+    for (const [i, f] of [[0, 1320], [1, 1760], [2, 2490]]) this.tone({ type: 'sine', f0: f, f1: f * 0.98, dur: 1.4 - i * 0.3, vol: 0.07, delay: 0.05, pos });
+  },
+  // The Titan roar (waking, each phase change). It carries over the whole arena, so it is not positional.
+  // big: the deeper phase-3 roar.
+  roar(big = false) {
+    const k = big ? 0.8 : 1, dur = big ? 2.2 : 1.6;
+    this.tone({ type: 'sawtooth', f0: 110 * k, f1: 62 * k, dur, vol: 0.5, attack: 0.25, filter: 700, vib: [7, 9] });
+    this.tone({ type: 'sawtooth', f0: 165 * k, f1: 92 * k, dur: dur * 0.9, vol: 0.3, attack: 0.3, filter: 900, vib: [5.5, 12] });
+    this.noise({ ftype: 'bandpass', f0: 700, f1: 260, q: 0.8, dur, vol: 0.4, attack: 0.25 });
+    this.tone({ type: 'sine', f0: 1480 * k, f1: 1180 * k, dur: dur * 0.8, vol: 0.06, attack: 0.4, vib: [11, 30] });
+  },
+  // Crystal breaking apart: a cascade of short high pings over a bright crash. big: the Titan.
+  shatter(x, y, z, big = false) {
+    const pos = { x, y, z }, n = big ? 22 : 9;
+    this.noise({ ftype: 'highpass', f0: 2000, f1: 7000, q: 0.4, dur: big ? 1.2 : 0.5, vol: big ? 0.8 : 0.45, pos });
+    for (let i = 0; i < n; i++) this.tone({ type: 'triangle', f0: randRange(1800, 4200), f1: randRange(900, 1500), dur: randRange(0.08, 0.3), vol: 0.1, delay: Math.pow(i / n, 1.5) * (big ? 1.1 : 0.45), pos });
+    if (big) this.tone({ f0: 70, f1: 30, dur: 1.4, vol: 0.8, pos });
   },
   mob(type, pos, hurt) {
     const p = { x: pos.x, y: pos.y + 1, z: pos.z }, h = hurt ? 1.35 : 1;

@@ -13,17 +13,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Realm sounds (SPEC_realms.md, Phase 7): a steel clang when a knight strikes, a glassy ping per Titan shard, a rising whine through the slam warning, a boom when the slam lands, and a roar when the Titan wakes and at each phase change (deeper into phase 3). A pylon breaks with a crystal shatter, and the Titan's death plays a bigger one.
 - Enemy arrows: the player picks up a skeleton arrow stuck in a block, as with a player arrow.
 - Soft edges setting: a second Shadows checkbox. Off gives a hard shadow edge (1 read instead of 4). It is disabled while shadows are off. A save without it loads as on.
 - Settings screen: a Settings button beside Play or Resume opens the settings in the same panel. The rows are grouped under Graphics, Controls, Sound, and World. Done or Esc returns to the menu.
 - Anti-aliasing setting: Off (the default), FXAA, or MSAA 2×, 4×, or 8×. MSAA stops at the most samples the GPU allows. Each mode works with bloom on or off.
-- Prism Colossus (SPEC_realms.md, Phase 6): a boss fight on the Crystal Realm arena.
+- Jewel Titan (SPEC_realms.md, Phase 6): a boss fight on the Crystal Realm arena.
   - 6 voidstone pillars ring the arena. A Resonance Pylon on each top gives crystal light 15 and a beam to the boss. Any hit or an arrow breaks a pylon. It drops nothing.
   - The boss wakes within 32 blocks of the center. A boss bar shows its HP and hides at 64 blocks.
   - Phase 1: the pylons shield it, and it fires 3-shard fans. Phase 2: it hunts and slams. A shockwave ring runs out 4 blocks along the floor and deals 8 as it passes; a jump dodges it. Phase 3, at 50 % HP: it is faster, fires 5-shard fans, and summons Shardlings.
   - Shardling: a small crystal mob with 8 HP that drops a crystal 1 time in 2.
   - A player death or leaving the realm resets the fight. Broken pylons stay broken.
-  - The kill drops the Prism Heart, 8..16 crystals, and 2..4 Emberite Ingots. A lit exit portal appears at the center and leads home like the arrival portal.
+  - The kill drops the Jewel Heart, 8..16 crystals, and 2..4 Emberite Ingots. A lit exit portal appears at the center and leads home like the arrival portal.
   - A victory screen shows the time played on the first kill. The boss never returns.
 - Crystal Realm (SPEC_realms.md, Phase 5): a Crystal Frame portal lit with an Ember Heart leads to a realm of floating islands.
   - New blocks: Crystal Frame, Voidstone, and Glimmer Moss. 1 obsidian and 4 crystals craft 2 Crystal Frames.

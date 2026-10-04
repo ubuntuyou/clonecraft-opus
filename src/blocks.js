@@ -325,7 +325,7 @@ const I = {
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
   RAW_EMBERITE: 256, EMBERITE: 257, EMBER_HEART: 258, EMBER_DUST: 259,
-  PRISM_HEART: 260,   // the boss trophy (Phase 6)
+  JEWEL_HEART: 260,   // the boss trophy (Phase 6)
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -348,7 +348,7 @@ defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
 defItem(I.EMBERITE, { name: 'Emberite Ingot' });
 defItem(I.EMBER_HEART, { name: 'Ember Heart', maxStack: 16 });
 defItem(I.EMBER_DUST, { name: 'Ember Dust' });
-defItem(I.PRISM_HEART, { name: 'Prism Heart', maxStack: 1 });
+defItem(I.JEWEL_HEART, { name: 'Jewel Heart', maxStack: 1 });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
 BLOCKS[B.EMBER_LAMP].drop = [I.EMBER_DUST, 2, 4];

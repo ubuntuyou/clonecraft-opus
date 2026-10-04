@@ -60,7 +60,7 @@
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
  *      import), homes, realms (the realm table, travel, the stash of the realms that are
  *      not current, the void), portals (Ember portal
- *      ignition, removal, the travel timer, linking, and building), boss (the Prism Colossus:
+ *      ignition, removal, the travel timer, linking, and building), boss (the Jewel Titan:
  *      the pylons, the beams, the fight, the boss bar, the exit portal, the victory)
  *  17. Day/night cycle and sky: sky (the ember and crystal skies replace the day sky);
  *      weather (clear, rain, storm; global, but only the overworld shows it): rain or snow

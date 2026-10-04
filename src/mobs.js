@@ -14,8 +14,8 @@
  * keeps 8..16 blocks from the player, and shoots a fireball every 3 s
  * while it sees the player. The Cinder Knight is a melee mob with half knockback and half arrow
  * damage (`def.arrowRes`, read in projectiles.js).
- * Crystal Realm mobs (SPEC_realms Phase 6): the Shardling is a plain melee mob. The Prism Colossus type
- * holds the model and the stats; class Colossus in src/boss.js extends Mob and replaces its update.
+ * Crystal Realm mobs (SPEC_realms Phase 6): the Shardling is a plain melee mob. The Jewel Titan type
+ * holds the model and the stats; class Titan in src/boss.js extends Mob and replaces its update.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { clamp, EYE, GRAVITY, JUMP_V, randInt, randRange, UNLOADED, VOID_Y } from './config.js';
@@ -114,7 +114,7 @@ const MOB_TEXTURES = {
   }),
   ck_trim: () => mtex('ck_trim', [128, 66, 34], 0.2),
   ck_plume: () => mtex('ck_plume', [210, 60, 22], 0.25, (set, r) => { for (let i = 0; i < 20; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 150, 40]); }),
-  // Crystal Realm mobs (Phase 6): the Prism Colossus and the Shardling
+  // Crystal Realm mobs (Phase 6): the Jewel Titan and the Shardling
   pc_body: () => mtex('pc_body', [52, 40, 86], 0.2, (set, r) => {
     for (let i = 0; i < 3; i++) { let x = r() * 16 | 0, y = 0; while (y < 16) { set(x, y, [90, 230, 222]); y++; if (r() < 0.4) x = (x + (r() < 0.5 ? 1 : 15)) & 15; } }
     for (let i = 0; i < 12; i++) set(r() * 16 | 0, r() * 16 | 0, [30, 22, 52]);
@@ -293,7 +293,7 @@ const MOB_TYPES = {
       return { head, legs, arms };
     },
   },
-  // Shardling (SPEC_realms Phase 6): the Prism Colossus summons it. A small, fast crystal biter.
+  // Shardling (SPEC_realms Phase 6): the Jewel Titan summons it. A small, fast crystal biter.
   shardling: {
     hostile: true, hp: 8, w: 0.55, h: 0.7, speed: 4, sound: null, damage: 3, reach: 1.0, sense: 32, fireproof: true,
     glow: 0.9, kill: 'was cut by a Shardling',
@@ -306,11 +306,11 @@ const MOB_TYPES = {
       return { head, legs };
     },
   },
-  // Prism Colossus (SPEC_realms Phase 6): the arena boss. src/boss.js owns its behavior (class Colossus).
-  colossus: {
+  // Jewel Titan (SPEC_realms Phase 6): the arena boss. src/boss.js owns its behavior (class Titan).
+  titan: {
     hostile: true, hp: 300, w: 2.4, h: 4.5, speed: 2.5, sound: null, kbRes: 1, fireproof: true, flies: true, glow: 1,
-    kill: 'was crushed by the Prism Colossus',
-    drops: () => [[I.PRISM_HEART, 1], [B.CRYSTAL, randInt(8, 16)], [I.EMBERITE, randInt(2, 4)]],
+    kill: 'was crushed by the Jewel Titan',
+    drops: () => [[I.JEWEL_HEART, 1], [B.CRYSTAL, randInt(8, 16)], [I.EMBERITE, randInt(2, 4)]],
     build(root, M) {
       const torso = limb(root, M, 2.0, 1.7, 1.2, 'pc_body', 0, 2.7, 0);
       limb(torso, M, 0.5, 0.5, 0.12, 'pc_core', 0, 0.1, 0.62);
@@ -460,6 +460,7 @@ class Mob {
         if (this.fuse >= 1.5) { explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3); return false; }
       } else if (dist < (def.reach || 1.1) && Math.abs(dy) < 1.6 && this.attackCD <= 0) {
         damagePlayer(def.damage, def.kill, this.pos, 'mob');
+        if (this.type === 'knight') audio.knightHit(this.pos);
         this.attackCD = 1; this.armT = 0.3;
       }
       if (def.climbs && this.onGround && this.leapCD <= 0 && dist > 2 && dist < 4 && Math.abs(dy) < 1.5) {

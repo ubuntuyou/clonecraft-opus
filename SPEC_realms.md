@@ -9,7 +9,7 @@ Joe's choices (2026-10-03): two realms; an obsidian frame lit with a Magma Core;
 
 ### Scope
 
-The game gets an end game. Two new realms sit beside the overworld. The Ember Realm is an enclosed cave world of ember rock and lava seas. One block there equals 8 blocks in the overworld, so it is also a fast-travel network. Its fortresses hold a new ore tier, two new mobs, and the Ember Heart. The Ember Heart opens the Crystal Realm: floating islands over a void, with the Prism Colossus in an arena. The kill opens an exit portal and shows a victory screen.
+The game gets an end game. Two new realms sit beside the overworld. The Ember Realm is an enclosed cave world of ember rock and lava seas. One block there equals 8 blocks in the overworld, so it is also a fast-travel network. Its fortresses hold a new ore tier, two new mobs, and the Ember Heart. The Ember Heart opens the Crystal Realm: floating islands over a void, with the Jewel Titan in an arena. The kill opens an exit portal and shows a victory screen.
 
 ### Constraints
 
@@ -124,7 +124,7 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
   - Crystal clusters: 1.5 % of island top cells, 2.5 % of the arena rim cells, 5 % of island underside cells, and 3 % of arena underside cells.
   - Glimmer Moss shows bright specks on 1.6 % of its texture pixels.
 
-#### Prism Colossus
+#### Jewel Titan
 
 - The arena: 6 voidstone pillars stand on a ring of radius 26 around the center, 10 to 16 blocks tall. A Resonance Pylon block sits on each pillar top. A pylon emits crystal light 15. A beam joins each standing pylon to the boss.
 - A pylon breaks by any hit (hand included) or by an arrow. It drops nothing.
@@ -135,9 +135,9 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 - Phase 3, HP at 50 % or below: speed 3.5. A 5-shard fan every 3 s. It summons 2 Shardlings every 12 s, up to 4 alive.
 - Shardling: 8 HP, small, speed 4, a hit of 3. It drops a crystal 1 time in 2.
 - A fight resets when the player dies or leaves the realm: full HP, and the Shardlings vanish. Broken pylons stay broken.
-- Death: the boss spins and cracks for 3 s with a light burst, then shatters. It drops the Prism Heart (a trophy item), 8–16 crystals, and 2–4 Emberite Ingots. An exit portal of Crystal Frames, already lit, appears at the arena center. It leads like the arrival portal.
+- Death: the boss spins and cracks for 3 s with a light burst, then shatters. It drops the Jewel Heart (a trophy item), 8–16 crystals, and 2–4 Emberite Ingots. An exit portal of Crystal Frames, already lit, appears at the arena center. It leads like the arrival portal.
 - After the kill, the save records it. The boss never returns. The exit portal stays.
-- Victory screen, on the first kill only: "The Prism Colossus is defeated", the time played in this world, and a Continue button. The world pauses behind it. Continue or Esc returns to play.
+- Victory screen, on the first kill only: "The Jewel Titan is defeated", the time played in this world, and a Continue button. The world pauses behind it. Continue or Esc returns to play.
 - Numbers rsh chose in Phase 6 (Joe has not reviewed them):
   - Pillars are 3×3 voidstone columns. On seed 1234 the pylons sit at y 107..112. A pylon has hardness 0.
   - The boss roams within 38 blocks of the center. It slams when the player is within 5 blocks, then waits 2.5 s before the next slam. The warning lifts it 1.6 blocks.
@@ -164,7 +164,7 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 | Ember Wisp, Cinder Knight, Shardling | `MOB_TYPES` in `src/mobs.js` |
 | Fireballs, shards | `src/projectiles.js` |
 | Spawn rules per realm | `src/spawning.js` |
-| Prism Colossus, pylons, boss bar | new `src/boss.js`, bar in `src/hud.js` |
+| Jewel Titan, pylons, boss bar | new `src/boss.js`, bar in `src/hud.js` |
 | Victory screen | `src/menus.js`, `src/index.html` |
 | Save fields | `src/persist.js` |
 
@@ -174,7 +174,7 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 
 - Phase 0 moves armor ids from 176..199 to 300..323: `armorId(tier, piece) = 300 + 4 × tier + piece`. A save without `ids: 2` maps each stack id in 176..199 to id + 124.
 - New blocks: 176 EMBER_ROCK, 177 ASH_SAND, 178 EMBER_LAMP, 179 EMBERITE_ORE, 180 EMBER_BRICKS, 181 PORTAL_EMBER, 182 PORTAL_CRYSTAL, 183 CRYSTAL_FRAME, 184 VOIDSTONE, 185 GLIMMER_MOSS, 186 PYLON.
-- New items: 256 RAW_EMBERITE, 257 EMBERITE, 258 EMBER_HEART, 259 EMBER_DUST, 260 PRISM_HEART.
+- New items: 256 RAW_EMBERITE, 257 EMBERITE, 258 EMBER_HEART, 259 EMBER_DUST, 260 JEWEL_HEART.
 - Emberite tools are tier 8: `toolId(kind, 8) = 270 + kind index` (pickaxe 270, sword 271, axe 272, shovel 273, hoe 274). Tiers 1–7 keep their ids.
 - Emberite armor is armor tier 6: ids 324..327.
 - Free after this spec: 187..199, 200, 210, 220, 230, 240, 254, and every item id from 261 except the ones above.
@@ -224,7 +224,7 @@ Each phase ends with `npm run check`, Playwright QA of its gate section, doc upd
 4. Phase 3, Ember portal: frame check, ignition, the pane and swirl, travel, 1:8 linking, and portal building.
 5. Phase 4, Ember content: Emberite and its tier, the fortress, the loot, the Ember Heart, the 2 mobs, fireballs, and the spawn rules.
 6. Phase 5, Crystal Realm: the island generator, the arena island, Crystal Frames, the crystal portal, arrival and return.
-7. Phase 6, boss: pylons, the Colossus, Shardlings, shards, the boss bar, the death, the exit portal, and the victory screen.
+7. Phase 6, boss: pylons, the Titan, Shardlings, shards, the boss bar, the death, the exit portal, and the victory screen.
 8. Phase 7, finish: sounds, the performance check in both realms, and the owner review list.
 
 ### Acceptance tests
