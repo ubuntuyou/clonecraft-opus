@@ -16,7 +16,8 @@
 // edges do not crawl. Casters: opaque terrain (leaves keep their holes), mobs, block drops,
 // vehicles, and arrows. The pass hides water, transparent and alpha-tested materials, points,
 // lines, and every ShaderMaterial but the terrain (the sky). Off when Shadows is off and while the
-// light is below the horizon. TERRAIN_FS reads it through uShadowMap and uShadowMat.
+// light is below the horizon. TERRAIN_FS reads the map through uShadowMap and uShadowMat.
+// Soft edges (CONFIG.softShadows) sets uShadowSoft: 4 reads give a soft edge, 1 read a hard edge.
 import { THREE } from './three.js';
 import { CONFIG } from './config.js';
 import { atlasTexture } from './atlas.js';
@@ -61,6 +62,7 @@ const shadows = (() => {
       if (!inited) { renderer.setRenderTarget(rt); renderer.clear(); renderer.setRenderTarget(null); inited = true; }
       const on = CONFIG.shadows && game.state !== 'loading' && terrainUniforms.uSunAmt.value > 0.01;
       terrainUniforms.uShadowOn.value = CONFIG.shadows ? 1 : 0;
+      terrainUniforms.uShadowSoft.value = CONFIG.softShadows ? 1 : 0;
       if (!on) return;
       // light basis; snap the centre to whole texels in light space
       L.copy(terrainUniforms.uSunDir.value).normalize();

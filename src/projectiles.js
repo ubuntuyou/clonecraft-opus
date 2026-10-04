@@ -1,7 +1,7 @@
 // ---- projectiles ------------------------------------------------------------------------
 // An arrow flies with gravity (and drag in liquid). A player arrow (shooter null) hits the first
 // mob on its path; a mob arrow hits only the player. An arrow that meets a solid cell sticks there
-// for ARROW_STUCK s. The player picks up a stuck player arrow by walking near it. An arrow whose
+// for ARROW_STUCK s. The player picks up a stuck arrow (a player or a mob arrow) by walking near it. An arrow whose
 // block is broken falls again. An arrow in an unloaded chunk, or in flight for ARROW_FLIGHT s, is removed.
 // A player arrow deals `def.arrowRes` x its damage to a mob with that field (the Cinder Knight takes half).
 // A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
@@ -134,7 +134,7 @@ const projectiles = (() => {
       if (a.stuck) {
         if (a.age > ARROW_STUCK) { remove(i); continue; }
         if (!SOLID[world.getBlock(a.stuck.x, a.stuck.y, a.stuck.z)]) { a.stuck = null; a.age = 0; a.dmg = 0; continue; }   // its block is gone: fall
-        if (!a.shooter && !p.dead && a.age > 0.25
+        if (!p.dead && a.age > 0.25
           && Math.abs(a.pos.x - p.pos.x) < 1.5 && Math.abs(a.pos.z - p.pos.z) < 1.5 && a.pos.y > p.pos.y - 1 && a.pos.y < p.pos.y + p.h + 0.5
           && inv.add(I.ARROW, 1) === 0) { audio.pop(); remove(i); }
         continue;

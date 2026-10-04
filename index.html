@@ -118,6 +118,8 @@
   .settings .chks { display: flex; gap: 20px; }
   .settings .chk { display: flex; align-items: center; gap: 8px; min-height: 26px; justify-self: start; cursor: pointer; }   /* the label text is part of the hit area */
   .settings input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: #8b8b8b; cursor: pointer; }
+  .settings .chk:has(input:disabled) { opacity: .5; cursor: default; }   /* Soft edges while Shadows is off */
+  .settings input[type=checkbox]:disabled { cursor: default; }
   .settings .group { grid-column: 1 / -1; margin-top: 8px; font-weight: bold; color: #ffff55; text-shadow: 1px 1px 0 #3f3f00; }   /* the .controls key color */
   .settings .group:first-child { margin-top: 0; }
   .heading { font-size: 28px; font-weight: 900; letter-spacing: 2px; margin: 2px 0 10px; text-shadow: 2px 2px 0 #3f3f3f; }
@@ -308,7 +310,8 @@ const SAVE = (() => { try { const d = JSON.parse(storage.get(SAVE_KEY) || 'null'
 
 const CONFIG = {
   renderDistance: 8, fov: 75, sensitivity: 1, volume: 0.6,
-  shadows: true,               // sun and moon shadows (pause menu "Shadows")
+  shadows: true,               // sun and moon shadows (settings "Shadows: On")
+  softShadows: true,           // a soft shadow edge (4 reads); false gives a hard edge (settings "Shadows: Soft edges")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
   renderScale: 1,              // share of the window's pixels drawn, 0.5..1 (pause menu "Render scale")
   aa: 0,                       // anti-aliasing: 0 off, 1 FXAA, 2/4/8 MSAA samples (settings "Anti-aliasing"; post.js)
@@ -321,7 +324,7 @@ const CONFIG = {
 try {
   const saved = JSON.parse(localStorage.getItem('clonecraft.settings') || '{}');
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
-  for (const k of ['freezeTime', 'shadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
+  for (const k of ['freezeTime', 'shadows', 'softShadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
   if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
   if ([0, 1, 2, 4, 8].includes(saved.aa)) CONFIG.aa = saved.aa;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
@@ -331,7 +334,7 @@ if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseI
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
-    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, aa: CONFIG.aa, freezeTime: CONFIG.freezeTime })); } catch (e) {}
+    shadows: CONFIG.shadows, softShadows: CONFIG.softShadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, aa: CONFIG.aa, freezeTime: CONFIG.freezeTime })); } catch (e) {}
 }
 
 const ckey = (cx, cz) => (((cx + 32768) & 0xffff) * 65536) + ((cz + 32768) & 0xffff);
@@ -4752,7 +4755,7 @@ const terrainUniforms = {
   uGlow: { value: 1 },                                                     // glowGain: HDR boost of the water glint
   // G3 shadows (`shadows` module): depth map from the sun or moon, world -> shadow clip matrix, on/off
   uShadowMap: { value: null }, uShadowMat: { value: new THREE.Matrix4() }, uShadowOn: { value: 0 }, uShadowBias: { value: 0.0003 },
-  uShadowTexel: { value: 1 / 2048 },
+  uShadowTexel: { value: 1 / 2048 }, uShadowSoft: { value: 1 },
   // G4 held torch (`heldLight` module): 32^3 light levels around the head, world origin of cell 0, on/off
   uHeld: { value: null }, uHeldOrigin: { value: new THREE.Vector3() }, uHeldOn: { value: 0 },
   uWet: { value: 0 },                                                      // weather wetness 0..1
@@ -4808,9 +4811,18 @@ const terrainUniforms = {
   terrainUniforms.uRipple.value = tex(rip);
 })();
 const TERRAIN_VS = /* glsl */`
+  // MSAA runs an edge pixel's shader at the pixel centre, which can lie outside the triangle. Plain
+  // varyings then extrapolate: vUv leaves its atlas tile and samples a bright neighbour tile (flashes on
+  // distant faces). Centroid sampling keeps vUv, vLight, and vCry inside the triangle. WebGL 1 has no
+  // centroid; it has no MSAA here either.
+  #if __VERSION__ >= 300
+  #define CENTROID centroid
+  #else
+  #define CENTROID
+  #endif
   attribute vec2 aUv; attribute vec4 aLight; attribute vec4 aTint; attribute float aCry;
-  varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
+  CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
+  CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
   void main() {
     vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66) + 2.0 * step(0.665, aTint.a) * step(aTint.a, 0.69);   // pane: 1 ember (160), 2 crystal (172)
@@ -4842,16 +4854,22 @@ const TERRAIN_VS = /* glsl */`
 const TERRAIN_FS = /* glsl */`
   uniform sampler2D map; uniform float uDaylight; uniform vec3 uSkyLight; uniform vec3 uAmbient; uniform float uTorch; uniform float uTime;
   uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar; uniform vec3 uSunDir; uniform float uSunAmt; uniform float uGlow;
-  uniform highp sampler2DShadow uShadowMap; uniform mat4 uShadowMat; uniform float uShadowOn; uniform float uShadowBias; uniform float uShadowTexel;
+  uniform highp sampler2DShadow uShadowMap; uniform mat4 uShadowMat; uniform float uShadowOn; uniform float uShadowBias; uniform float uShadowTexel; uniform float uShadowSoft;
   uniform sampler2D uCaus; uniform sampler2D uRipple;
   uniform highp sampler3D uHeld; uniform vec3 uHeldOrigin; uniform float uHeldOn; uniform float uWet;
-  varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
+  #if __VERSION__ >= 300
+  #define CENTROID centroid
+  #else
+  #define CENTROID
+  #endif
+  CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
+  CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   float curve(float l) { return (pow(0.83, (1.0 - l) * 15.0) - 0.0611) / 0.9389; }
   // block light (torches, lava) falls off slower than sky light, so a torch reaches farther
   float curveB(float l) { return (pow(0.85, (1.0 - l) * 15.0) - 0.0874) / 0.9126; }
   // G3 (P2): 1 = sunlit, 0 = in shadow. Hardware-filtered depth compares: each read blends 4 texels.
   // Terrain takes 4 reads on a square turned by per-pixel noise (a soft ~0.3-block penumbra); water takes 1.
+  // With Soft shadows off (uShadowSoft 0), terrain also takes 1 read: a hard edge.
   // Fades to 1 at the edge of the shadow box.
   float shadowLit(vec3 n, bool soft) {
     vec4 sc = uShadowMat * vec4(vWorld + n * 0.12, 1.0);
@@ -4930,7 +4948,7 @@ const TERRAIN_FS = /* glsl */`
       #ifdef WATER
       if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, false) * cloudLit();
       #else
-      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, true) * cloudLit();
+      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, uShadowSoft > 0.5) * cloudLit();
       #endif
       float open = smoothstep(0.6, 0.95, vLight.x);
       float direct = max(ndl, 0.0) * lit * open * uSunAmt;
@@ -8533,7 +8551,7 @@ const vehicles = (() => {
 // ---- projectiles ------------------------------------------------------------------------
 // An arrow flies with gravity (and drag in liquid). A player arrow (shooter null) hits the first
 // mob on its path; a mob arrow hits only the player. An arrow that meets a solid cell sticks there
-// for ARROW_STUCK s. The player picks up a stuck player arrow by walking near it. An arrow whose
+// for ARROW_STUCK s. The player picks up a stuck arrow (a player or a mob arrow) by walking near it. An arrow whose
 // block is broken falls again. An arrow in an unloaded chunk, or in flight for ARROW_FLIGHT s, is removed.
 // A player arrow deals `def.arrowRes` x its damage to a mob with that field (the Cinder Knight takes half).
 // A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
@@ -8657,7 +8675,7 @@ const projectiles = (() => {
       if (a.stuck) {
         if (a.age > ARROW_STUCK) { remove(i); continue; }
         if (!SOLID[world.getBlock(a.stuck.x, a.stuck.y, a.stuck.z)]) { a.stuck = null; a.age = 0; a.dmg = 0; continue; }   // its block is gone: fall
-        if (!a.shooter && !p.dead && a.age > 0.25
+        if (!p.dead && a.age > 0.25
           && Math.abs(a.pos.x - p.pos.x) < 1.5 && Math.abs(a.pos.z - p.pos.z) < 1.5 && a.pos.y > p.pos.y - 1 && a.pos.y < p.pos.y + p.h + 0.5
           && inv.add(I.ARROW, 1) === 0) { audio.pop(); remove(i); }
         continue;
@@ -9752,11 +9770,14 @@ aaEl.addEventListener('input', () => {
   aaVal.textContent = aaText(CONFIG.aa);
   saveSettings();
 });
-for (const [id, key] of [['setShadows', 'shadows'], ['setBloom', 'bloom']]) {
+// Soft edges applies only to shadows, so it is disabled while Shadows is off.
+const softEl = $('setSoft'), syncSoft = () => { softEl.disabled = !CONFIG.shadows; };
+for (const [id, key] of [['setShadows', 'shadows'], ['setSoft', 'softShadows'], ['setBloom', 'bloom']]) {
   const el = $(id);
   el.checked = CONFIG[key];
-  el.addEventListener('change', () => { CONFIG[key] = el.checked; saveSettings(); });
+  el.addEventListener('change', () => { CONFIG[key] = el.checked; syncSoft(); saveSettings(); });
 }
+syncSoft();
 
 // Time of day: the slider shows the clock in hours (0-24). dayTime 0 is sunrise at 06:00.
 // The world save holds dayTime, so a new time saves with the world. Freeze time is a setting for all worlds.
@@ -11681,7 +11702,8 @@ function setLast(v) { last = v; }
 // edges do not crawl. Casters: opaque terrain (leaves keep their holes), mobs, block drops,
 // vehicles, and arrows. The pass hides water, transparent and alpha-tested materials, points,
 // lines, and every ShaderMaterial but the terrain (the sky). Off when Shadows is off and while the
-// light is below the horizon. TERRAIN_FS reads it through uShadowMap and uShadowMat.
+// light is below the horizon. TERRAIN_FS reads the map through uShadowMap and uShadowMat.
+// Soft edges (CONFIG.softShadows) sets uShadowSoft: 4 reads give a soft edge, 1 read a hard edge.
 
 const shadows = (() => {
   const SIZE = 2048, HALF = 64, DEPTH = 320;
@@ -11721,6 +11743,7 @@ const shadows = (() => {
       if (!inited) { renderer.setRenderTarget(rt); renderer.clear(); renderer.setRenderTarget(null); inited = true; }
       const on = CONFIG.shadows && game.state !== 'loading' && terrainUniforms.uSunAmt.value > 0.01;
       terrainUniforms.uShadowOn.value = CONFIG.shadows ? 1 : 0;
+      terrainUniforms.uShadowSoft.value = CONFIG.softShadows ? 1 : 0;
       if (!on) return;
       // light basis; snap the centre to whole texels in light space
       L.copy(terrainUniforms.uSunDir.value).normalize();
@@ -12310,7 +12333,8 @@ requestAnimationFrame(frame);</script>
       <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
       <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
       <label for="setAA">Anti-aliasing</label><input id="setAA" type="range" min="0" max="4" step="1"><span id="valAA"></span>
-      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
+      <span>Shadows</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">On</label><label class="chk"><input id="setSoft" type="checkbox">Soft edges</label></span><span></span>
+      <span>Effects</span><span class="chks"><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
       <div class="group">Controls</div>
       <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
       <div class="group">Sound</div>

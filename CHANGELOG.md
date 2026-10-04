@@ -13,6 +13,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Enemy arrows: the player picks up a skeleton arrow stuck in a block, as with a player arrow.
+- Soft edges setting: a second Shadows checkbox. Off gives a hard shadow edge (1 read instead of 4). It is disabled while shadows are off. A save without it loads as on.
 - Settings screen: a Settings button beside Play or Resume opens the settings in the same panel. The rows are grouped under Graphics, Controls, Sound, and World. Done or Esc returns to the menu.
 - Anti-aliasing setting: Off (the default), FXAA, or MSAA 2×, 4×, or 8×. MSAA stops at the most samples the GPU allows. Each mode works with bloom on or off.
 - Prism Colossus (SPEC_realms.md, Phase 6): a boss fight on the Crystal Realm arena.
@@ -232,6 +234,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- MSAA no longer shows pinpoint flashes on distant terrain. The terrain shaders sample their varyings at the centroid, so an edge pixel stays inside its atlas tile.
 - A dungeon floor no longer hangs in mid-air in a cave. A room is built only where every cell under its floor is solid.
 - Weather no longer speckles a slope with patches of snow amid rain. Outside snowy biomes, the drop's height decides the kind: snow above y 158, rain below.
 - The sun, moon, and sun halo turned toward the world origin instead of the player, so they looked squished (or vanished) far from spawn.

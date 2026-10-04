@@ -25,6 +25,9 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 
 ## Gotchas
 
+- MSAA and atlas UVs: a shader that samples the block atlas must declare its UV varying with `CENTROID` (see `terrain-material.js`). A plain varying extrapolates at MSAA edge pixels, samples a neighbour tile, and shows pinpoint flashes on distant faces. Copy the macro block into both the vertex and the fragment shader.
+- MSAA QA: compare an MSAA frame with an AA-off frame, and count edge pixels whose colour leaves the AA-off 5×5 neighbourhood (for example, yellow on grey). A plain brightness count also flags thin edges that MSAA resolves, so it reads high even after a fix.
+
 - Headless Chromium refuses pointer lock. A hard lock (`requestLock()` from Play or respawn) then calls `showPause()`, and the state becomes `paused`. A soft lock (`requestLock(true)` from a menu close) keeps `playing` and shows `#resume`.
 - Esc closes a menu on the keydown and requests the lock on the keyup (`escLock`). In Chrome and Brave, Joe saw a lock requested on the keydown end in the pause screen. The likely cause: the browser ends pointer lock on the Esc keyup. I did not verify this. An unlock within 300 ms of a soft lock shows `#resume`, not the pause screen.
 - Esc on the pause screen resumes only 400 ms or more after the pause (`pausedAt`). The guard skips an Esc that paused the game.

@@ -60,7 +60,8 @@ const SAVE = (() => { try { const d = JSON.parse(storage.get(SAVE_KEY) || 'null'
 
 const CONFIG = {
   renderDistance: 8, fov: 75, sensitivity: 1, volume: 0.6,
-  shadows: true,               // sun and moon shadows (pause menu "Shadows")
+  shadows: true,               // sun and moon shadows (settings "Shadows: On")
+  softShadows: true,           // a soft shadow edge (4 reads); false gives a hard edge (settings "Shadows: Soft edges")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
   renderScale: 1,              // share of the window's pixels drawn, 0.5..1 (pause menu "Render scale")
   aa: 0,                       // anti-aliasing: 0 off, 1 FXAA, 2/4/8 MSAA samples (settings "Anti-aliasing"; post.js)
@@ -73,7 +74,7 @@ const CONFIG = {
 try {
   const saved = JSON.parse(localStorage.getItem('clonecraft.settings') || '{}');
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
-  for (const k of ['freezeTime', 'shadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
+  for (const k of ['freezeTime', 'shadows', 'softShadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
   if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
   if ([0, 1, 2, 4, 8].includes(saved.aa)) CONFIG.aa = saved.aa;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
@@ -83,7 +84,7 @@ if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseI
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
-    shadows: CONFIG.shadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, aa: CONFIG.aa, freezeTime: CONFIG.freezeTime })); } catch (e) {}
+    shadows: CONFIG.shadows, softShadows: CONFIG.softShadows, bloom: CONFIG.bloom, renderScale: CONFIG.renderScale, aa: CONFIG.aa, freezeTime: CONFIG.freezeTime })); } catch (e) {}
 }
 
 const ckey = (cx, cz) => (((cx + 32768) & 0xffff) * 65536) + ((cz + 32768) & 0xffff);

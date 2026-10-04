@@ -199,7 +199,7 @@ Moonlight is the night floor of `game.clearDaylight` (4.5/15) plus the moon's di
 
 ### D35. Shadows and bloom are separate settings
 
-The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the depth pass redraws the scene), so `CONFIG.shadows` and `CONFIG.bloom` are separate booleans. `shadows.render` reads only `CONFIG.shadows`; `post` reads `CONFIG.bloom` and `CONFIG.aa` (D54). Light shafts stay with bloom because they need `sceneRT` and the composite pass. The settings view is for a desktop mouse, so its rows are compact and do not use the 44 px touch targets (Joe, 2026-09-29).
+The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the depth pass redraws the scene), so `CONFIG.shadows` and `CONFIG.bloom` are separate booleans. `shadows.render` reads `CONFIG.shadows` and `CONFIG.softShadows`. Soft edges sets the `uShadowSoft` uniform: terrain takes 4 shadow reads (a soft edge) or 1 (a hard edge); water always takes 1. Soft edges is disabled in the view while shadows are off. `post` reads `CONFIG.bloom` and `CONFIG.aa` (D54). Light shafts stay with bloom because they need `sceneRT` and the composite pass. The settings view is for a desktop mouse, so its rows are compact and do not use the 44 px touch targets (Joe, 2026-09-29).
 
 ### D34. Leaves pass the player through one collision table
 
@@ -304,6 +304,7 @@ The renderer is created with `antialias: false`, and a context attribute cannot 
 MSAA sets `sceneRT.samples`. A change of the count disposes `sceneRT`, and the next render rebuilds it. Three r160 resolves both color and depth after the render, so the light-shaft mask still reads a plain depth texture.
 `post.aaModes` lists the modes this GPU can run. The MSAA cap comes from the sample limit of the scene target format; WebGL 1 gets Off and FXAA only. `post.aaMode()` clamps a saved mode down to that list, so a save from a stronger GPU still loads.
 FXAA is the last full-screen pass and works in gamma space (D5). With bloom on, the composite writes to an 8-bit `ldrRT`, then FXAA draws to the canvas. With bloom off and AA on, the world renders into `sceneRT`, then FXAA or a copy draws it. With bloom off and AA off, the world draws straight to the canvas, as before.
+MSAA runs an edge pixel's shader at the pixel centre, which can lie outside the triangle. A plain `vUv` then leaves its atlas tile and samples a neighbour tile, which showed as pinpoint flashes on distant terrain. So the terrain shaders declare `vUv`, `vLight`, and `vCry` with the `CENTROID` macro (`centroid` on WebGL 2, nothing on WebGL 1). Without MSAA, centroid sampling equals centre sampling, so AA Off and FXAA do not change.
 The overlay panel has two views: the main view and the settings view. The views are not game states, so no state check changes. A capture keydown listener in `menus.js` takes Esc while the settings view is open, before the Esc resume in `player.js`. Any state that hides the overlay resets the panel to the main view.
 
 ### D50. Ember fortresses sit on a 96-block grid with parity offsets

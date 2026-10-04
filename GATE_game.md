@@ -759,3 +759,21 @@ Joe asked for a Settings button on the pause menu, with the configurable setting
   - 2026-10-04: the smallest text is 14 px (group headings). Noon and night screenshots read clearly on the dark panel. The panel fits: scrollHeight 543 = clientHeight 543.
 - [x] Chromium: 0 console errors and 0 warnings. `npm run check` exits 0.
   - 2026-10-04: the Playwright session log holds 0 errors and 0 warnings. `npm run check` exits 0: depcheck passes, 63/63 tests pass, and index.html equals a fresh build.
+
+## Enemy arrows, soft shadows, and the MSAA flashes (Joe, 2026-10-04 12:42 CT)
+
+Joe asked to pick up enemy arrows and to turn off soft shadows. Joe dropped "dynamic shadows" and reported pinpoint flashes on distant objects with MSAA at any level. rsh traced the flashes to `vUv` extrapolation at MSAA edge pixels (atlas bleed) and picked the fix: centroid varyings.
+
+- [x] A skeleton arrow stuck in a block is picked up like a player arrow: walking near it adds 1 arrow and plays the pop. A full inventory leaves the arrow in place. A player arrow still picks up.
+  - 2026-10-04 (Playwright): a skeleton arrow 3 blocks away stayed stuck (128 arrows). The player moved next to it: 129, and the arrow left the list. With every slot full, a second skeleton arrow stayed stuck. After the slots were restored, it picked up. A player arrow then gave 130.
+- [x] The settings view has a Shadows row with On and Soft edges, and an Effects row with Bloom + shafts. Soft edges is disabled (dimmed) while On is off.
+  - 2026-10-04: with On cleared, Soft edges reads `disabled` and its label has opacity 0.5 (screenshot). With On checked, Soft edges is enabled again.
+- [x] Soft edges off gives a hard shadow edge (1 read); on gives the soft edge. A screenshot crop shows both. The setting saves and survives a reload. A save without it loads as on.
+  - 2026-10-04: a crop of one terrace shadow shows stepped shadow-map texels with Soft edges off and a blurred edge with it on. A click saved `softShadows: false`. After a reload, the config, the checkbox, and `uShadowSoft` read off (0). After the key was deleted and the page reloaded, all three read on (1).
+- [x] With MSAA 2× and 4×, distant terrain shows no pixel brighter than the non-MSAA image around it (the bright-pixel count drops to near 0 over 8 views). No flashes are visible in a screenshot.
+  - 2026-10-04, render-target test (640×360, 8 views): before the fix, MSAA 4× had 0..214 bright pixels per view. After it, MSAA 2× and 4× had 0..3 per view.
+  - 2026-10-04, on screen (MSAA 4×, bloom on): the unfixed shader gave 3447 off-tile (yellow) edge pixels. The fixed shader gave 10 and 7, against 9 for a second AA-off frame. Crops show yellow seams only in the unfixed frame. The remaining bright-pixel flags in the fixed frame are thin snow edges that MSAA resolves and the AA-off frame misses.
+- [x] MSAA still smooths block edges (an edge-pixel count), and textures look unchanged at Off.
+  - 2026-10-04: of 41658 edge pixels, 12752 are blended at MSAA 4× against 4709 at Off. Centroid sampling equals centre sampling without multisampling, so the Off image does not change. A second AA-off frame differs from the first only by noise (9 pixels).
+- [x] Chromium: 0 console errors and 0 warnings. `npm run check` exits 0.
+  - 2026-10-04: the console has 0 errors and 0 warnings. `npm run check` exits 0 (depcheck pass, tests pass, index.html equals a fresh build).

@@ -115,11 +115,14 @@ aaEl.addEventListener('input', () => {
   aaVal.textContent = aaText(CONFIG.aa);
   saveSettings();
 });
-for (const [id, key] of [['setShadows', 'shadows'], ['setBloom', 'bloom']]) {
+// Soft edges applies only to shadows, so it is disabled while Shadows is off.
+const softEl = $('setSoft'), syncSoft = () => { softEl.disabled = !CONFIG.shadows; };
+for (const [id, key] of [['setShadows', 'shadows'], ['setSoft', 'softShadows'], ['setBloom', 'bloom']]) {
   const el = $(id);
   el.checked = CONFIG[key];
-  el.addEventListener('change', () => { CONFIG[key] = el.checked; saveSettings(); });
+  el.addEventListener('change', () => { CONFIG[key] = el.checked; syncSoft(); saveSettings(); });
 }
+syncSoft();
 
 // Time of day: the slider shows the clock in hours (0-24). dayTime 0 is sunrise at 06:00.
 // The world save holds dayTime, so a new time saves with the world. Freeze time is a setting for all worlds.

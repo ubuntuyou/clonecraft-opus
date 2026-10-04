@@ -117,6 +117,8 @@
   .settings .chks { display: flex; gap: 20px; }
   .settings .chk { display: flex; align-items: center; gap: 8px; min-height: 26px; justify-self: start; cursor: pointer; }   /* the label text is part of the hit area */
   .settings input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: #8b8b8b; cursor: pointer; }
+  .settings .chk:has(input:disabled) { opacity: .5; cursor: default; }   /* Soft edges while Shadows is off */
+  .settings input[type=checkbox]:disabled { cursor: default; }
   .settings .group { grid-column: 1 / -1; margin-top: 8px; font-weight: bold; color: #ffff55; text-shadow: 1px 1px 0 #3f3f00; }   /* the .controls key color */
   .settings .group:first-child { margin-top: 0; }
   .heading { font-size: 28px; font-weight: 900; letter-spacing: 2px; margin: 2px 0 10px; text-shadow: 2px 2px 0 #3f3f3f; }
@@ -307,7 +309,8 @@
       <label for="setFov">Field of view</label><input id="setFov" type="range" min="50" max="110" step="1"><span id="valFov"></span>
       <label for="setScale">Render scale</label><input id="setScale" type="range" min="0.5" max="1" step="0.05"><span id="valScale"></span>
       <label for="setAA">Anti-aliasing</label><input id="setAA" type="range" min="0" max="4" step="1"><span id="valAA"></span>
-      <span>Effects</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">Shadows</label><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
+      <span>Shadows</span><span class="chks"><label class="chk"><input id="setShadows" type="checkbox">On</label><label class="chk"><input id="setSoft" type="checkbox">Soft edges</label></span><span></span>
+      <span>Effects</span><span class="chks"><label class="chk"><input id="setBloom" type="checkbox">Bloom + shafts</label></span><span></span>
       <div class="group">Controls</div>
       <label for="setSens">Mouse sensitivity</label><input id="setSens" type="range" min="0.2" max="3" step="0.05"><span id="valSens"></span>
       <div class="group">Sound</div>

@@ -17,7 +17,7 @@ const terrainUniforms = {
   uGlow: { value: 1 },                                                     // glowGain: HDR boost of the water glint
   // G3 shadows (`shadows` module): depth map from the sun or moon, world -> shadow clip matrix, on/off
   uShadowMap: { value: null }, uShadowMat: { value: new THREE.Matrix4() }, uShadowOn: { value: 0 }, uShadowBias: { value: 0.0003 },
-  uShadowTexel: { value: 1 / 2048 },
+  uShadowTexel: { value: 1 / 2048 }, uShadowSoft: { value: 1 },
   // G4 held torch (`heldLight` module): 32^3 light levels around the head, world origin of cell 0, on/off
   uHeld: { value: null }, uHeldOrigin: { value: new THREE.Vector3() }, uHeldOn: { value: 0 },
   uWet: { value: 0 },                                                      // weather wetness 0..1
@@ -73,9 +73,18 @@ const terrainUniforms = {
   terrainUniforms.uRipple.value = tex(rip);
 })();
 const TERRAIN_VS = /* glsl */`
+  // MSAA runs an edge pixel's shader at the pixel centre, which can lie outside the triangle. Plain
+  // varyings then extrapolate: vUv leaves its atlas tile and samples a bright neighbour tile (flashes on
+  // distant faces). Centroid sampling keeps vUv, vLight, and vCry inside the triangle. WebGL 1 has no
+  // centroid; it has no MSAA here either.
+  #if __VERSION__ >= 300
+  #define CENTROID centroid
+  #else
+  #define CENTROID
+  #endif
   attribute vec2 aUv; attribute vec4 aLight; attribute vec4 aTint; attribute float aCry;
-  varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
+  CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
+  CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
   void main() {
     vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66) + 2.0 * step(0.665, aTint.a) * step(aTint.a, 0.69);   // pane: 1 ember (160), 2 crystal (172)
@@ -107,16 +116,22 @@ const TERRAIN_VS = /* glsl */`
 const TERRAIN_FS = /* glsl */`
   uniform sampler2D map; uniform float uDaylight; uniform vec3 uSkyLight; uniform vec3 uAmbient; uniform float uTorch; uniform float uTime;
   uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar; uniform vec3 uSunDir; uniform float uSunAmt; uniform float uGlow;
-  uniform highp sampler2DShadow uShadowMap; uniform mat4 uShadowMat; uniform float uShadowOn; uniform float uShadowBias; uniform float uShadowTexel;
+  uniform highp sampler2DShadow uShadowMap; uniform mat4 uShadowMat; uniform float uShadowOn; uniform float uShadowBias; uniform float uShadowTexel; uniform float uShadowSoft;
   uniform sampler2D uCaus; uniform sampler2D uRipple;
   uniform highp sampler3D uHeld; uniform vec3 uHeldOrigin; uniform float uHeldOn; uniform float uWet;
-  varying vec2 vUv; varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
-  varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
+  #if __VERSION__ >= 300
+  #define CENTROID centroid
+  #else
+  #define CENTROID
+  #endif
+  CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
+  CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   float curve(float l) { return (pow(0.83, (1.0 - l) * 15.0) - 0.0611) / 0.9389; }
   // block light (torches, lava) falls off slower than sky light, so a torch reaches farther
   float curveB(float l) { return (pow(0.85, (1.0 - l) * 15.0) - 0.0874) / 0.9126; }
   // G3 (P2): 1 = sunlit, 0 = in shadow. Hardware-filtered depth compares: each read blends 4 texels.
   // Terrain takes 4 reads on a square turned by per-pixel noise (a soft ~0.3-block penumbra); water takes 1.
+  // With Soft shadows off (uShadowSoft 0), terrain also takes 1 read: a hard edge.
   // Fades to 1 at the edge of the shadow box.
   float shadowLit(vec3 n, bool soft) {
     vec4 sc = uShadowMat * vec4(vWorld + n * 0.12, 1.0);
@@ -195,7 +210,7 @@ const TERRAIN_FS = /* glsl */`
       #ifdef WATER
       if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, false) * cloudLit();
       #else
-      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, true) * cloudLit();
+      if (ndl > 0.0 && uSunAmt > 0.0) lit = shadowLit(n, uShadowSoft > 0.5) * cloudLit();
       #endif
       float open = smoothstep(0.6, 0.95, vLight.x);
       float direct = max(ndl, 0.0) * lit * open * uSunAmt;

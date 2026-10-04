@@ -85,7 +85,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 - Zombies and skeletons burn in daylight. Creepers explode and break blocks. Skeletons keep their distance and shoot arrows. Spiders climb walls and leap; in bright light they stay neutral until hit. Magma Brutes live in caves below y 40, glow, walk through lava, and hit hard.
 - Armor in 6 tiers (leather, copper, steel, gold, ruby, diamond) in 4 slots. Each armor point cuts combat damage by 4%, up to 80%. Falls, lava, and cactus ignore armor.
 - Enchanting Altar (4 obsidian, 2 diamonds, 2 crystals, 1 Magma Core): spend 1–3 crystals to add Efficiency, Fortune, Sharpness, Unbreaking, Protection, Power, or Feather Falling (levels I–III) to a tool, armor piece, or bow. An item holds up to 3 enchantments. Enchanted icons shimmer purple.
-- A bow (3 sticks, 3 string) and arrows (flint, stick, feather make 4). A full draw takes 1 s and deals up to 9 damage. Gravel drops flint.
+- A bow (3 sticks, 3 string) and arrows (flint, stick, feather make 4). A full draw takes 1 s and deals up to 9 damage. Gravel drops flint. The player picks up stuck arrows, skeleton arrows included, by walking near them.
 - Travel: boats (5 planks) row at 6 blocks/s on water and crawl on land. Rails (6 steel and 1 stick make 16) join straight, curve at corners, and slope up one block. Minecarts (5 steel) ride the rails at up to 8 blocks/s and speed up downhill. Two hits break a boat or a cart.
 - A compass (4 steel, 1 crystal) shows a dial that points to the spawn, with the distance in blocks.
 - Structures: dungeons of 2 to 4 rooms at different levels, joined by stairs or ladders, with a mob spawner and chests, desert temples with a TNT trap under the chest room (a rattle warns when you come near the trap), ruined brick towers with a chest on top, and mineshafts with rails, cobwebs, and chests. Each structure has its own loot. A chest fills once, and the loot is the same for the same seed.
@@ -103,7 +103,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 - Export World downloads the current world as a JSON file. Import World opens a world from such a file. If that seed already has a save, the game asks before it replaces the save.
 - Procedural WebAudio sound effects and point particles.
 - Bloom on the sun, moon, torch flames, and water glint. Light shafts from the sun or moon through gaps in leaves, terrain, and clouds.
-- A Settings screen, opened from the title or pause menu, for render distance, field of view, render scale, anti-aliasing (Off, FXAA, or MSAA up to the GPU limit), shadows, bloom and light shafts, mouse sensitivity, volume, the time of day, and freeze time. The browser keeps them in `localStorage`.
+- A Settings screen, opened from the title or pause menu, for render distance, field of view, render scale, anti-aliasing (Off, FXAA, or MSAA up to the GPU limit), shadows and their soft edges, bloom and light shafts, mouse sensitivity, volume, the time of day, and freeze time. The browser keeps them in `localStorage`.
 
 ## Test handle
 
