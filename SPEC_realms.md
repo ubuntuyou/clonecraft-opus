@@ -66,15 +66,17 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 - Light: no sky light reaches inside. An ambient floor of level 9, tinted red-orange, keeps unlit caves visible. (Phase 2 raised it from 6: level 6 read as near-black on screenshots.) Lava and Ember Lamps give block light.
 - Fog is dark red and ends at 72 blocks or the render distance, whichever is nearer. Ash particles drift in the air around the camera.
 - Water: a water bucket used in the Ember Realm makes steam particles and a hiss. The bucket empties, and no water appears. Ice and snow do not exist there.
-- Hostile spawns ignore day and night. A mob spawns where block light is 11 or less. Weights: Magma Brute 35 %, Ember Wisp 45 %, Cinder Knight 20 % (Cinder Knights spawn only inside fortress bounds).
+- Hostile spawns ignore day and night. A mob spawns where block light is 11 or less. Weights: Magma Brute 35 %, Ember Wisp 45 %, Cinder Knight 20 % (Cinder Knights spawn only inside fortress bounds). Outside a fortress the weights are 35:45 (43.75 % and 56.25 %). The realm has a roof, so a spawn try picks a height within 20 blocks of the player's height.
 
 #### Ember Fortress
 
 - Each cell of a 96-block grid (in Ember Realm coordinates) holds one fortress. Its keep sits inside one chunk near the cell center.
+  - The keep centre sits at cell offset 40 or 55 on each axis. The x offset follows the parity of the grid z, and the z offset the parity of the grid x. So no two fortresses share a column.
+  - The keep floor is the height in 40..84 with the most open cells along the 4 bridge axes.
 - The keep: a 13×13 room of Ember Bricks, 6 blocks tall, standing on brick pillars that reach the floor or the lava. It holds a Cinder Knight spawner and the heart chest.
 - The heart chest always holds 1 Ember Heart, plus fortress loot.
 - 2 to 4 bridges leave the keep along x and z. A bridge is 5 wide, with a 1-block rail on each side, and 32 to 64 long. Brick pillars hold it up every 8 blocks. Each chunk stamps its own part of a bridge, as mineshafts do (D28).
-- A bridge ends in a small room with 1 chest, 1 time in 2.
+- A bridge ends in a small room, 7 blocks deep. The room holds 1 chest, 1 time in 2.
 - A player walks from any bridge end into the keep without digging.
 - Fortress loot: Emberite Ingots, Raw Emberite, Ember Dust, Magma Cores, diamonds, obsidian, golden apples, and enchanted diamond tools.
 
@@ -82,11 +84,11 @@ The game gets an end game. Two new realms sit beside the overworld. The Ember Re
 
 - Raw Emberite smelts into an Emberite Ingot.
 - Emberite tier: tools (pickaxe, sword, axe, shovel, hoe) and armor. Recipes use the vanilla shapes.
-  - Tools: level 6, speed 11, durability 2400. Damage: pickaxe 7, sword 9, axe 9, shovel 6.
+  - Tools: level 6, speed 11, durability 2400. Damage: pickaxe 7, sword 9, axe 9, shovel 6, hoe 4.
   - Armor: points 3/8/6/3, durability factor 40. Each worn piece also cuts lava damage by 20 %.
 - Ember Dust: burns in a furnace for 60 s. 4 Ember Dust in a 2×2 craft 1 Ember Lamp.
-- Ember Wisp: 10 HP. It flies and hovers 2–6 blocks above the floor. It keeps 8 to 16 blocks from the player. It shoots a fireball every 3 s with a line of sight. A fireball flies straight at 12 blocks per s, deals 5 (armored), and shows a small burst. It breaks no blocks. The wisp drops 0–2 Ember Dust.
-- Cinder Knight: 30 HP, speed 2.4, a hit of 6, and half knockback. Arrows deal half damage to it. It drops 0–2 coal and Raw Emberite 1 time in 3.
+- Ember Wisp: 10 HP, fireproof. It flies and hovers 2–6 blocks above the floor. It chases a player within 28 blocks. While it chases, it also stays 2–4 blocks above the player's feet, so it does not sink below a bridge deck over the lava sea. It keeps 8 to 16 blocks from the player. It shoots a fireball every 3 s with a line of sight. A fireball flies straight at 12 blocks per s, deals 5 (armored), and shows a small burst. It breaks no blocks. The wisp drops 0–2 Ember Dust.
+- Cinder Knight: 30 HP, fireproof, speed 2.4, a hit of 6, and half knockback. Arrows deal half damage to it. It drops 0–2 coal and Raw Emberite 1 time in 3.
 - Magma Brute: unchanged, and it now also spawns in the Ember Realm.
 
 #### Ember portal

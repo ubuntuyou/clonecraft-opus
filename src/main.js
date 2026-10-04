@@ -32,7 +32,7 @@ import { lineOfSight, Mob, mobs, updateMobs } from './mobs.js';
 import { vehicles } from './vehicles.js';
 import { projectiles } from './projectiles.js';
 import { explode, primedTnt, primeTnt, updateTnt } from './explosions.js';
-import { spawners, spawnHostiles } from './spawning.js';
+import { emberType, spawners, spawnHostiles } from './spawning.js';
 import { particles } from './particles.js';
 import { audio } from './audio.js';
 import { hud } from './hud.js';
@@ -129,7 +129,7 @@ window.clonecraft = {
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
   spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, portals, heldLight, shadows, clouds,
-  realm, REALMS, defaultTarget, standNear,
+  realm, REALMS, defaultTarget, standNear, emberType,
 };
 
 requestAnimationFrame(frame);

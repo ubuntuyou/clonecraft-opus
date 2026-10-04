@@ -1,13 +1,14 @@
 // ---- spawning ---------------------------------------------------------------------------
 import { THREE } from './three.js';
 import {
-  CS, H, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32, randInt, randRange, SEED,
-  UNLOADED,
+  clamp, CS, EMBER_SPAWN_LIGHT, emberMobType, H, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32,
+  randInt, randRange, SEED, UNLOADED,
 } from './config.js';
 import { B, baseOf, IS_LEAF, LIQ_KIND, OPAQUE, SOLID } from './blocks.js';
 import { BIOME } from './biomes.js';
 import { game, player, scene, world } from './engine.js';
 import { FACE_NORMAL } from './interact.js';
+import { WG } from './gen-service.js';
 import { Mob, MOB_TEXTURES, MOB_TYPES, mobs } from './mobs.js';
 import { particles } from './order.js';
 
@@ -71,10 +72,29 @@ function spawnRoom(x, y, z, def) {
   }
   return true;
 }
+// The overworld mob type for a floor cell (x, y, z), or null when the cell is too bright.
+function overworldType(x, y, z) {
+  // a cave below y 40 (no sky light) spawns a Magma Brute 1 time in 8, in any light
+  if (y < 40 && world.getSky(x, y, z) === 0 && Math.random() < 1 / 8) return 'brute';
+  const light = Math.max(Math.round(world.getSky(x, y, z) * game.daylight), world.getBlk(x, y, z));
+  if (light > 7) return null;
+  const r = Math.random();
+  return r < 0.35 ? 'zombie' : r < 0.65 ? 'skeleton' : r < 0.85 ? 'creeper' : 'spider';
+}
+// The Ember Realm mob type for a floor cell (x, y, z), or null when the block light is too high.
+// Cinder Knights spawn only inside fortress bounds (WG.inFortress).
+function emberType(x, y, z) {
+  if (world.getBlk(x, y, z) > EMBER_SPAWN_LIGHT) return null;
+  return emberMobType(Math.random(), WG.inFortress(x, y, z));
+}
+// Every 0.35 s: up to 6 tries at a floor cell 24..44 blocks from the player. The overworld and the
+// Ember Realm spawn hostiles; the Crystal Realm spawns none. An ember try starts within 20 blocks
+// of the player's height, because the realm has a roof.
 let spawnTimer = 0;
 function spawnHostiles(dt) {
   spawnTimer -= dt;
-  if (spawnTimer > 0 || player.dead || world.realm !== 'overworld') return;
+  const ember = world.realm === 'ember';
+  if (spawnTimer > 0 || player.dead || (world.realm !== 'overworld' && !ember)) return;
   spawnTimer = 0.35;
   if (hostileCount() >= MAX_HOSTILE) return;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -83,24 +103,15 @@ function spawnHostiles(dt) {
     const c = world.chunkAt(x, z);
     if (!c || !c.meshed) continue;
     const top = c.heights[(z & 15) * CS + (x & 15)];
-    let y = randInt(2, Math.min(H - 3, top + 1));
+    let y = ember ? clamp(Math.floor(player.pos.y) + randInt(-20, 20), 2, H - 3) : randInt(2, Math.min(H - 3, top + 1));
     while (y > 1 && !SOLID[world.getBlock(x, y - 1, z)]) y--;
     const below = world.getBlock(x, y - 1, z);
     if (!OPAQUE[below] || below === B.BEDROCK || IS_LEAF[below]) continue;
     const b0 = world.getBlock(x, y, z), b1 = world.getBlock(x, y + 1, z);
     if (SOLID[b0] || SOLID[b1] || LIQ_KIND[b0] || LIQ_KIND[b1]) continue;
     if (Math.hypot(x + 0.5 - player.pos.x, y - player.pos.y, z + 0.5 - player.pos.z) < 24) continue;
-    // a cave below y 40 (no sky light) spawns a Magma Brute 1 time in 8, in any light
-    const cave = y < 40 && world.getSky(x, y, z) === 0;
-    let type;
-    if (cave && Math.random() < 1 / 8) type = 'brute';
-    else {
-      const light = Math.max(Math.round(world.getSky(x, y, z) * game.daylight), world.getBlk(x, y, z));
-      if (light > 7) continue;
-      const r = Math.random();
-      type = r < 0.35 ? 'zombie' : r < 0.65 ? 'skeleton' : r < 0.85 ? 'creeper' : 'spider';
-    }
-    if (!spawnRoom(x, y, z, MOB_TYPES[type])) continue;
+    const type = ember ? emberType(x, y, z) : overworldType(x, y, z);
+    if (!type || !spawnRoom(x, y, z, MOB_TYPES[type])) continue;
     mobs.push(new Mob(type, x + 0.5, y, z + 0.5));
     return;
   }
@@ -180,4 +191,4 @@ const spawners = (() => {
   return { update, live, clear };
 })();
 
-export { hostileCount, spawners, spawnHostiles };
+export { emberType, hostileCount, spawners, spawnHostiles };

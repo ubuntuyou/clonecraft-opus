@@ -26,7 +26,8 @@ test('each I id has an ITEMS entry', () => {
 test('every block id fits in a chunk byte and is not UNLOADED', () => {
   assert.deepEqual(BLOCKS.map((b, id) => b && id).filter((id) => id !== undefined && id !== false && (id < 0 || id >= UNLOADED)), []);
 });
-test('armor ids are 300..323 and follow 300 + 4 * tier + piece', () => {
+// Phase 4 adds the Emberite tier (6) at 324..327.
+test('armor ids are 300..327 and follow 300 + 4 * tier + piece', () => {
   const ids = [];
   ARMOR_TIERS.forEach((t, tier) => ARMOR_PIECES.forEach((p, piece) => {
     const id = armorId(tier, piece);
@@ -35,7 +36,7 @@ test('armor ids are 300..323 and follow 300 + 4 * tier + piece', () => {
     ids.push(id);
   }));
   assert.equal(Math.min(...ids), 300);
-  assert.equal(Math.max(...ids), 323);
+  assert.equal(Math.max(...ids), 327);
 });
 // Ids 176..186 are the realm blocks; each phase adds its own. 182..199 stay empty until then.
 // The Ember portal block (181) has no item: only ignition makes it.

@@ -833,6 +833,7 @@ const MAT_COL = {
   ruby: [[118, 8, 28], [204, 30, 60], [255, 116, 140]],
   diamond: [[28, 126, 126], [78, 216, 206], [196, 255, 250]],
   leather: [[96, 50, 28], [150, 80, 44], [176, 104, 60]],
+  emberite: [[52, 16, 20], [108, 34, 34], [222, 104, 50]],
 };
 const HANDLE = [[78, 56, 28], [120, 88, 46], [150, 114, 64]];
 function drawHandle(set, from, to) {
@@ -1031,6 +1032,25 @@ ITEM_PIX[I.EMBER_DUST] = pixArt((set) => {
     set(x, y, rng() < 0.2 ? [255, 236, 160] : t > 0.5 ? [255, 168, 56] : [214, 84, 24]);
   }
   for (const [x, y] of [[4, 5], [11, 4], [8, 3], [13, 6]]) set(x, y, [255, 196, 90]);
+});
+// Phase 4: the Emberite ingot, and the Ember Heart (a heart of dark rock with a glowing core).
+ITEM_PIX[I.EMBERITE] = pixArt((set) => {
+  const C = MAT_COL.emberite;
+  for (let y = 5; y <= 11; y++) for (let x = 2; x <= 13; x++) {
+    const inset = (11 - y) * 0.4; if (x < 2 + inset || x > 13 - inset) continue;
+    set(x, y, y === 5 ? C[2] : y >= 10 ? C[0] : C[1]);
+  }
+  for (const [x, y] of [[5, 7], [9, 8], [11, 7], [7, 9]]) set(x, y, [255, 170, 70]);
+});
+ITEM_PIX[I.EMBER_HEART] = pixArt((set) => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const u = (x + 0.5 - 8) / 6.4, v = (8.6 - (y + 0.5)) / 6.4;   // the heart curve: (u² + v² − 1)³ ≤ u² v³
+    const f = (u * u + v * v - 1) ** 3 - u * u * v * v * v;
+    if (f > 0) continue;
+    const core = Math.hypot(x + 0.5 - 8, y + 0.5 - 8.5);
+    set(x, y, f > -0.02 ? [40, 10, 12] : core < 2.2 ? [255, 236, 170] : core < 3.6 ? [255, 150, 48] : core < 4.8 ? [196, 58, 26] : [96, 24, 22]);
+  }
+  set(5, 5, [255, 210, 170]);
 });
 // Travel icons (Batch 16): a boat and a minecart from the side, a compass from above.
 ITEM_PIX[I.BOAT] = pixArt((set) => {

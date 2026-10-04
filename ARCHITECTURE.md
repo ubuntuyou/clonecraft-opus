@@ -282,6 +282,19 @@ Removal runs from `world.onEdit`. An edit that changes a portal cell, or that re
 The pane is one double-sided quad in the water pass, so it blends with the transparent geometry and casts no shadow.
 Every 'travel' state disarms the portal: portal travel, respawn, and home travel. The player must step out of the pane before the timer runs again. So an arrival inside a portal never sends the player straight back.
 
+### D50. Ember fortresses sit on a 96-block grid with parity offsets
+
+Each 96-block grid cell of the Ember Realm holds one fortress. The keep centre sits at cell offset 40 or 55 on each axis. The x offset follows the parity of the grid z, and the z offset follows the parity of the grid x. With a reach of 78 blocks (keep half-width plus the longest bridge and its end room), no column belongs to two fortresses. So the stamp order of two fortresses never matters.
+`fortressPlan(gx, gz)` is pure and memoized. It picks the floor height, the bridges, the end rooms, and the chests from a cell hash and from `emberSample`, which is a pure function of world coordinates. Each chunk asks the plans that can reach it and stamps only its own cells, as the mineshafts do (D28).
+The plan is also the spawn rule. `inFortress(x, y, z)` tests the plan boxes, and the main thread calls it through `WG` (`gen-service.js`). So the Cinder Knight spawn needs no chunk feature and no save field.
+The heart chest is a normal generated chest with loot type `heart`. `lootChest()` fills it on first touch and `looted` keeps it, so the Ember Heart appears once per fortress.
+
+### D51. Ember mobs extend `Mob` with definition fields; fireballs are projectiles
+
+The Ember Wisp and the Cinder Knight are ordinary `Mob` instances. Their differences live in `MOB_DEFS` fields that the shared code reads: `flies` (no gravity, hover, and a rise over a wall), `fireproof`, `kbRes` (a knockback cut), and `arrowRes` (a player-arrow damage factor, read in `projectiles.js`). A new mob kind with one of these traits needs no new code path.
+A flyer hovers relative to the floor below it. Over a low floor, such as the lava sea beside a bridge, a floor-relative hover sinks the flyer below the deck and breaks its line of sight. So a chasing flyer also stays 1 + hover/2 blocks above the player's feet.
+A fireball is a `projectiles` entry with `kind: 'fireball'`. It flies straight with no gravity, hits only the player, and bursts on a solid or liquid cell. It breaks no block, so it makes no edit and no save state.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -301,11 +314,11 @@ Every 'travel' state disarms the portal: portal travel, respawn, and home travel
 | save | `persist.save()` writes the save. `persist.apply(SAVE)` restores it at boot. |
 | light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |
 | player damage | `damagePlayer(amount, cause, from, kind)` is the only damage path for the player. `kind` selects armor (D24). |
-| projectiles | `projectiles.shoot(x, y, z, vx, vy, vz, dmg, shooter)` launches an arrow. `projectiles.update(dt)` runs once per frame. |
+| projectiles | `projectiles.shoot(x, y, z, vx, vy, vz, dmg, shooter)` launches an arrow. `projectiles.fireball(x, y, z, dx, dy, dz, dmg, shooter)` launches a fireball along a unit direction (D51). `projectiles.update(dt)` runs once per frame. |
 | enchantments | `enchLevel(stack, key)` returns 0..3. Each effect site (mining, drops, attack, wear, armor, bow, fall) reads it (D26). |
 | vehicles | `vehicles.update(dt)` runs once per frame before `updatePlayer`. `vehicles.mount(v)`, `dismount()`, and `placeHeld(item)` are the entry points (D27). |
 | structure loot | `lootChest(x, y, z)` returns the filled tile entity of an unfilled generated chest, or null. `tileEntity()` and the chest spill call it (D28). |
-| spawners | `spawners.update(dt)` runs once per frame. It reads `chunk.features` and counts against `MAX_HOSTILE` (D28). |
+| spawners | `spawners.update(dt)` runs once per frame. It reads `chunk.features` and counts against `MAX_HOSTILE` (D28). In the Ember Realm, `spawnHostiles` picks the type with `emberType`, which asks `WG.inFortress` (D50). |
 | weather | `weather.update(dt)` runs once per frame before `sky.update`. The sky reads `weather.k`, `storm`, `dim`, and `flash`. Mobs read `weather.wetAt(x, z)`. `set(kind, seconds)` and `strike(x, z)` are the entry points (D29). |
 | clouds | `clouds.advance(dt, weather.k, weather.storm)` runs once per frame from `sky.update`. Shaders spread `cloudUniforms` and include `CLOUD_GLSL`; `clouds.densityAt(x, z)` gives the same density on the CPU (D44). |
 | screens | `setState(s)`. |

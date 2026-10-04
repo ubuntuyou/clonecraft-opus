@@ -106,10 +106,17 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `portals.go()` does not clear `armed`. The 'travel' state that `go()` starts clears it. Any new travel path must pass through the 'travel' state, or an arrival in a pane sends the player back.
 - A boat is about 1.4 blocks wide. Spawn it at the centre of a 2-wide opening, or the vehicle code lifts it clear of the frame.
 - `CONFIG.shadows` false sets `uShadowOn` 0. The terrain then uses the old ±12 % face term, not the ambient-plus-direct split.
+- `world.getBlk(x, y, z)` returns the block light, not the block id. Use `world.getBlock` for the id.
+- A player arrow has `shooter` null. An arrow with a shooter hits only the player. To test arrow damage on a mob, call `projectiles.shoot(...)` with `shooter` null and a level velocity.
+- The tool id formula `base + tier` collides at tier 8 (pickaxe 208 is `BONE_MEAL`). Emberite tools take ids 270..274 instead.
+- A flyer's hover is relative to the floor below it. Without the chase height rule (ARCHITECTURE D51), a wisp over the lava sea sinks below the bridge deck, loses line of sight, and stops firing.
+- Ember spawn pressure: the natural spawn uses the overworld rate (1 try per 0.35 s up to `MAX_HOSTILE`). The realm is dark almost everywhere, so the cap fills in about 6 s.
 
 ## Pointers
 
 - Realm QA: `clonecraft.realm.travel('ember')`, `('crystal')`, or `('overworld')` switches the realm. Crystal stub terrain loads too fast to see the travel screen. To hold it, set `clonecraft.world.update = () => {}` before the travel, then `delete clonecraft.world.update`.
+- Ember content QA: `clonecraft` exposes `Mob`, `mobs`, `projectiles`, `spawners` (`.live`), `looted`, `featureAt`, `emberType`, `WG`, and `respawn`. On seed 12345, fortress cell (0, 0) has its keep centre at (40, 40), the floor at y 84, the spawner at (40, 85, 40), and the heart chest at (36, 85, 36).
+- Mob QA in headless Chromium: a per-frame health refill does not stop a death. Set `player.invuln = 99` every frame instead. After a death, `setState('playing')` hides the death screen but leaves `player.dead` true. Call `respawn()`, wait for the 'travel' state to end, then travel back.
 - Portal QA: `clonecraft.portals` exposes `t`, `armed`, `cells`, `humGain`, `vignette`, `lastBuild`, `touching()`, and `go()`. `clonecraft.vehicles.spawn(kind, x, y, z, yaw)` plus `mount(v)` seat the player for the rider test.
 
 - Game time: `game.dayTime` is 0..1. 0 is 06:00, 0.25 is noon, 0.5 is 18:00, and 0.75 is midnight.

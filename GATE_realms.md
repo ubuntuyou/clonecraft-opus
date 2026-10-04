@@ -8,8 +8,9 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 - [x] `migrateIds` maps every stack id in 176..199 to id + 124 in the inventory, the loose stacks, the armor slots, and every chest and furnace. A save with `ids: 2` passes through unchanged. (Node test on a built old save.)
 - [x] An old save from HEAD before Phase 0 loads in Chromium with its worn armor, armor in the inventory, armor in a chest, its edits, and its homes. Armor points and durability match the old save.
 - [x] An old export file imports and loads the same way.
-- [ ] An item with an id of 256 or more survives every stack path: pick up, hotbar, held view model, icon, tooltip, split, drop, chest, furnace fuel and output, trash and undo, craft result, death drop, save, export, and import.
+- [x] An item with an id of 256 or more survives every stack path: pick up, hotbar, held view model, icon, tooltip, split, drop, chest, furnace fuel and output, trash and undo, craft result, death drop, save, export, and import.
   Note (Phase 0): armor ids 300..323 passed pick up, hotbar, held view model, icon, tooltip, move, armor slot, chest, trash and undo, craft result (recipe in the table grid), Q drop, death drop, save, export, and import. Split and furnace fuel and output need a stackable, burnable, or smeltable id of 256 or more. None exists before Phase 4 (Raw Emberite, Ember Dust, Emberite Ingot), so this item stays open until Phase 4 checks those paths.
+  Note (Phase 4): Playwright: a right-click split of a Raw Emberite (256) stack gave two halves. Ember Dust (259) went into the furnace fuel slot and burned. Raw Emberite went into the input slot, and an Emberite Ingot (257) came out of the output slot into the inventory.
 - [ ] Ids 176..186 are blocks and fit in a chunk byte. No B id and I id overlap. (Node test.)
   Note (Phase 0): the Node tests prove every block id is below 255, ids 176..199 are free, and B and I do not overlap. The blocks 176..186 arrive in Phases 2, 3, 5, and 6. This item closes when the last of them exists.
 
@@ -92,17 +93,28 @@ Spec: `SPEC_realms.md`. `[x]` means I observed it in Chromium through Playwright
 
 ## Phase 4: Ember content
 
-- [ ] Raw Emberite smelts to an Emberite Ingot. Every Emberite tool and armor piece crafts with the vanilla shape through real recipe-book clicks.
-- [ ] Emberite tools: level 6, speed 11, durability 2400, and the spec damage values. Emberite armor: points 3/8/6/3, durability factor 40. A full set cuts lava damage by 80 %.
-- [ ] Ember Dust burns 60 s in a furnace. 4 dust in a 2×2 craft 1 Ember Lamp.
-- [ ] Fortresses generate on the 96-block grid: a keep in one chunk, 2 to 4 bridges, pillars to the floor or lava, and end rooms. No cell of a stamp lies outside its chunk. The same seed gives the same fortress. (Node scan.)
-- [ ] A walk check finds a path from every bridge end into the keep without digging. (Node walk check, and one walk in Chromium.)
-- [ ] Every keep's heart chest holds exactly 1 Ember Heart. The other chests hold fortress loot. Loot fills on first touch and is the same on every visit.
-- [ ] The keep spawner makes Cinder Knights.
-- [ ] Ember Wisp: flies, keeps 8–16 blocks away, fires a fireball every 3 s with line of sight. A fireball deals 5 (armored), bursts, and breaks no block. Drops 0–2 Ember Dust.
-- [ ] Cinder Knight: 30 HP, a hit of 6, half damage from arrows, half knockback. Drops 0–2 coal and Raw Emberite 1 time in 3.
-- [ ] Spawns in the Ember Realm follow the weights and the light rule. Cinder Knights spawn only inside fortress bounds. Magma Brutes spawn there too. (Count over many spawn rolls.)
-- [ ] Mob models and textures look right. (Screenshots.)
+- [x] Raw Emberite smelts to an Emberite Ingot. Every Emberite tool and armor piece crafts with the vanilla shape through real recipe-book clicks.
+  Note (Phase 4): Node test for every shape. Playwright: Raw Emberite smelted to an ingot in a furnace. All 9 pieces (5 tools, 4 armor) crafted through recipe-book clicks.
+- [x] Emberite tools: level 6, speed 11, durability 2400, and the spec damage values. Emberite armor: points 3/8/6/3, durability factor 40. A full set cuts lava damage by 80 %.
+  Note (Phase 4): Node test for the stats (hoe damage 4, rsh's choice). Playwright: the worn full set read 20 points and cut lava damage by 80 %.
+- [x] Ember Dust burns 60 s in a furnace. 4 dust in a 2×2 craft 1 Ember Lamp.
+  Note (Phase 4): Node test, and Playwright: one dust gave `burnMax` 60, and 4 dust in the 2×2 grid gave 1 Ember Lamp.
+- [x] Fortresses generate on the 96-block grid: a keep in one chunk, 2 to 4 bridges, pillars to the floor or lava, and end rooms. No cell of a stamp lies outside its chunk. The same seed gives the same fortress. (Node scan.)
+  Note (Phase 4): Node scan of the 25 cells in −2..2: every keep lies in one chunk, every planned brick exists across chunk edges, every pillar ends on rock, lava, or bedrock, and no column belongs to 2 fortresses. A chunk writes only its own array; two generations and a `toString` copy give the same bytes.
+- [x] A walk check finds a path from every bridge end into the keep without digging. (Node walk check, and one walk in Chromium.)
+  Note (Phase 4): Node walk check passes for every bridge of the 25 fortresses. Playwright: a held-W walk went from the west end room (x −29.5) into the keep (x 37.8) in 15.6 s, with no dig and no drop below y 85.
+- [x] Every keep's heart chest holds exactly 1 Ember Heart. The other chests hold fortress loot. Loot fills on first touch and is the same on every visit.
+  Note (Phase 4): Node test: one heart chest per keep, and `LOOT.heart` puts 1 Ember Heart first; fortress loot has no heart. Playwright: the heart chest (36, 85, 36) held 1 Ember Heart plus fortress loot; the room chest (−31, 85, 40) held fortress loot. Both kept the same stacks on reopen, after an overworld round trip, and after a page reload.
+- [x] The keep spawner makes Cinder Knights.
+  Note (Phase 4): Playwright: the spawner at (40, 85, 40) was live with type knight and made 2 Cinder Knights within 1 block of it. Natural spawns cannot land within 24 blocks of the player.
+- [x] Ember Wisp: flies, keeps 8–16 blocks away, fires a fireball every 3 s with line of sight. A fireball deals 5 (armored), bursts, and breaks no block. Drops 0–2 Ember Dust.
+  Note (Phase 4): Playwright found a defect: over the lava sea the wisp sank below the deck and fired twice in 16 s. The chase height rule fixed it (ARCHITECTURE D51). After the fix: shots 3.0..3.1 s apart, 14 blocks away, 2..4.8 above the player's feet; a wisp spawned at 4.8 blocks backed off to 8.7. Hits dealt 5 bare and 1 in full diamond armor. `flameBurst` ran, and `world.overrides` stayed unchanged. Drops over 6000 rolls: 0, 1, or 2 dust at about 1/3 each.
+- [x] Cinder Knight: 30 HP, a hit of 6, half damage from arrows, half knockback. Drops 0–2 coal and Raw Emberite 1 time in 3.
+  Note (Phase 4): Playwright: hp 30; hits of 6 on the bare player; an 8-damage player arrow dealt 4 (8 on a zombie); knockback velocity 3 against 6 for a zombie. Drops over 6000 rolls: 0, 1, or 2 coal at about 1/3 each, and Raw Emberite 0.322.
+- [x] Spawns in the Ember Realm follow the weights and the light rule. Cinder Knights spawn only inside fortress bounds. Magma Brutes spawn there too. (Count over many spawn rolls.)
+  Note (Phase 4): Node tests, and Playwright with the real `emberType`: fortress cell brute 0.347, knight 0.200, wisp 0.453; open cell brute 0.429, wisp 0.571, no knight. Block light 12 and 14 gave no spawn; 9, 10, and 11 always spawned.
+- [x] Mob models and textures look right. (Screenshots.)
+  Note (Phase 4): screenshots: the knight shows the helm, visor, glowing eyes, plume, pauldrons, belt, and sword. The wisp shows a glowing face and flame shards. The fireball shows an orange shell and a flame trail. Joe has not reviewed the look.
 
 ## Phase 5: Crystal Realm
 

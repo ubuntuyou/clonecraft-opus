@@ -3,6 +3,9 @@
 // mob on its path; a mob arrow hits only the player. An arrow that meets a solid cell sticks there
 // for ARROW_STUCK s. The player picks up a stuck player arrow by walking near it. An arrow whose
 // block is broken falls again. An arrow in an unloaded chunk, or in flight for ARROW_FLIGHT s, is removed.
+// A player arrow deals `def.arrowRes` x its damage to a mob with that field (the Cinder Knight takes half).
+// A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
+// on the player, on a solid or liquid cell, or after FIREBALL_FLIGHT s. It breaks no block.
 import { THREE } from './three.js';
 import { H, UNLOADED } from './config.js';
 import { I, LIQ_KIND, SOLID } from './blocks.js';
@@ -11,9 +14,9 @@ import { game, player, scene, world } from './engine.js';
 import { damagePlayer } from './player.js';
 import { rayBox, raycastMobs } from './interact.js';
 import { inv } from './inventory.js';
-import { audio } from './order.js';
+import { audio, particles } from './order.js';
 
-const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10;
+const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10, FIREBALL_SPEED = 12, FIREBALL_FLIGHT = 6;
 const projectiles = (() => {
   const list = [];
   // one vertex-coloured geometry along +z: shaft, head, and fletching
@@ -35,6 +38,10 @@ const projectiles = (() => {
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     return g;
   })();
+  // a fireball: an orange shell around a yellow core; both always full bright
+  const fireShell = new THREE.BoxGeometry(0.34, 0.34, 0.34), fireCore = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+  const shellMat = new THREE.MeshBasicMaterial({ color: 0xff5a14, transparent: true, opacity: 0.8 });
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffe080 });
   const _t = new THREE.Vector3(), _d = new THREE.Vector3();
   function shoot(x, y, z, vx, vy, vz, dmg, shooter) {
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true }));
@@ -43,7 +50,45 @@ const projectiles = (() => {
     scene.add(mesh); list.push(a);
     return a;
   }
-  function remove(i) { const a = list[i]; scene.remove(a.mesh); a.mesh.material.dispose(); list.splice(i, 1); }
+  // A fireball from (x, y, z) along the unit direction (dx, dy, dz) at FIREBALL_SPEED.
+  function fireball(x, y, z, dx, dy, dz, dmg, shooter) {
+    const mesh = new THREE.Group(), shell = new THREE.Mesh(fireShell, shellMat);
+    mesh.add(new THREE.Mesh(fireCore, coreMat), shell);
+    shell.rotation.set(0.6, 0.6, 0);
+    const a = { kind: 'fireball', pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(dx, dy, dz).multiplyScalar(FIREBALL_SPEED),
+      dmg, shooter, stuck: null, age: 0, mesh };
+    mesh.position.copy(a.pos);
+    scene.add(mesh); list.push(a);
+    return a;
+  }
+  function burst(x, y, z) { particles.flameBurst(x, y, z); audio.fireballHit(x, y, z); }
+  // Moves a fireball one frame. Returns false when the fireball is gone.
+  function flyFireball(a, dt) {
+    if (a.age > FIREBALL_FLIGHT) return false;
+    const p = player, sx = a.vel.x * dt, sy = a.vel.y * dt, sz = a.vel.z * dt;
+    if (!p.dead) {
+      const hw = p.w / 2 + 0.17;
+      if (rayBox(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, p.pos.x - hw, p.pos.y - 0.17, p.pos.z - hw, p.pos.x + hw, p.pos.y + p.h + 0.17, p.pos.z + hw, 1)) {
+        _d.set(a.vel.x, 0, a.vel.z).normalize();
+        damagePlayer(a.dmg, 'was burned by an Ember Wisp', { x: a.pos.x - _d.x, z: a.pos.z - _d.z }, 'fireball');
+        burst(a.pos.x, a.pos.y, a.pos.z);
+        return false;
+      }
+    }
+    const n = Math.max(1, Math.ceil(Math.hypot(sx, sy, sz) / 0.1));
+    for (let k = 1; k <= n; k++) {
+      const x = a.pos.x + sx * k / n, y = a.pos.y + sy * k / n, z = a.pos.z + sz * k / n;
+      const id = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
+      if (id === UNLOADED) return false;
+      if (SOLID[id] || LIQ_KIND[id]) { burst(x - sx / n, y - sy / n, z - sz / n); return false; }
+    }
+    a.pos.x += sx; a.pos.y += sy; a.pos.z += sz;
+    a.mesh.position.copy(a.pos);
+    a.mesh.rotation.x += dt * 7; a.mesh.rotation.y += dt * 5;
+    if (Math.random() < 0.7) particles.fire(a.pos.x, a.pos.y - 0.1, a.pos.z, 0.2);
+    return true;
+  }
+  function remove(i) { const a = list[i]; scene.remove(a.mesh); if (a.kind !== 'fireball') a.mesh.material.dispose(); list.splice(i, 1); }
   function clear() { for (let i = list.length - 1; i >= 0; i--) remove(i); }
   function stickAt(a, x, y, z, bx, by, bz) {
     a.pos.set(x, y, z); a.stuck = { x: bx, y: by, z: bz }; a.age = 0; a.vel.set(0, 0, 0);
@@ -57,6 +102,7 @@ const projectiles = (() => {
       a.age += dt;
       const bx = Math.floor(a.pos.x), by = Math.floor(a.pos.y), bz = Math.floor(a.pos.z);
       if (world.getBlock(bx, by, bz) === UNLOADED && by >= 0 && by < H) { remove(i); continue; }
+      if (a.kind === 'fireball') { if (!flyFireball(a, dt)) remove(i); continue; }
       a.mesh.material.color.setScalar(Math.max(0.1, world.brightnessAt(bx, by, bz, game.daylight)));
       if (a.stuck) {
         if (a.age > ARROW_STUCK) { remove(i); continue; }
@@ -76,7 +122,7 @@ const projectiles = (() => {
         _d.set(a.vel.x, 0, a.vel.z).normalize();
         if (!a.shooter) {
           const m = raycastMobs(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, 1);
-          if (m) { m.hurt(a.dmg, _d, 0.6); audio.arrowHit(a.pos.x, a.pos.y, a.pos.z); remove(i); continue; }
+          if (m) { m.hurt(a.dmg * (m.def.arrowRes ?? 1), _d, 0.6); audio.arrowHit(a.pos.x, a.pos.y, a.pos.z); remove(i); continue; }
         } else if (!p.dead) {
           const hw = p.w / 2;
           if (rayBox(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, p.pos.x - hw, p.pos.y, p.pos.z - hw, p.pos.x + hw, p.pos.y + p.h, p.pos.z + hw, 1)) {
@@ -102,7 +148,7 @@ const projectiles = (() => {
       a.mesh.lookAt(_t.copy(a.pos).add(a.vel));
     }
   }
-  return { list, shoot, update, clear };
+  return { list, shoot, fireball, update, clear };
 })();
 
-export { ARROW_GRAVITY, projectiles };
+export { ARROW_GRAVITY, FIREBALL_SPEED, projectiles };

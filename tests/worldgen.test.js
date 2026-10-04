@@ -155,8 +155,8 @@ test('ember: bedrock shell, roof bumps to y 116, lava sea, the 4 blocks, and the
   for (const id of [B.EMBER_ROCK, B.ASH_SAND, B.EMBER_LAMP, B.EMBERITE_ORE]) assert.ok(count[id] > 0, `block ${id} generates`);
   assert.ok(count[B.EMBER_ROCK] > count[B.ASH_SAND] * 20, 'Ember Rock is the main rock');
   assert.equal(count[B.STONE] || 0, 0, 'no overworld stone');
-  // A lamp hangs: from rock, bedrock, or another lamp.
-  for (const [up, y] of lamps) assert.ok([B.EMBER_ROCK, B.BEDROCK, B.EMBER_LAMP].includes(up), `a lamp at y ${y} hangs from ${up}`);
+  // A lamp hangs: from rock, bedrock, another lamp, or a fortress brick (Phase 4 stamps after the lamps).
+  for (const [up, y] of lamps) assert.ok([B.EMBER_ROCK, B.BEDROCK, B.EMBER_LAMP, B.EMBER_BRICKS].includes(up), `a lamp at y ${y} hangs from ${up}`);
   // Emberite veins: 6-connected groups of ore cells.
   const veins = [];
   for (const k of ore.keys()) {

@@ -247,6 +247,18 @@ const FLY_SPEED = 10.9, FLY_V = 7.5;        // flight: horizontal (x2 when sprin
 const BOB_RATE = 0.6;                       // walk-bob cycles per block walked (one footstep per cycle)
 const MAX_HOSTILE = 18, MAX_PASSIVE = 40, MAX_ANIMALS_PER_CHUNK = 4;
 const UNLOADED = 255;
+// Ember Realm hostile spawns (SPEC_realms Phase 4). A mob spawns where block light is at most
+// EMBER_SPAWN_LIGHT; sky light and the time of day do not count. EMBER_WEIGHTS are percent weights.
+const EMBER_SPAWN_LIGHT = 11;
+const EMBER_WEIGHTS = [['brute', 35], ['wisp', 45], ['knight', 20]];
+// The Ember Realm mob type for a roll r in [0, 1). Outside a fortress the Cinder Knight is left
+// out, and the other two weights keep their ratio.
+function emberMobType(r, inFortress) {
+  const w = inFortress ? EMBER_WEIGHTS : EMBER_WEIGHTS.filter(([t]) => t !== 'knight');
+  let x = r * w.reduce((n, [, k]) => n + k, 0);
+  for (const [t, k] of w) if ((x -= k) < 0) return t;
+  return w[w.length - 1][0];
+}
 let glowGain = 1;               // HDR gain of emissive sources (sun, moon, flames, water glint); `post` sets it
 
 function hashString(s) {
@@ -618,7 +630,8 @@ for (let lvl = 1; lvl <= 8; lvl++) {
 // ---- Items ----------------------------------------------------------------------
 // Block items share their block id. A block id is one byte (0..254; 255 is UNLOADED), because a chunk
 // stores one byte per cell. Other items use the free byte ids and every id from 256 up. Tool ids are
-// 200 + 10 * kind + tier (tier 1..7). Armor ids are 300 + 4 * tier + piece (SPEC_realms, Phase 0).
+// 200 + 10 * kind + tier (tier 1..7) and 270 + kind for the Emberite tier 8, because 208 is BONE_MEAL.
+// Armor ids are 300 + 4 * tier + piece (SPEC_realms, Phase 0).
 const I = {
   STICK: 100, COAL: 101, RAW_IRON: 102, STEEL: 103, RAW_COPPER: 104, COPPER: 105, RAW_GOLD: 106, GOLD: 107,
   RUBY: 108, DIAMOND: 109,
@@ -627,7 +640,7 @@ const I = {
   BUCKET: 167, WATER_BUCKET: 168, LAVA_BUCKET: 169, SEEDS: 170, WHEAT: 171, BREAD: 172, APPLE: 173, GOLDEN_APPLE: 174,
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
-  RAW_EMBERITE: 256, EMBER_DUST: 259,
+  RAW_EMBERITE: 256, EMBERITE: 257, EMBER_HEART: 258, EMBER_DUST: 259,
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -647,6 +660,8 @@ defItem(I.RUBY, { name: 'Ruby' });
 defItem(I.DIAMOND, { name: 'Diamond' });
 defItem(I.DOOR, { name: 'Door', kind: 'door', maxStack: 16 });
 defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
+defItem(I.EMBERITE, { name: 'Emberite Ingot' });
+defItem(I.EMBER_HEART, { name: 'Ember Heart', maxStack: 16 });
 defItem(I.EMBER_DUST, { name: 'Ember Dust' });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
@@ -659,15 +674,17 @@ const TIERS = [null,
   { name: 'Steel', level: 3, speed: 6, dur: 400, mat: 'steel' },
   { name: 'Golden', level: 3, speed: 12, dur: 64, mat: 'gold' },
   { name: 'Ruby', level: 4, speed: 8, dur: 900, mat: 'ruby' },
-  { name: 'Diamond', level: 5, speed: 9, dur: 1561, mat: 'diamond' }];
+  { name: 'Diamond', level: 5, speed: 9, dur: 1561, mat: 'diamond' },
+  { name: 'Emberite', level: 6, speed: 11, dur: 2400, mat: 'emberite' }];
 const TOOL_KINDS = {
-  pickaxe: { label: 'Pickaxe', base: 200, dmg: [0, 2, 3, 3, 4, 2, 5, 6] },
-  sword: { label: 'Sword', base: 210, dmg: [0, 4, 5, 5, 6, 4, 7, 8] },
-  axe: { label: 'Axe', base: 220, dmg: [0, 3, 4, 5, 6, 4, 7, 8] },
-  shovel: { label: 'Shovel', base: 230, dmg: [0, 2, 3, 3, 4, 2, 4, 5] },
-  hoe: { label: 'Hoe', base: 240, dmg: [0, 1, 1, 2, 2, 1, 2, 3] },
+  pickaxe: { label: 'Pickaxe', base: 200, dmg: [0, 2, 3, 3, 4, 2, 5, 6, 7] },
+  sword: { label: 'Sword', base: 210, dmg: [0, 4, 5, 5, 6, 4, 7, 8, 9] },
+  axe: { label: 'Axe', base: 220, dmg: [0, 3, 4, 5, 6, 4, 7, 8, 9] },
+  shovel: { label: 'Shovel', base: 230, dmg: [0, 2, 3, 3, 4, 2, 4, 5, 6] },
+  hoe: { label: 'Hoe', base: 240, dmg: [0, 1, 1, 2, 2, 1, 2, 3, 4] },
 };
-const toolId = (type, tier) => TOOL_KINDS[type].base + tier;
+const TOOL_ORDER = Object.keys(TOOL_KINDS);
+const toolId = (type, tier) => (tier === 8 ? 270 + TOOL_ORDER.indexOf(type) : TOOL_KINDS[type].base + tier);
 for (const [type, k] of Object.entries(TOOL_KINDS)) {
   for (let tier = 1; tier < TIERS.length; tier++) {
     const t = TIERS[tier];
@@ -708,7 +725,9 @@ const ARMOR_TIERS = [
   { name: 'Steel', mat: 'steel', item: I.STEEL, pts: [2, 6, 5, 2], factor: 15 },
   { name: 'Golden', mat: 'gold', item: I.GOLD, pts: [2, 5, 3, 1], factor: 7 },
   { name: 'Ruby', mat: 'ruby', item: I.RUBY, pts: [3, 7, 5, 2], factor: 25 },
-  { name: 'Diamond', mat: 'diamond', item: I.DIAMOND, pts: [3, 8, 6, 3], factor: 33 }];
+  { name: 'Diamond', mat: 'diamond', item: I.DIAMOND, pts: [3, 8, 6, 3], factor: 33 },
+  { name: 'Emberite', mat: 'emberite', item: I.EMBERITE, pts: [3, 8, 6, 3], factor: 40 }];   // 20 % less lava damage per piece
+const EMBERITE_ARMOR = 6;
 const ARMOR_PIECES = [
   { name: 'Helmet', base: 11, shape: ['MMM', 'M M'] },
   { name: 'Chestplate', base: 16, shape: ['M M', 'MMM', 'MMM'] },
@@ -783,9 +802,9 @@ function restack(s, count = s.count) {
 
 // Furnace tables: what smelts into what, and how many seconds a fuel item burns.
 const SMELT = { [I.RAW_IRON]: I.STEEL, [I.RAW_COPPER]: I.COPPER, [I.RAW_GOLD]: I.GOLD, [B.SAND]: B.GLASS, [B.COBBLE]: B.STONE,
-  [B.STONE_BRICKS]: B.CRACKED_BRICKS };
+  [B.STONE_BRICKS]: B.CRACKED_BRICKS, [I.RAW_EMBERITE]: I.EMBERITE };
 const FUEL = { [I.COAL]: 40, [B.LOG]: 15, [B.PLANKS]: 15, [I.STICK]: 5, [B.CHEST]: 15, [B.TABLE]: 15, [B.COAL_BLOCK]: 400, [B.STAIRS_PLANKS]: 15,
-  [I.LAVA_BUCKET]: 1000 };
+  [I.LAVA_BUCKET]: 1000, [I.EMBER_DUST]: 60 };
 const FUEL_LEFT = { [I.LAVA_BUCKET]: I.BUCKET };   // a burnt fuel that leaves an item in the fuel slot
 const SMELT_TIME = 5;
 
@@ -1826,6 +1845,7 @@ const MAT_COL = {
   ruby: [[118, 8, 28], [204, 30, 60], [255, 116, 140]],
   diamond: [[28, 126, 126], [78, 216, 206], [196, 255, 250]],
   leather: [[96, 50, 28], [150, 80, 44], [176, 104, 60]],
+  emberite: [[52, 16, 20], [108, 34, 34], [222, 104, 50]],
 };
 const HANDLE = [[78, 56, 28], [120, 88, 46], [150, 114, 64]];
 function drawHandle(set, from, to) {
@@ -2025,6 +2045,25 @@ ITEM_PIX[I.EMBER_DUST] = pixArt((set) => {
   }
   for (const [x, y] of [[4, 5], [11, 4], [8, 3], [13, 6]]) set(x, y, [255, 196, 90]);
 });
+// Phase 4: the Emberite ingot, and the Ember Heart (a heart of dark rock with a glowing core).
+ITEM_PIX[I.EMBERITE] = pixArt((set) => {
+  const C = MAT_COL.emberite;
+  for (let y = 5; y <= 11; y++) for (let x = 2; x <= 13; x++) {
+    const inset = (11 - y) * 0.4; if (x < 2 + inset || x > 13 - inset) continue;
+    set(x, y, y === 5 ? C[2] : y >= 10 ? C[0] : C[1]);
+  }
+  for (const [x, y] of [[5, 7], [9, 8], [11, 7], [7, 9]]) set(x, y, [255, 170, 70]);
+});
+ITEM_PIX[I.EMBER_HEART] = pixArt((set) => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const u = (x + 0.5 - 8) / 6.4, v = (8.6 - (y + 0.5)) / 6.4;   // the heart curve: (u² + v² − 1)³ ≤ u² v³
+    const f = (u * u + v * v - 1) ** 3 - u * u * v * v * v;
+    if (f > 0) continue;
+    const core = Math.hypot(x + 0.5 - 8, y + 0.5 - 8.5);
+    set(x, y, f > -0.02 ? [40, 10, 12] : core < 2.2 ? [255, 236, 170] : core < 3.6 ? [255, 150, 48] : core < 4.8 ? [196, 58, 26] : [96, 24, 22]);
+  }
+  set(5, 5, [255, 210, 170]);
+});
 // Travel icons (Batch 16): a boat and a minecart from the side, a compass from above.
 ITEM_PIX[I.BOAT] = pixArt((set) => {
   for (let x = 0; x < 16; x++) set(x, 6, [196, 150, 92]);
@@ -2132,7 +2171,7 @@ function mobTexture(base, variance, painter, w = 16, h = 16) {
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
  * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
  * default), 'ember', or 'crystal'. emberChunk builds the Ember Realm cave world (SPEC_realms Phase 2).
- * The crystal generator is a flat stub until Phase 5.
+ * The crystal generator is a flat stub until Phase 5. stampFortresses adds the Ember Fortresses (Phase 4).
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -3068,6 +3107,124 @@ function WorldGenModule(SEED, K) {
   // Bedrock bump of column (x, z): 0..EMBER_HANG cells below the roof.
   const emberBump = (x, z) => Math.floor(smoothstep(0.05, 0.75, ER.n2(x / 16, z / 16) * 0.75 + ER.n2(x / 5, z / 5) * 0.25) * (EMBER_HANG + 0.99));
 
+  // ---------------------------------------------------------------- Ember Fortress (SPEC_realms Phase 4)
+  // Each cell of the FT_GRID grid holds one fortress. Terms used below:
+  //   - keep: a 13 x 13 room of Ember Bricks around (kx, kz). The floor is at y, the walls fill
+  //     y + 1..y + 5, and the roof is at y + 6. It holds the knight spawner and the heart chest.
+  //   - bridge: a deck 7 wide at y (5 to walk, plus a rail at y + 1 on each side). It leaves the keep
+  //     through a door in direction d and runs `len` cells (t = 0..len - 1). Its end room fills
+  //     t = len..len + 6 and holds a chest when `chest` is true.
+  //   - (t, w): a bridge cell. t counts along the bridge from the keep wall, w across it (-3..3).
+  // The keep centre sits at cell offset 40 or 55 on each axis: x follows the parity of gz, and z the
+  // parity of gx. A fortress reaches 77 cells from its keep centre. With this layout, no part of one
+  // fortress shares a column with a part of another, so the stamp order does not matter.
+  // The floor height y is the candidate (40..84) with the most open cells along the 4 axes.
+  // fortressPlan(gx, gz) is pure. A memo keeps the plans, because each chunk asks for 4 to 9 of them.
+  const FT_GRID = 96, FT_REACH = 78, FT_OFF = [40, 55];
+  const ftMemo = new Map();
+  function fortressPlan(gx, gz) {
+    const key = `${gx},${gz}`;
+    let plan = ftMemo.get(key);
+    if (plan) return plan;
+    const r = mulberry32(hash3(SEED ^ 0xf0275, gx, gz));
+    const kx = gx * FT_GRID + FT_OFF[gz & 1], kz = gz * FT_GRID + FT_OFF[gx & 1];
+    let y = 40, best = -1;
+    for (let cy = 40; cy <= 84; cy += 4) {
+      let open = 0;
+      for (const [ux, uz] of D4) for (let d = 0; d <= 60; d += 12) for (const dy of [1, 4]) {
+        if (emberSample(kx + ux * d, cy + dy, kz + uz * d) <= 0) open++;
+      }
+      if (open > best) { best = open; y = cy; }
+    }
+    const dirs = [0, 1, 2, 3];
+    for (let i = 3; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [dirs[i], dirs[j]] = [dirs[j], dirs[i]]; }
+    const n = 2 + Math.floor(r() * 3), bridges = [];
+    for (let k = 0; k < n; k++) bridges.push({ d: dirs[k], len: 32 + Math.floor(r() * 33), chest: r() < 0.5 });
+    plan = { gx, gz, kx, kz, y, bridges };
+    if (ftMemo.size > 4096) ftMemo.clear();
+    ftMemo.set(key, plan);
+    return plan;
+  }
+  // The world cell of bridge cell (t, w).
+  const bridgeCell = (P, b, t, w) => {
+    const [ux, uz] = D4[b.d];
+    return [P.kx + ux * (7 + t) - uz * w, P.kz + uz * (7 + t) + ux * w];
+  };
+  // The plan boxes of a fortress: [x0, y0, z0, x1, y1, z1], inclusive. Box 0 is the keep.
+  function fortressBoxes(P) {
+    const boxes = [[P.kx - 6, P.y, P.kz - 6, P.kx + 6, P.y + 6, P.kz + 6]];
+    for (const b of P.bridges) {
+      const [ax, az] = bridgeCell(P, b, 0, -3), [bx, bz] = bridgeCell(P, b, b.len + 6, 3);
+      boxes.push([Math.min(ax, bx), P.y, Math.min(az, bz), Math.max(ax, bx), P.y + 5, Math.max(az, bz)]);
+    }
+    return boxes;
+  }
+  // The plans of every fortress whose reach covers the box x0..x1, z0..z1.
+  function fortressesNear(x0, z0, x1, z1) {
+    const out = [];
+    const gxa = Math.floor((x0 - 55 - FT_REACH) / FT_GRID), gxb = Math.floor((x1 - 40 + FT_REACH) / FT_GRID);
+    const gza = Math.floor((z0 - 55 - FT_REACH) / FT_GRID), gzb = Math.floor((z1 - 40 + FT_REACH) / FT_GRID);
+    for (let gz = gza; gz <= gzb; gz++) for (let gx = gxa; gx <= gxb; gx++) out.push(fortressPlan(gx, gz));
+    return out;
+  }
+  // True when cell (x, y, z) lies inside a fortress box (Ember Realm coordinates).
+  function inFortress(x, y, z) {
+    for (const P of fortressesNear(x, z, x, z)) {
+      for (const [ax, ay, az, bx, by, bz] of fortressBoxes(P)) if (x >= ax && x <= bx && y >= ay && y <= by && z >= az && z <= bz) return true;
+    }
+    return false;
+  }
+  function stampFortresses(S) {
+    const { x0, z0 } = S;
+    const at = (x, y, z, id) => S.set(x - x0, y, z - z0, id);
+    // A pillar: brick from y0 down through air and lamps. It stops at rock, at the lava, or at y 1.
+    const pillar = (x, y0, z) => {
+      const lx = x - x0, lz = z - z0;
+      if (!S.inside(lx, lz)) return;
+      for (let y = y0; y > 0 && (S.get(lx, y, lz) === B.AIR || S.get(lx, y, lz) === B.EMBER_LAMP); y--) S.set(lx, y, lz, B.EMBER_BRICKS);
+    };
+    for (const P of fortressesNear(x0, z0, x0 + CS - 1, z0 + CS - 1)) {
+      const boxes = fortressBoxes(P), y = P.y;
+      if (!boxes.some((b) => b[3] >= x0 && b[0] <= x0 + CS - 1 && b[5] >= z0 && b[2] <= z0 + CS - 1)) continue;
+      // the keep: a brick shell with air inside
+      for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) {
+        const x = P.kx + dx, z = P.kz + dz, wall = Math.abs(dx) === 6 || Math.abs(dz) === 6;
+        if (!S.inside(x - x0, z - z0)) continue;
+        for (let k = 0; k <= 6; k++) at(x, y + k, z, k === 0 || k === 6 || wall ? B.EMBER_BRICKS : B.AIR);
+      }
+      for (const b of P.bridges) {
+        const [ux, uz] = D4[b.d];
+        for (let w = -1; w <= 1; w++) for (let k = 1; k <= 3; k++) at(P.kx + ux * 6 - uz * w, y + k, P.kz + uz * 6 + ux * w, B.AIR);   // keep door
+        for (let t = 0; t < b.len + 7; t++) for (let w = -3; w <= 3; w++) {
+          const [x, z] = bridgeCell(P, b, t, w);
+          if (!S.inside(x - x0, z - z0)) continue;
+          at(x, y, z, B.EMBER_BRICKS);
+          if (t < b.len) {   // the deck: rails at the edges, air above the walkway
+            if (Math.abs(w) === 3) at(x, y + 1, z, B.EMBER_BRICKS);
+            else for (let k = 1; k <= 4; k++) at(x, y + k, z, B.AIR);
+          } else {           // the end room: a shell 7 x 7 x 6 with a door in the near wall
+            const wall = t === b.len || t === b.len + 6 || Math.abs(w) === 3, door = t === b.len && Math.abs(w) <= 1;
+            for (let k = 1; k <= 5; k++) at(x, y + k, z, k === 5 || (wall && !(door && k <= 3)) ? B.EMBER_BRICKS : B.AIR);
+          }
+        }
+        // pillars: every 8 cells under the walkway centre, and at the room corners
+        for (let t = 4; t < b.len; t += 8) for (let w = -1; w <= 1; w++) { const [x, z] = bridgeCell(P, b, t, w); pillar(x, y - 1, z); }
+        for (const t of [b.len, b.len + 6]) for (const w of [-3, 3]) { const [x, z] = bridgeCell(P, b, t, w); pillar(x, y - 1, z); }
+        if (b.chest) {
+          const [x, z] = bridgeCell(P, b, b.len + 5, 0), lx = x - x0, lz = z - z0;
+          if (S.inside(lx, lz)) { S.set(lx, y + 1, lz, B.CHEST + dirOf(-ux, -uz)); S.feature('chest', lx, y + 1, lz, 'fortress'); }
+        }
+      }
+      for (const dx of [-6, -5, 0, 5, 6]) for (const dz of [-6, -5, 0, 5, 6]) {
+        if ((dx === 0) !== (dz === 0) || Math.abs(dx) + Math.abs(dz) >= 5) pillar(P.kx + dx, y - 1, P.kz + dz);
+      }
+      // the keep contents: the spawner at the centre, the heart chest in the -x -z corner
+      const sx = P.kx - x0, sz = P.kz - z0;
+      if (S.inside(sx, sz)) { S.set(sx, y + 1, sz, B.SPAWNER); S.feature('spawner', sx, y + 1, sz, 'knight'); }
+      if (S.inside(sx - 4, sz - 4)) { S.set(sx - 4, y + 1, sz - 4, B.CHEST + dirOf(1, 0)); S.feature('chest', sx - 4, y + 1, sz - 4, 'heart'); }
+    }
+  }
+
   function emberChunk(cx, cz) {
     const x0 = cx * CS, z0 = cz * CS;
     const blocks = new Uint8Array(CS * CS * H), biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
@@ -3143,8 +3300,11 @@ function WorldGenModule(SEED, K) {
         if (d === 0) x++; else if (d === 1) x--; else if (d === 2) z++; else if (d === 3) z--; else if (d === 4 && y < 110) y++; else if (y > 8) y--;
       }
     }
+    // 6. Ember Fortresses
+    const features = [];
+    stampFortresses(structCtx(x0, z0, blocks, null, features));
     heights.fill(H - 1);   // the roof tops every column
-    return { blocks, biomes, heights, features: [] };
+    return { blocks, biomes, heights, features };
   }
 
   // ---------------------------------------------------------------- crystal stub (SPEC_realms Phase 1)
@@ -3165,7 +3325,7 @@ function WorldGenModule(SEED, K) {
     return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? stubChunk(cx, cz) : overworldChunk(cx, cz, info);
   }
 
-  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan };
+  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID };
 }
 
 const GEN_CONSTS = { CS, H, SEA, B, BIOME };
@@ -4964,14 +5124,17 @@ function updateCamera(dt) {
 }
 
 // Armor applies to these damage kinds. Each armor point cuts the damage by 4%, up to 80%.
-const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1 };
+// Each worn Emberite piece cuts lava damage by 20% (SPEC_realms, Phase 4).
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1, fireball: 1 };
 function armorFactor() { return 1 - Math.min(0.8, inv.armorPoints() * 0.04); }
-// kind: mob, arrow, explosion, lightning (armored), or fall, lava, cactus, void (not armored).
+const emberitePieces = () => inv.armor.filter((s) => s && ITEMS[s.id].armor?.tier === EMBERITE_ARMOR).length;
+// kind: mob, arrow, explosion, lightning, fireball (armored), or fall, lava, cactus, void (not armored).
 // No damage lands while a menu, the loading screen, or the travel screen shows.
 function damagePlayer(amount, cause, from, kind = 'mob') {
   const p = player;
   if (p.dead || p.invuln > 0 || amount <= 0 || game.state === 'loading' || game.state === 'menu' || game.state === 'travel') return;
   if (ARMORED[kind] && inv.armorPoints() > 0) { amount *= armorFactor(); inv.wearArmor(); audio.armorHit(); }
+  if (kind === 'lava') amount *= 1 - 0.2 * emberitePieces();
   p.health = Math.max(0, p.health - amount);
   p.invuln = 0.5; p.lastHurt = game.clock;
   p.hurtTilt = (Math.random() < 0.5 ? -1 : 1) * 0.12;
@@ -6648,8 +6811,9 @@ shaped(['C  ', 'CC ', 'CCC'], { C: B.COBBLE }, B.STAIRS_COBBLE, 4);
 shaped(['P  ', 'PP ', 'PPP'], { P: B.PLANKS }, B.STAIRS_PLANKS, 4);
 shaped(['SS', 'SS'], { S: B.STONE }, B.STONE_BRICKS, 4);
 shaped(['SS', 'SS'], { S: B.SAND }, B.SANDSTONE, 1);
+shaped(['DD', 'DD'], { D: I.EMBER_DUST }, B.EMBER_LAMP, 1);
 shaped(['S', 'S'], { S: B.SANDSTONE }, B.CHISELED_SANDSTONE, 1);
-const TOOL_MATS = [[B.PLANKS, 1], [B.COBBLE, 2], [I.COPPER, 3], [I.STEEL, 4], [I.GOLD, 5], [I.RUBY, 6], [I.DIAMOND, 7]];
+const TOOL_MATS = [[B.PLANKS, 1], [B.COBBLE, 2], [I.COPPER, 3], [I.STEEL, 4], [I.GOLD, 5], [I.RUBY, 6], [I.DIAMOND, 7], [I.EMBERITE, 8]];
 for (const [mat, tier] of TOOL_MATS) {
   shaped(['MMM', ' S ', ' S '], { M: mat, S: I.STICK }, toolId('pickaxe', tier));
   shaped(['M', 'M', 'S'], { M: mat, S: I.STICK }, toolId('sword', tier));
@@ -6743,8 +6907,9 @@ function spillTileEntity(x, y, z) {
 // open (tileEntity), break, or explosion (spillTileEntity). The rng seeds from the world seed, the
 // position, and the structure type, so the loot is the same on every visit. `looted` holds the
 // filled positions ("x,y,z"), so a chest never fills twice, even when a new chest takes its place.
-// A LOOT entry is [item, min, max, weight]. 'ench' is an enchanted steel-to-diamond tool and
-// 'armor' a diamond armor piece. The golden apple comes only from loot.
+// A LOOT entry is [item, min, max, weight]. 'ench' is an enchanted steel-to-diamond tool, 'ench_diamond'
+// an enchanted diamond tool, and 'armor' a diamond armor piece. The golden apple comes only from loot.
+// `always` lists stacks that every chest of the type holds first: each heart chest holds 1 Ember Heart.
 const LOOT = {
   dungeon: { rolls: [4, 7], items: [[I.BONE, 1, 4, 10], [I.FLESH, 1, 4, 10], [I.STRING, 1, 3, 8], [I.GUNPOWDER, 1, 4, 8],
     [I.BREAD, 1, 3, 8], [I.STEEL, 1, 4, 6], [I.GOLD, 1, 3, 4], [I.ARROW, 2, 8, 5], [I.BUCKET, 1, 1, 3], [I.SEEDS, 2, 6, 4],
@@ -6758,7 +6923,11 @@ const LOOT = {
   mine: { rolls: [3, 6], items: [[I.COAL, 3, 10, 12], [B.RAIL, 4, 12, 10], [B.TORCH, 4, 12, 8], [I.RAW_IRON, 1, 5, 8],
     [I.RAW_GOLD, 1, 3, 5], [I.BREAD, 1, 3, 6], [I.RUBY, 1, 2, 2], [I.DIAMOND, 1, 2, 2], [I.GOLDEN_APPLE, 1, 1, 1],
     [I.MAGMA_CORE, 1, 1, 1], ['ench', 1, 1, 1]] },
+  fortress: { rolls: [3, 6], items: [[I.EMBERITE, 1, 2, 4], [I.RAW_EMBERITE, 1, 3, 6], [I.EMBER_DUST, 2, 8, 12],
+    [I.MAGMA_CORE, 1, 3, 8], [I.DIAMOND, 1, 3, 5], [B.OBSIDIAN, 2, 6, 6], [I.GOLDEN_APPLE, 1, 2, 4], ['ench_diamond', 1, 1, 3]] },
 };
+LOOT.heart = { ...LOOT.fortress, always: [[I.EMBER_HEART, 1]] };
+const DIAMOND_ARMOR = 5;   // a fixed tier: a new armor tier must not change old loot
 const looted = new Set();
 // The chest feature at (x, y, z), or null.
 function featureAt(x, y, z, kind) {
@@ -6768,9 +6937,10 @@ function featureAt(x, y, z, kind) {
 // One loot stack drawn with `rnd`.
 function lootStack(entry, rnd) {
   const [what, lo, hi] = entry, count = lo + Math.floor(rnd() * (hi - lo + 1));
-  if (what === 'armor') { const id = armorId(ARMOR_TIERS.length - 1, Math.floor(rnd() * 4)); return { id, count: 1, dur: ITEMS[id].maxDur }; }
-  if (what === 'ench') {
-    const kinds = ['pickaxe', 'sword', 'axe', 'shovel'], id = toolId(kinds[Math.floor(rnd() * 4)], 4 + Math.floor(rnd() * 4));
+  if (what === 'armor') { const id = armorId(DIAMOND_ARMOR, Math.floor(rnd() * 4)); return { id, count: 1, dur: ITEMS[id].maxDur }; }
+  if (what === 'ench' || what === 'ench_diamond') {
+    const kinds = ['pickaxe', 'sword', 'axe', 'shovel'], kind = kinds[Math.floor(rnd() * 4)];
+    const id = toolId(kind, what === 'ench' ? 4 + Math.floor(rnd() * 4) : 7);
     const keys = Object.keys(ENCH).filter((k) => ENCH[k].fits(ITEMS[id])), ench = {};
     const n = 1 + (rnd() < 0.35 ? 1 : 0);
     for (let i = 0; i < n && keys.length; i++) ench[keys.splice(Math.floor(rnd() * keys.length), 1)[0]] = 1 + Math.floor(rnd() * ENCH_MAX);
@@ -6787,6 +6957,7 @@ function lootChest(x, y, z) {
   looted.add(k);
   const rnd = mulberry32(WG.hash3(SEED ^ 0x100f, x, WG.hash3(y, z, f.type.length)));
   const slots = new Array(27).fill(null), total = table.items.reduce((a, e) => a + e[3], 0);
+  (table.always || []).forEach(([id, count], i) => { slots[i] = { id, count }; });
   const rolls = table.rolls[0] + Math.floor(rnd() * (table.rolls[1] - table.rolls[0] + 1));
   for (let i = 0; i < rolls; i++) {
     let w = rnd() * total, e = table.items[0];
@@ -7237,6 +7408,11 @@ function fillRecipe(r, row) {
  * Hostile mobs (zombie, creeper) spawn in the dark: light = max(sky * daylight, block) <= 7,
  * so dark caves spawn them by day too. Zombies burn in direct sunlight; creepers under
  * open sky despawn by day. Creepers hiss for 1.5 s near the player, then explode.
+ * Ember Realm mobs (SPEC_realms Phase 4): the Ember Wisp flies (`def.flies`). It hovers 2..6 blocks
+ * above the floor below it. While it chases, it stays 2..4 blocks above the player's feet too,
+ * keeps 8..16 blocks from the player, and shoots a fireball every 3 s
+ * while it sees the player. The Cinder Knight is a melee mob with half knockback and half arrow
+ * damage (`def.arrowRes`, read in projectiles.js).
  * ===================================================================================== */
 
 const mobs = [];
@@ -7304,6 +7480,25 @@ const MOB_TEXTURES = {
     for (let x = 5; x < 11; x++) set(x, 12, [120, 30, 10]);
   }),
   mb_core: () => mtex('mb_core', [255, 150, 40], 0.3),
+  wisp_core: () => mtex('wisp_core', [255, 190, 64], 0.16, (set, r) => { for (let i = 0; i < 30; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 240, 170]); }),
+  wisp_face: () => mtex('wisp_face', [255, 190, 64], 0.14, (set) => {
+    for (let y = 5; y < 9; y++) for (const x of [3, 4, 11, 12]) set(x, y, [70, 16, 4]);   // hollow eyes
+    for (let x = 5; x < 11; x++) set(x, 11, [100, 26, 6]);
+    for (let x = 6; x < 10; x++) set(x, 12, [100, 26, 6]);
+  }),
+  wisp_flame: () => mtex('wisp_flame', [240, 96, 20], 0.3, (set, r) => { for (let i = 0; i < 40; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [255, 176, 44] : [176, 36, 10]); }),
+  ck_armor: () => mtex('ck_armor', [52, 44, 48], 0.18, (set, r) => {
+    for (const y of [0, 5, 10, 15]) for (let x = 0; x < 16; x++) set(x, y, [30, 26, 30]);   // plate seams
+    for (const y of [2, 7, 12]) { set(2, y, [130, 120, 120]); set(13, y, [130, 120, 120]); }   // rivets
+    for (let i = 0; i < 6; i++) set(r() * 16 | 0, (r() * 3 | 0) * 5 + 1, [255, 110, 24]);   // embers in the seams
+  }),
+  ck_helm: () => mtex('ck_helm', [52, 44, 48], 0.16, (set) => { for (let x = 0; x < 16; x++) set(x, 13, [30, 26, 30]); }),
+  ck_visor: () => mtex('ck_visor', [52, 44, 48], 0.16, (set) => {
+    for (let x = 2; x < 14; x++) { set(x, 6, [16, 10, 10]); set(x, 7, x === 4 || x === 5 || x === 10 || x === 11 ? [255, 150, 40] : [16, 10, 10]); }   // eye slit
+    for (let y = 8; y < 13; y++) { set(7, y, [16, 10, 10]); set(8, y, [16, 10, 10]); }   // breath slit
+  }),
+  ck_trim: () => mtex('ck_trim', [128, 66, 34], 0.2),
+  ck_plume: () => mtex('ck_plume', [210, 60, 22], 0.25, (set, r) => { for (let i = 0; i < 20; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 150, 40]); }),
   c_skin: () => mtex('c_skin', [86, 172, 74], 0.5, (set, r) => { for (let i = 0; i < 50; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [40, 90, 40] : [170, 220, 160]); }),
   c_face: () => mtex('c_face', [86, 172, 74], 0.45, (set) => {
     const k = [16, 22, 16];
@@ -7432,6 +7627,41 @@ const MOB_TYPES = {
       return { head, legs, arms };
     },
   },
+  wisp: {
+    hostile: true, hp: 10, w: 0.7, h: 0.9, speed: 2.6, sound: 'whistle', fireproof: true, flies: true, sense: 28,
+    glow: 1, kill: 'was burned by an Ember Wisp',
+    drops: () => [[I.EMBER_DUST, randInt(0, 2)]],
+    build(root, M) {
+      const head = limb(root, M, 0.5, 0.5, 0.5, headFaces('wisp_core', 'wisp_face'), 0, 0.45, 0);
+      // 4 flame shards circle the core; a flame tail flickers under it
+      const orbit = new THREE.Group(); orbit.position.y = 0.45; root.add(orbit);
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2, s = limb(orbit, M, 0.14, 0.32, 0.14, 'wisp_flame', Math.sin(a) * 0.45, i % 2 ? 0.1 : -0.1, Math.cos(a) * 0.45);
+        s.rotation.z = i % 2 ? 0.4 : -0.4;
+      }
+      const tail = limb(root, M, 0.24, 0.3, 0.24, 'wisp_flame', 0, 0.2, 0, 0, -0.1, 0);
+      return { head, legs: [], orbit, tail };
+    },
+  },
+  knight: {
+    hostile: true, hp: 30, w: 0.7, h: 2.05, speed: 2.4, sound: 'clank', damage: 6, reach: 1.3, kbRes: 0.5, arrowRes: 0.5,
+    fireproof: true, armBase: 0, kill: 'was slain by a Cinder Knight',
+    drops: () => [[I.COAL, randInt(0, 2)], [I.RAW_EMBERITE, Math.random() < 1 / 3 ? 1 : 0]],
+    build(root, M, mob) {
+      limb(root, M, 0.56, 0.78, 0.32, 'ck_armor', 0, 1.15, 0);
+      limb(root, M, 0.6, 0.1, 0.36, 'ck_trim', 0, 0.8, 0);   // belt
+      const head = limb(root, M, 0.5, 0.5, 0.5, headFaces('ck_helm', 'ck_visor'), 0, 1.54, 0, 0, 0.25, 0);
+      limb(head, M, 0.08, 0.16, 0.44, 'ck_plume', 0, 0.58, -0.02);
+      const arms = [-0.41, 0.41].map((x) => limb(root, M, 0.26, 0.78, 0.26, 'ck_armor', x, 1.5, 0, 0, -0.33, 0));
+      for (const a of arms) limb(a, M, 0.34, 0.18, 0.36, 'ck_trim', 0, 0.02, 0);   // pauldrons
+      const legs = [-0.14, 0.14].map((x) => limb(root, M, 0.26, 0.76, 0.26, 'ck_armor', x, 0.76, 0, 0, -0.38, 0));
+      // a steel sword in the right hand, pointing forward
+      const sw = makeItemMesh(toolId('sword', 4)); sw.userData.shared = true; mob.mats.push(sw.material);
+      sw.scale.setScalar(0.8); sw.position.set(0, -0.66, 0.12); sw.rotation.set(0, -Math.PI / 2, -Math.PI / 4);
+      arms[0].add(sw);
+      return { head, legs, arms };
+    },
+  },
   creeper: {
     hostile: true, hp: 20, w: 0.6, h: 1.7, speed: 2.1, sound: null,
     drops: () => [[I.GUNPOWDER, randInt(0, 2)]],
@@ -7530,10 +7760,19 @@ class Mob {
     // a spider in bright light stays neutral until the player hits it
     const calm = def.brightNeutral && !this.angry
       && Math.max(Math.round(world.getSky(hx, hy, hz) * game.daylight), world.getBlk(hx, hy, hz)) >= def.brightNeutral;
-    const canChase = def.hostile && !calm && !p.dead && dist3 < 16 && game.state !== 'paused';
+    const canChase = def.hostile && !calm && !p.dead && dist3 < (def.sense || 16) && game.state !== 'paused';
     if (canChase) {
       mx = dx / (dist || 1); mz = dz / (dist || 1); lookAtPlayer = true;
-      if (def.ranged) {
+      if (def.flies) {
+        // keep 8..16 blocks away and drift sideways; shoot every 3 s while the player is in sight
+        if ((this.seeT -= dt) <= 0) { this.seeT = 0.25; this.sees = lineOfSight(this.pos.x, this.pos.y + this.h / 2, this.pos.z, p.pos.x, p.pos.y + EYE, p.pos.z); }
+        if ((this.strafeT -= dt) <= 0) { this.strafeT = randRange(1.5, 3.5); this.strafe = Math.random() < 0.5 ? -1 : 1; }
+        const ux = mx, uz = mz;
+        if (dist < 8) { mx = -ux; mz = -uz; }
+        else if (dist <= 16) { mx = uz * this.strafe * 0.6; mz = -ux * this.strafe * 0.6; }
+        this.shootCD -= dt;
+        if (this.sees && this.shootCD <= 0) { this.shootFireball(p); this.shootCD = 3; }
+      } else if (def.ranged) {
         // keep 6..12 blocks away and strafe; shoot every 2 s while the player is in sight
         if ((this.seeT -= dt) <= 0) { this.seeT = 0.25; this.sees = lineOfSight(this.pos.x, this.pos.y + 1.6, this.pos.z, p.pos.x, p.pos.y + EYE, p.pos.z); }
         if ((this.strafeT -= dt) <= 0) { this.strafeT = randRange(1.5, 3.5); this.strafe = Math.random() < 0.5 ? -1 : 1; }
@@ -7574,7 +7813,7 @@ class Mob {
       }
       if (!def.hostile && dist3 < 6 && !this.goal && this.fleeT <= 0) lookAtPlayer = true;
       // stay away from drops of 3+ blocks and (for passive mobs) open water
-      if (mx || mz) {
+      if ((mx || mz) && !def.flies) {
         const ax = Math.floor(this.pos.x + mx * 0.9), az = Math.floor(this.pos.z + mz * 0.9), fy = Math.floor(this.pos.y);
         let drop = 0;
         while (drop < 4 && !SOLID[world.getBlock(ax, fy - 1 - drop, az)] && !LIQ_KIND[world.getBlock(ax, fy - 1 - drop, az)]) drop++;
@@ -7596,16 +7835,29 @@ class Mob {
       for (let k = 0; k < 4; k++) particles.fire(this.pos.x, this.pos.y + randRange(0.1, this.h), this.pos.z, this.w);
       if (this.dead) return true;
     }
-    const a = 1 - Math.exp(-(this.onGround ? 10 : 3) * dt);
+    const a = 1 - Math.exp(-(def.flies ? 4 : this.onGround ? 10 : 3) * dt);
     this.vel.x += (mx * speed - this.vel.x) * a;
     this.vel.z += (mz * speed - this.vel.z) * a;
-    if (this.inWater) { this.vel.y += (2.2 - this.vel.y) * Math.min(1, dt * 3); }
+    if (def.flies) {
+      // hover `this.hover` blocks above the floor; with no floor in reach, sink slowly; rise over a wall.
+      // A chasing flyer also stays 1 + hover/2 blocks above the player's feet: over a low floor (the
+      // lava sea beside a bridge) it does not sink below the deck and lose sight of the player.
+      if ((this.hoverT -= dt) <= 0 || this.hover === undefined) { this.hoverT = randRange(3, 7); this.hover = randRange(2, 6); }
+      const floor = this.floorBelow();
+      let ty = floor === null ? this.pos.y - 2 : floor + this.hover;
+      if (canChase) ty = Math.max(ty, p.pos.y + 1 + this.hover / 2);
+      const vy = clamp((ty - this.pos.y) * 1.5, -3, 3) + Math.sin(this.age * 2.2) * 0.4;
+      this.vel.y += (vy - this.vel.y) * Math.min(1, dt * 3);
+      if (this.hitWall && (mx || mz)) this.vel.y = Math.max(this.vel.y, 2.5);
+    } else if (this.inWater) { this.vel.y += (2.2 - this.vel.y) * Math.min(1, dt * 3); }
     else {
       this.vel.y -= GRAVITY * dt;
       if (this.type === 'chicken') this.vel.y = Math.max(this.vel.y, -2.5);
     }
-    if (def.climbs && this.hitWall && (mx || mz)) this.vel.y = 2.6;   // a spider walks up walls
-    else if (this.hitWall && this.onGround && (mx || mz)) this.vel.y = JUMP_V * 0.95;
+    if (!def.flies && this.hitWall && (mx || mz)) {   // a flyer rises over a wall above, so it skips this
+      if (def.climbs) this.vel.y = 2.6;   // a spider walks up walls
+      else if (this.onGround) this.vel.y = JUMP_V * 0.95;
+    }
     moveEntity(this, dt);
     // mobs push each other and the player apart
     for (const o of mobs) {
@@ -7621,7 +7873,7 @@ class Mob {
 
     // ---- animation
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    if (def.ranged && canChase) this.yaw = angleLerp(this.yaw, Math.atan2(dx, dz), Math.min(1, dt * 8));   // an archer faces its target
+    if ((def.ranged || def.flies) && canChase) this.yaw = angleLerp(this.yaw, Math.atan2(dx, dz), Math.min(1, dt * 8));   // an archer faces its target
     else if (hs > 0.2) this.yaw = angleLerp(this.yaw, Math.atan2(this.vel.x, this.vel.z), Math.min(1, dt * 8));
     else if (lookAtPlayer && canChase) this.yaw = angleLerp(this.yaw, Math.atan2(dx, dz), Math.min(1, dt * 6));
     this.walkAmt += ((hs > 0.2 ? 1 : 0) - this.walkAmt) * Math.min(1, dt * 8);
@@ -7637,6 +7889,7 @@ class Mob {
       l.rotation.y = l.userData.fan + Math.sin(ph) * 0.35 * this.walkAmt;
       l.rotation.z = l.userData.side * (-0.55 + Math.max(0, Math.cos(ph)) * 0.3 * this.walkAmt);
     });
+    if (this.parts.orbit) { this.parts.orbit.rotation.y += dt * 2.4; this.parts.tail.scale.set(1, 1 + Math.sin(this.age * 9) * 0.25, 1); }
     if (this.parts.wings) { const f = this.onGround ? 0 : Math.abs(Math.sin(this.age * 22)) * 1.1; this.parts.wings[0].rotation.z = f; this.parts.wings[1].rotation.z = -f; }
     let hy2 = 0;
     if (lookAtPlayer) hy2 = clamp(angleLerp(0, Math.atan2(dx, dz) - this.yaw, 1), -1, 1);
@@ -7664,6 +7917,25 @@ class Mob {
   }
 
   paint(r, g, b) { for (const m of this.mats) m.color.setRGB(r, g, b); }
+
+  // The y just above the first solid or liquid cell at or below the mob, within 16 cells; null when none.
+  floorBelow() {
+    const x = Math.floor(this.pos.x), z = Math.floor(this.pos.z);
+    for (let y = Math.floor(this.pos.y), k = 0; k < 16; y--, k++) {
+      const id = world.getBlock(x, y, z);
+      if (SOLID[id] || LIQ_KIND[id] || id === UNLOADED) return y + 1;
+    }
+    return null;
+  }
+
+  // Wisp shot: a straight fireball at the player's chest, from just outside the wisp's box.
+  shootFireball(p) {
+    const ex = this.pos.x, ey = this.pos.y + this.h / 2, ez = this.pos.z;
+    const tx = p.pos.x + randRange(-0.3, 0.3) - ex, ty = p.pos.y + 1.1 - ey, tz = p.pos.z + randRange(-0.3, 0.3) - ez;
+    const d = Math.hypot(tx, ty, tz) || 1;
+    projectiles.fireball(ex + tx / d * 0.65, ey + ty / d * 0.65, ez + tz / d * 0.65, tx / d, ty / d, tz / d, 5, this);
+    audio.fireballShoot(this.pos);
+  }
 
   // Skeleton shot: aim at the player's chest, lead the drop by gravity, add a little spread.
   shootAt(p) {
@@ -7961,8 +8233,11 @@ const vehicles = (() => {
 // mob on its path; a mob arrow hits only the player. An arrow that meets a solid cell sticks there
 // for ARROW_STUCK s. The player picks up a stuck player arrow by walking near it. An arrow whose
 // block is broken falls again. An arrow in an unloaded chunk, or in flight for ARROW_FLIGHT s, is removed.
+// A player arrow deals `def.arrowRes` x its damage to a mob with that field (the Cinder Knight takes half).
+// A fireball (SPEC_realms Phase 4) flies straight with no gravity and hits only the player. It bursts
+// on the player, on a solid or liquid cell, or after FIREBALL_FLIGHT s. It breaks no block.
 
-const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10;
+const ARROW_GRAVITY = 20, ARROW_STUCK = 30, ARROW_FLIGHT = 10, FIREBALL_SPEED = 12, FIREBALL_FLIGHT = 6;
 const projectiles = (() => {
   const list = [];
   // one vertex-coloured geometry along +z: shaft, head, and fletching
@@ -7984,6 +8259,10 @@ const projectiles = (() => {
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     return g;
   })();
+  // a fireball: an orange shell around a yellow core; both always full bright
+  const fireShell = new THREE.BoxGeometry(0.34, 0.34, 0.34), fireCore = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+  const shellMat = new THREE.MeshBasicMaterial({ color: 0xff5a14, transparent: true, opacity: 0.8 });
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffe080 });
   const _t = new THREE.Vector3(), _d = new THREE.Vector3();
   function shoot(x, y, z, vx, vy, vz, dmg, shooter) {
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true }));
@@ -7992,7 +8271,45 @@ const projectiles = (() => {
     scene.add(mesh); list.push(a);
     return a;
   }
-  function remove(i) { const a = list[i]; scene.remove(a.mesh); a.mesh.material.dispose(); list.splice(i, 1); }
+  // A fireball from (x, y, z) along the unit direction (dx, dy, dz) at FIREBALL_SPEED.
+  function fireball(x, y, z, dx, dy, dz, dmg, shooter) {
+    const mesh = new THREE.Group(), shell = new THREE.Mesh(fireShell, shellMat);
+    mesh.add(new THREE.Mesh(fireCore, coreMat), shell);
+    shell.rotation.set(0.6, 0.6, 0);
+    const a = { kind: 'fireball', pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(dx, dy, dz).multiplyScalar(FIREBALL_SPEED),
+      dmg, shooter, stuck: null, age: 0, mesh };
+    mesh.position.copy(a.pos);
+    scene.add(mesh); list.push(a);
+    return a;
+  }
+  function burst(x, y, z) { particles.flameBurst(x, y, z); audio.fireballHit(x, y, z); }
+  // Moves a fireball one frame. Returns false when the fireball is gone.
+  function flyFireball(a, dt) {
+    if (a.age > FIREBALL_FLIGHT) return false;
+    const p = player, sx = a.vel.x * dt, sy = a.vel.y * dt, sz = a.vel.z * dt;
+    if (!p.dead) {
+      const hw = p.w / 2 + 0.17;
+      if (rayBox(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, p.pos.x - hw, p.pos.y - 0.17, p.pos.z - hw, p.pos.x + hw, p.pos.y + p.h + 0.17, p.pos.z + hw, 1)) {
+        _d.set(a.vel.x, 0, a.vel.z).normalize();
+        damagePlayer(a.dmg, 'was burned by an Ember Wisp', { x: a.pos.x - _d.x, z: a.pos.z - _d.z }, 'fireball');
+        burst(a.pos.x, a.pos.y, a.pos.z);
+        return false;
+      }
+    }
+    const n = Math.max(1, Math.ceil(Math.hypot(sx, sy, sz) / 0.1));
+    for (let k = 1; k <= n; k++) {
+      const x = a.pos.x + sx * k / n, y = a.pos.y + sy * k / n, z = a.pos.z + sz * k / n;
+      const id = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
+      if (id === UNLOADED) return false;
+      if (SOLID[id] || LIQ_KIND[id]) { burst(x - sx / n, y - sy / n, z - sz / n); return false; }
+    }
+    a.pos.x += sx; a.pos.y += sy; a.pos.z += sz;
+    a.mesh.position.copy(a.pos);
+    a.mesh.rotation.x += dt * 7; a.mesh.rotation.y += dt * 5;
+    if (Math.random() < 0.7) particles.fire(a.pos.x, a.pos.y - 0.1, a.pos.z, 0.2);
+    return true;
+  }
+  function remove(i) { const a = list[i]; scene.remove(a.mesh); if (a.kind !== 'fireball') a.mesh.material.dispose(); list.splice(i, 1); }
   function clear() { for (let i = list.length - 1; i >= 0; i--) remove(i); }
   function stickAt(a, x, y, z, bx, by, bz) {
     a.pos.set(x, y, z); a.stuck = { x: bx, y: by, z: bz }; a.age = 0; a.vel.set(0, 0, 0);
@@ -8006,6 +8323,7 @@ const projectiles = (() => {
       a.age += dt;
       const bx = Math.floor(a.pos.x), by = Math.floor(a.pos.y), bz = Math.floor(a.pos.z);
       if (world.getBlock(bx, by, bz) === UNLOADED && by >= 0 && by < H) { remove(i); continue; }
+      if (a.kind === 'fireball') { if (!flyFireball(a, dt)) remove(i); continue; }
       a.mesh.material.color.setScalar(Math.max(0.1, world.brightnessAt(bx, by, bz, game.daylight)));
       if (a.stuck) {
         if (a.age > ARROW_STUCK) { remove(i); continue; }
@@ -8025,7 +8343,7 @@ const projectiles = (() => {
         _d.set(a.vel.x, 0, a.vel.z).normalize();
         if (!a.shooter) {
           const m = raycastMobs(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, 1);
-          if (m) { m.hurt(a.dmg, _d, 0.6); audio.arrowHit(a.pos.x, a.pos.y, a.pos.z); remove(i); continue; }
+          if (m) { m.hurt(a.dmg * (m.def.arrowRes ?? 1), _d, 0.6); audio.arrowHit(a.pos.x, a.pos.y, a.pos.z); remove(i); continue; }
         } else if (!p.dead) {
           const hw = p.w / 2;
           if (rayBox(a.pos.x, a.pos.y, a.pos.z, sx, sy, sz, p.pos.x - hw, p.pos.y, p.pos.z - hw, p.pos.x + hw, p.pos.y + p.h, p.pos.z + hw, 1)) {
@@ -8051,7 +8369,7 @@ const projectiles = (() => {
       a.mesh.lookAt(_t.copy(a.pos).add(a.vel));
     }
   }
-  return { list, shoot, update, clear };
+  return { list, shoot, fireball, update, clear };
 })();
 
 // ---- explosions ------------------------------------------------------------------------
@@ -8190,10 +8508,29 @@ function spawnRoom(x, y, z, def) {
   }
   return true;
 }
+// The overworld mob type for a floor cell (x, y, z), or null when the cell is too bright.
+function overworldType(x, y, z) {
+  // a cave below y 40 (no sky light) spawns a Magma Brute 1 time in 8, in any light
+  if (y < 40 && world.getSky(x, y, z) === 0 && Math.random() < 1 / 8) return 'brute';
+  const light = Math.max(Math.round(world.getSky(x, y, z) * game.daylight), world.getBlk(x, y, z));
+  if (light > 7) return null;
+  const r = Math.random();
+  return r < 0.35 ? 'zombie' : r < 0.65 ? 'skeleton' : r < 0.85 ? 'creeper' : 'spider';
+}
+// The Ember Realm mob type for a floor cell (x, y, z), or null when the block light is too high.
+// Cinder Knights spawn only inside fortress bounds (WG.inFortress).
+function emberType(x, y, z) {
+  if (world.getBlk(x, y, z) > EMBER_SPAWN_LIGHT) return null;
+  return emberMobType(Math.random(), WG.inFortress(x, y, z));
+}
+// Every 0.35 s: up to 6 tries at a floor cell 24..44 blocks from the player. The overworld and the
+// Ember Realm spawn hostiles; the Crystal Realm spawns none. An ember try starts within 20 blocks
+// of the player's height, because the realm has a roof.
 let spawnTimer = 0;
 function spawnHostiles(dt) {
   spawnTimer -= dt;
-  if (spawnTimer > 0 || player.dead || world.realm !== 'overworld') return;
+  const ember = world.realm === 'ember';
+  if (spawnTimer > 0 || player.dead || (world.realm !== 'overworld' && !ember)) return;
   spawnTimer = 0.35;
   if (hostileCount() >= MAX_HOSTILE) return;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -8202,24 +8539,15 @@ function spawnHostiles(dt) {
     const c = world.chunkAt(x, z);
     if (!c || !c.meshed) continue;
     const top = c.heights[(z & 15) * CS + (x & 15)];
-    let y = randInt(2, Math.min(H - 3, top + 1));
+    let y = ember ? clamp(Math.floor(player.pos.y) + randInt(-20, 20), 2, H - 3) : randInt(2, Math.min(H - 3, top + 1));
     while (y > 1 && !SOLID[world.getBlock(x, y - 1, z)]) y--;
     const below = world.getBlock(x, y - 1, z);
     if (!OPAQUE[below] || below === B.BEDROCK || IS_LEAF[below]) continue;
     const b0 = world.getBlock(x, y, z), b1 = world.getBlock(x, y + 1, z);
     if (SOLID[b0] || SOLID[b1] || LIQ_KIND[b0] || LIQ_KIND[b1]) continue;
     if (Math.hypot(x + 0.5 - player.pos.x, y - player.pos.y, z + 0.5 - player.pos.z) < 24) continue;
-    // a cave below y 40 (no sky light) spawns a Magma Brute 1 time in 8, in any light
-    const cave = y < 40 && world.getSky(x, y, z) === 0;
-    let type;
-    if (cave && Math.random() < 1 / 8) type = 'brute';
-    else {
-      const light = Math.max(Math.round(world.getSky(x, y, z) * game.daylight), world.getBlk(x, y, z));
-      if (light > 7) continue;
-      const r = Math.random();
-      type = r < 0.35 ? 'zombie' : r < 0.65 ? 'skeleton' : r < 0.85 ? 'creeper' : 'spider';
-    }
-    if (!spawnRoom(x, y, z, MOB_TYPES[type])) continue;
+    const type = ember ? emberType(x, y, z) : overworldType(x, y, z);
+    if (!type || !spawnRoom(x, y, z, MOB_TYPES[type])) continue;
     mobs.push(new Mob(type, x + 0.5, y, z + 0.5));
     return;
   }
@@ -8528,6 +8856,15 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y, z + randRange(-w, w) / 2, 0, randRange(0.4, 1), 0,
         { color: Math.random() < 0.5 ? [1, 0.75, 0.25] : [1, 0.4, 0.08], life: randRange(0.25, 0.5), size: randRange(0.1, 0.18), grav: -0.5, drag: 1, flags: 6 });
     },
+    flameBurst(x, y, z) {   // a fireball bursts: a puff of flame and a little smoke
+      for (let i = 0; i < 18; i++) emit(x, y, z, randRange(-3, 3), randRange(-1.5, 3.5), randRange(-3, 3),
+        { color: Math.random() < 0.5 ? [1, 0.8, 0.3] : [1, 0.38, 0.06], life: randRange(0.2, 0.45), size: randRange(0.1, 0.2), grav: -1, drag: 3, flags: 6 });
+      for (let i = 0; i < 5; i++) {
+        const g = randRange(0.25, 0.4);
+        emit(x, y, z, randRange(-0.6, 0.6), randRange(0.4, 1.2), randRange(-0.6, 0.6),
+          { color: [g, g, g], life: randRange(0.6, 1), size: randRange(0.15, 0.25), grow: 0.2, grav: -0.4, drag: 2, flags: 4 });
+      }
+    },
     ember(x, y, z, w = 0.6, h = 1) {   // a glowing speck that drifts up from a Magma Brute
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });
@@ -8740,6 +9077,11 @@ const audio = {
     this.tone({ type: 'triangle', f0: 220, f1: 210, dur: 0.5, vol: 0.3, filter: 1200 });
     this.tone({ type: 'triangle', f0: 156, f1: 150, dur: 0.8, vol: 0.3, filter: 1200, delay: 0.4 });
   },
+  fireballShoot(pos) { this.noise({ ftype: 'bandpass', f0: 500, f1: 1500, q: 0.8, dur: 0.4, vol: 0.4, attack: 0.05, pos: { x: pos.x, y: pos.y + 0.5, z: pos.z } }); },
+  fireballHit(x, y, z) {
+    this.noise({ ftype: 'lowpass', f0: 1400, f1: 200, dur: 0.35, vol: 0.45, pos: { x, y, z } });
+    this.noise({ ftype: 'highpass', f0: 3000, f1: 5000, q: 0.5, dur: 0.25, vol: 0.15, delay: 0.05, pos: { x, y, z } });
+  },
   hiss(pos) { this.noise({ ftype: 'highpass', f0: 2500, f1: 5000, q: 0.4, dur: 1.5, vol: 0.55, attack: 0.9, pos }); },
   explode(x, y, z) {
     const pos = { x, y, z };
@@ -8775,6 +9117,14 @@ const audio = {
       case 'spider':
         this.noise({ ftype: 'bandpass', f0: 3200 * h, f1: 2200, q: 1.5, dur: hurt ? 0.2 : 0.5, vol: 0.3, attack: 0.05, pos: p });
         for (let i = 0; i < 3; i++) this.tone({ type: 'square', f0: 180 * h, f1: 150, dur: 0.04, vol: 0.08, delay: 0.1 + i * 0.09, filter: 1200, pos: p });
+        break;
+      case 'wisp':   // a breathy whistle over a crackle
+        this.tone({ type: 'sine', f0: 820 * h, f1: 600 * h, dur: hurt ? 0.25 : 0.8, vol: 0.18, attack: 0.15, vib: [7, 40], pos: p });
+        this.noise({ ftype: 'bandpass', f0: 1800, f1: 900, q: 0.7, dur: hurt ? 0.25 : 0.7, vol: 0.12, attack: 0.1, pos: p });
+        break;
+      case 'knight':   // plate armor clanks under a low growl
+        for (let i = 0; i < 2; i++) this.noise({ ftype: 'bandpass', f0: randRange(2400, 3200) * h, f1: 2000, q: 9, dur: 0.12, vol: 0.3, delay: i * 0.16, pos: p });
+        this.tone({ type: 'sawtooth', f0: 85 * h, f1: 65 * h, dur: hurt ? 0.3 : 0.8, vol: 0.3, attack: 0.08, filter: 380, vib: [4, 5], pos: p });
         break;
       case 'brute':   // a deep rumble with a crackle
         this.tone({ type: 'sawtooth', f0: 60 * h, f1: 42 * h, dur: hurt ? 0.5 : 1.2, vol: 0.5, attack: 0.1, filter: 300, vib: [6, 4], pos: p });
@@ -11008,7 +11358,7 @@ window.clonecraft = {
   ENCH, altarOffers, enchantAltar, validEnch, attackMob, get enchantSeed() { return enchantSeed; },
   vehicles, railPlan, railJoin, railLink, IS_RAIL, RAIL_ENDS, get targetVehicle() { return targetVehicle; },
   spawners, looted, lootChest, featureAt, LOOT, inCobweb, weather, fireflies, ash, portals, heldLight, shadows, clouds,
-  realm, REALMS, defaultTarget, standNear,
+  realm, REALMS, defaultTarget, standNear, emberType,
 };
 
 requestAnimationFrame(frame);</script>

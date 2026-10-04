@@ -11,7 +11,7 @@ import {
   BOB_RATE, clamp, CLIMB_V, CONFIG, EYE, FLY_SPEED, FLY_V, GRAVITY, JUMP_V, LEAF_SPEED, ASH_SPEED, randRange,
   SPRINT_MULT, WALK_SPEED,
 } from './config.js';
-import { B, BLOCKS, CLIMB, enchLevel, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_WATER } from './blocks.js';
+import { B, BLOCKS, CLIMB, EMBERITE_ARMOR, enchLevel, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_WATER, ITEMS } from './blocks.js';
 import { camera, canvas, game, input, player, world } from './engine.js';
 import {
   moveEntity, bow, primaryClick, useItem, farming, dropEverything, dropHeld, inv, selectSlot, closeInventory,
@@ -296,14 +296,17 @@ function updateCamera(dt) {
 }
 
 // Armor applies to these damage kinds. Each armor point cuts the damage by 4%, up to 80%.
-const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1 };
+// Each worn Emberite piece cuts lava damage by 20% (SPEC_realms, Phase 4).
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, lightning: 1, fireball: 1 };
 function armorFactor() { return 1 - Math.min(0.8, inv.armorPoints() * 0.04); }
-// kind: mob, arrow, explosion, lightning (armored), or fall, lava, cactus, void (not armored).
+const emberitePieces = () => inv.armor.filter((s) => s && ITEMS[s.id].armor?.tier === EMBERITE_ARMOR).length;
+// kind: mob, arrow, explosion, lightning, fireball (armored), or fall, lava, cactus, void (not armored).
 // No damage lands while a menu, the loading screen, or the travel screen shows.
 function damagePlayer(amount, cause, from, kind = 'mob') {
   const p = player;
   if (p.dead || p.invuln > 0 || amount <= 0 || game.state === 'loading' || game.state === 'menu' || game.state === 'travel') return;
   if (ARMORED[kind] && inv.armorPoints() > 0) { amount *= armorFactor(); inv.wearArmor(); audio.armorHit(); }
+  if (kind === 'lava') amount *= 1 - 0.2 * emberitePieces();
   p.health = Math.max(0, p.health - amount);
   p.invuln = 0.5; p.lastHurt = game.clock;
   p.hurtTilt = (Math.random() < 0.5 ? -1 : 1) * 0.12;

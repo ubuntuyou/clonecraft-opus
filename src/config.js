@@ -16,6 +16,18 @@ const FLY_SPEED = 10.9, FLY_V = 7.5;        // flight: horizontal (x2 when sprin
 const BOB_RATE = 0.6;                       // walk-bob cycles per block walked (one footstep per cycle)
 const MAX_HOSTILE = 18, MAX_PASSIVE = 40, MAX_ANIMALS_PER_CHUNK = 4;
 const UNLOADED = 255;
+// Ember Realm hostile spawns (SPEC_realms Phase 4). A mob spawns where block light is at most
+// EMBER_SPAWN_LIGHT; sky light and the time of day do not count. EMBER_WEIGHTS are percent weights.
+const EMBER_SPAWN_LIGHT = 11;
+const EMBER_WEIGHTS = [['brute', 35], ['wisp', 45], ['knight', 20]];
+// The Ember Realm mob type for a roll r in [0, 1). Outside a fortress the Cinder Knight is left
+// out, and the other two weights keep their ratio.
+function emberMobType(r, inFortress) {
+  const w = inFortress ? EMBER_WEIGHTS : EMBER_WEIGHTS.filter(([t]) => t !== 'knight');
+  let x = r * w.reduce((n, [, k]) => n + k, 0);
+  for (const [t, k] of w) if ((x -= k) < 0) return t;
+  return w[w.length - 1][0];
+}
 let glowGain = 1;               // HDR gain of emissive sources (sun, moon, flames, water glint); `post` sets it
 
 function hashString(s) {
@@ -91,7 +103,7 @@ const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 function setGlowGain(v) { glowGain = v; }
 
 export {
-  BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
+  BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
   LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
   PLAYER_W, randInt, randRange, REACH, SAVE, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
   storage, UNLOADED, VOID_Y, VOL, WALK_SPEED,

@@ -6,7 +6,7 @@
  * also instantiates it on the main thread (spawn search, biome/height queries, fallback).
  * generateChunk(cx, cz, realm) is a pure function of (SEED, cx, cz, realm). realm is 'overworld' (the
  * default), 'ember', or 'crystal'. emberChunk builds the Ember Realm cave world (SPEC_realms Phase 2).
- * The crystal generator is a flat stub until Phase 5.
+ * The crystal generator is a flat stub until Phase 5. stampFortresses adds the Ember Fortresses (Phase 4).
  * Dungeons have 2..4 rooms at different levels, joined by stairs or ladder shafts (stampDungeon).
  * ===================================================================================== */
 function WorldGenModule(SEED, K) {
@@ -942,6 +942,124 @@ function WorldGenModule(SEED, K) {
   // Bedrock bump of column (x, z): 0..EMBER_HANG cells below the roof.
   const emberBump = (x, z) => Math.floor(smoothstep(0.05, 0.75, ER.n2(x / 16, z / 16) * 0.75 + ER.n2(x / 5, z / 5) * 0.25) * (EMBER_HANG + 0.99));
 
+  // ---------------------------------------------------------------- Ember Fortress (SPEC_realms Phase 4)
+  // Each cell of the FT_GRID grid holds one fortress. Terms used below:
+  //   - keep: a 13 x 13 room of Ember Bricks around (kx, kz). The floor is at y, the walls fill
+  //     y + 1..y + 5, and the roof is at y + 6. It holds the knight spawner and the heart chest.
+  //   - bridge: a deck 7 wide at y (5 to walk, plus a rail at y + 1 on each side). It leaves the keep
+  //     through a door in direction d and runs `len` cells (t = 0..len - 1). Its end room fills
+  //     t = len..len + 6 and holds a chest when `chest` is true.
+  //   - (t, w): a bridge cell. t counts along the bridge from the keep wall, w across it (-3..3).
+  // The keep centre sits at cell offset 40 or 55 on each axis: x follows the parity of gz, and z the
+  // parity of gx. A fortress reaches 77 cells from its keep centre. With this layout, no part of one
+  // fortress shares a column with a part of another, so the stamp order does not matter.
+  // The floor height y is the candidate (40..84) with the most open cells along the 4 axes.
+  // fortressPlan(gx, gz) is pure. A memo keeps the plans, because each chunk asks for 4 to 9 of them.
+  const FT_GRID = 96, FT_REACH = 78, FT_OFF = [40, 55];
+  const ftMemo = new Map();
+  function fortressPlan(gx, gz) {
+    const key = `${gx},${gz}`;
+    let plan = ftMemo.get(key);
+    if (plan) return plan;
+    const r = mulberry32(hash3(SEED ^ 0xf0275, gx, gz));
+    const kx = gx * FT_GRID + FT_OFF[gz & 1], kz = gz * FT_GRID + FT_OFF[gx & 1];
+    let y = 40, best = -1;
+    for (let cy = 40; cy <= 84; cy += 4) {
+      let open = 0;
+      for (const [ux, uz] of D4) for (let d = 0; d <= 60; d += 12) for (const dy of [1, 4]) {
+        if (emberSample(kx + ux * d, cy + dy, kz + uz * d) <= 0) open++;
+      }
+      if (open > best) { best = open; y = cy; }
+    }
+    const dirs = [0, 1, 2, 3];
+    for (let i = 3; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [dirs[i], dirs[j]] = [dirs[j], dirs[i]]; }
+    const n = 2 + Math.floor(r() * 3), bridges = [];
+    for (let k = 0; k < n; k++) bridges.push({ d: dirs[k], len: 32 + Math.floor(r() * 33), chest: r() < 0.5 });
+    plan = { gx, gz, kx, kz, y, bridges };
+    if (ftMemo.size > 4096) ftMemo.clear();
+    ftMemo.set(key, plan);
+    return plan;
+  }
+  // The world cell of bridge cell (t, w).
+  const bridgeCell = (P, b, t, w) => {
+    const [ux, uz] = D4[b.d];
+    return [P.kx + ux * (7 + t) - uz * w, P.kz + uz * (7 + t) + ux * w];
+  };
+  // The plan boxes of a fortress: [x0, y0, z0, x1, y1, z1], inclusive. Box 0 is the keep.
+  function fortressBoxes(P) {
+    const boxes = [[P.kx - 6, P.y, P.kz - 6, P.kx + 6, P.y + 6, P.kz + 6]];
+    for (const b of P.bridges) {
+      const [ax, az] = bridgeCell(P, b, 0, -3), [bx, bz] = bridgeCell(P, b, b.len + 6, 3);
+      boxes.push([Math.min(ax, bx), P.y, Math.min(az, bz), Math.max(ax, bx), P.y + 5, Math.max(az, bz)]);
+    }
+    return boxes;
+  }
+  // The plans of every fortress whose reach covers the box x0..x1, z0..z1.
+  function fortressesNear(x0, z0, x1, z1) {
+    const out = [];
+    const gxa = Math.floor((x0 - 55 - FT_REACH) / FT_GRID), gxb = Math.floor((x1 - 40 + FT_REACH) / FT_GRID);
+    const gza = Math.floor((z0 - 55 - FT_REACH) / FT_GRID), gzb = Math.floor((z1 - 40 + FT_REACH) / FT_GRID);
+    for (let gz = gza; gz <= gzb; gz++) for (let gx = gxa; gx <= gxb; gx++) out.push(fortressPlan(gx, gz));
+    return out;
+  }
+  // True when cell (x, y, z) lies inside a fortress box (Ember Realm coordinates).
+  function inFortress(x, y, z) {
+    for (const P of fortressesNear(x, z, x, z)) {
+      for (const [ax, ay, az, bx, by, bz] of fortressBoxes(P)) if (x >= ax && x <= bx && y >= ay && y <= by && z >= az && z <= bz) return true;
+    }
+    return false;
+  }
+  function stampFortresses(S) {
+    const { x0, z0 } = S;
+    const at = (x, y, z, id) => S.set(x - x0, y, z - z0, id);
+    // A pillar: brick from y0 down through air and lamps. It stops at rock, at the lava, or at y 1.
+    const pillar = (x, y0, z) => {
+      const lx = x - x0, lz = z - z0;
+      if (!S.inside(lx, lz)) return;
+      for (let y = y0; y > 0 && (S.get(lx, y, lz) === B.AIR || S.get(lx, y, lz) === B.EMBER_LAMP); y--) S.set(lx, y, lz, B.EMBER_BRICKS);
+    };
+    for (const P of fortressesNear(x0, z0, x0 + CS - 1, z0 + CS - 1)) {
+      const boxes = fortressBoxes(P), y = P.y;
+      if (!boxes.some((b) => b[3] >= x0 && b[0] <= x0 + CS - 1 && b[5] >= z0 && b[2] <= z0 + CS - 1)) continue;
+      // the keep: a brick shell with air inside
+      for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) {
+        const x = P.kx + dx, z = P.kz + dz, wall = Math.abs(dx) === 6 || Math.abs(dz) === 6;
+        if (!S.inside(x - x0, z - z0)) continue;
+        for (let k = 0; k <= 6; k++) at(x, y + k, z, k === 0 || k === 6 || wall ? B.EMBER_BRICKS : B.AIR);
+      }
+      for (const b of P.bridges) {
+        const [ux, uz] = D4[b.d];
+        for (let w = -1; w <= 1; w++) for (let k = 1; k <= 3; k++) at(P.kx + ux * 6 - uz * w, y + k, P.kz + uz * 6 + ux * w, B.AIR);   // keep door
+        for (let t = 0; t < b.len + 7; t++) for (let w = -3; w <= 3; w++) {
+          const [x, z] = bridgeCell(P, b, t, w);
+          if (!S.inside(x - x0, z - z0)) continue;
+          at(x, y, z, B.EMBER_BRICKS);
+          if (t < b.len) {   // the deck: rails at the edges, air above the walkway
+            if (Math.abs(w) === 3) at(x, y + 1, z, B.EMBER_BRICKS);
+            else for (let k = 1; k <= 4; k++) at(x, y + k, z, B.AIR);
+          } else {           // the end room: a shell 7 x 7 x 6 with a door in the near wall
+            const wall = t === b.len || t === b.len + 6 || Math.abs(w) === 3, door = t === b.len && Math.abs(w) <= 1;
+            for (let k = 1; k <= 5; k++) at(x, y + k, z, k === 5 || (wall && !(door && k <= 3)) ? B.EMBER_BRICKS : B.AIR);
+          }
+        }
+        // pillars: every 8 cells under the walkway centre, and at the room corners
+        for (let t = 4; t < b.len; t += 8) for (let w = -1; w <= 1; w++) { const [x, z] = bridgeCell(P, b, t, w); pillar(x, y - 1, z); }
+        for (const t of [b.len, b.len + 6]) for (const w of [-3, 3]) { const [x, z] = bridgeCell(P, b, t, w); pillar(x, y - 1, z); }
+        if (b.chest) {
+          const [x, z] = bridgeCell(P, b, b.len + 5, 0), lx = x - x0, lz = z - z0;
+          if (S.inside(lx, lz)) { S.set(lx, y + 1, lz, B.CHEST + dirOf(-ux, -uz)); S.feature('chest', lx, y + 1, lz, 'fortress'); }
+        }
+      }
+      for (const dx of [-6, -5, 0, 5, 6]) for (const dz of [-6, -5, 0, 5, 6]) {
+        if ((dx === 0) !== (dz === 0) || Math.abs(dx) + Math.abs(dz) >= 5) pillar(P.kx + dx, y - 1, P.kz + dz);
+      }
+      // the keep contents: the spawner at the centre, the heart chest in the -x -z corner
+      const sx = P.kx - x0, sz = P.kz - z0;
+      if (S.inside(sx, sz)) { S.set(sx, y + 1, sz, B.SPAWNER); S.feature('spawner', sx, y + 1, sz, 'knight'); }
+      if (S.inside(sx - 4, sz - 4)) { S.set(sx - 4, y + 1, sz - 4, B.CHEST + dirOf(1, 0)); S.feature('chest', sx - 4, y + 1, sz - 4, 'heart'); }
+    }
+  }
+
   function emberChunk(cx, cz) {
     const x0 = cx * CS, z0 = cz * CS;
     const blocks = new Uint8Array(CS * CS * H), biomes = new Uint8Array(CS * CS), heights = new Uint8Array(CS * CS);
@@ -1017,8 +1135,11 @@ function WorldGenModule(SEED, K) {
         if (d === 0) x++; else if (d === 1) x--; else if (d === 2) z++; else if (d === 3) z--; else if (d === 4 && y < 110) y++; else if (y > 8) y--;
       }
     }
+    // 6. Ember Fortresses
+    const features = [];
+    stampFortresses(structCtx(x0, z0, blocks, null, features));
     heights.fill(H - 1);   // the roof tops every column
-    return { blocks, biomes, heights, features: [] };
+    return { blocks, biomes, heights, features };
   }
 
   // ---------------------------------------------------------------- crystal stub (SPEC_realms Phase 1)
@@ -1039,7 +1160,7 @@ function WorldGenModule(SEED, K) {
     return realm === 'ember' ? emberChunk(cx, cz) : realm === 'crystal' ? stubChunk(cx, cz) : overworldChunk(cx, cz, info);
   }
 
-  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan };
+  return { column, generateChunk, growTree, hash3, SNOW_LINE, mineshaftPlan, dungeonPlan, fortressPlan, fortressBoxes, inFortress, FT_GRID };
 }
 
 export { WorldGenModule };

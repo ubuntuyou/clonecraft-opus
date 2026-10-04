@@ -296,7 +296,8 @@ for (let lvl = 1; lvl <= 8; lvl++) {
 // ---- Items ----------------------------------------------------------------------
 // Block items share their block id. A block id is one byte (0..254; 255 is UNLOADED), because a chunk
 // stores one byte per cell. Other items use the free byte ids and every id from 256 up. Tool ids are
-// 200 + 10 * kind + tier (tier 1..7). Armor ids are 300 + 4 * tier + piece (SPEC_realms, Phase 0).
+// 200 + 10 * kind + tier (tier 1..7) and 270 + kind for the Emberite tier 8, because 208 is BONE_MEAL.
+// Armor ids are 300 + 4 * tier + piece (SPEC_realms, Phase 0).
 const I = {
   STICK: 100, COAL: 101, RAW_IRON: 102, STEEL: 103, RAW_COPPER: 104, COPPER: 105, RAW_GOLD: 106, GOLD: 107,
   RUBY: 108, DIAMOND: 109,
@@ -305,7 +306,7 @@ const I = {
   BUCKET: 167, WATER_BUCKET: 168, LAVA_BUCKET: 169, SEEDS: 170, WHEAT: 171, BREAD: 172, APPLE: 173, GOLDEN_APPLE: 174,
   BONE: 175, BONE_MEAL: 208, STRING: 209, FLINT: 218, ARROW: 219, BOW: 228, MAGMA_CORE: 229,
   BOAT: 238, MINECART: 239, COMPASS: 248,
-  RAW_EMBERITE: 256, EMBER_DUST: 259,
+  RAW_EMBERITE: 256, EMBERITE: 257, EMBER_HEART: 258, EMBER_DUST: 259,
 };
 const ITEMS = [];
 for (const def of BLOCKS) {
@@ -325,6 +326,8 @@ defItem(I.RUBY, { name: 'Ruby' });
 defItem(I.DIAMOND, { name: 'Diamond' });
 defItem(I.DOOR, { name: 'Door', kind: 'door', maxStack: 16 });
 defItem(I.RAW_EMBERITE, { name: 'Raw Emberite' });
+defItem(I.EMBERITE, { name: 'Emberite Ingot' });
+defItem(I.EMBER_HEART, { name: 'Ember Heart', maxStack: 16 });
 defItem(I.EMBER_DUST, { name: 'Ember Dust' });
 for (const [id, , , , item, lo, hi] of ORE_DEFS) BLOCKS[id].drop = [I[item], lo, hi];
 BLOCKS[B.COBWEB].drop = I.STRING;
@@ -337,15 +340,17 @@ const TIERS = [null,
   { name: 'Steel', level: 3, speed: 6, dur: 400, mat: 'steel' },
   { name: 'Golden', level: 3, speed: 12, dur: 64, mat: 'gold' },
   { name: 'Ruby', level: 4, speed: 8, dur: 900, mat: 'ruby' },
-  { name: 'Diamond', level: 5, speed: 9, dur: 1561, mat: 'diamond' }];
+  { name: 'Diamond', level: 5, speed: 9, dur: 1561, mat: 'diamond' },
+  { name: 'Emberite', level: 6, speed: 11, dur: 2400, mat: 'emberite' }];
 const TOOL_KINDS = {
-  pickaxe: { label: 'Pickaxe', base: 200, dmg: [0, 2, 3, 3, 4, 2, 5, 6] },
-  sword: { label: 'Sword', base: 210, dmg: [0, 4, 5, 5, 6, 4, 7, 8] },
-  axe: { label: 'Axe', base: 220, dmg: [0, 3, 4, 5, 6, 4, 7, 8] },
-  shovel: { label: 'Shovel', base: 230, dmg: [0, 2, 3, 3, 4, 2, 4, 5] },
-  hoe: { label: 'Hoe', base: 240, dmg: [0, 1, 1, 2, 2, 1, 2, 3] },
+  pickaxe: { label: 'Pickaxe', base: 200, dmg: [0, 2, 3, 3, 4, 2, 5, 6, 7] },
+  sword: { label: 'Sword', base: 210, dmg: [0, 4, 5, 5, 6, 4, 7, 8, 9] },
+  axe: { label: 'Axe', base: 220, dmg: [0, 3, 4, 5, 6, 4, 7, 8, 9] },
+  shovel: { label: 'Shovel', base: 230, dmg: [0, 2, 3, 3, 4, 2, 4, 5, 6] },
+  hoe: { label: 'Hoe', base: 240, dmg: [0, 1, 1, 2, 2, 1, 2, 3, 4] },
 };
-const toolId = (type, tier) => TOOL_KINDS[type].base + tier;
+const TOOL_ORDER = Object.keys(TOOL_KINDS);
+const toolId = (type, tier) => (tier === 8 ? 270 + TOOL_ORDER.indexOf(type) : TOOL_KINDS[type].base + tier);
 for (const [type, k] of Object.entries(TOOL_KINDS)) {
   for (let tier = 1; tier < TIERS.length; tier++) {
     const t = TIERS[tier];
@@ -386,7 +391,9 @@ const ARMOR_TIERS = [
   { name: 'Steel', mat: 'steel', item: I.STEEL, pts: [2, 6, 5, 2], factor: 15 },
   { name: 'Golden', mat: 'gold', item: I.GOLD, pts: [2, 5, 3, 1], factor: 7 },
   { name: 'Ruby', mat: 'ruby', item: I.RUBY, pts: [3, 7, 5, 2], factor: 25 },
-  { name: 'Diamond', mat: 'diamond', item: I.DIAMOND, pts: [3, 8, 6, 3], factor: 33 }];
+  { name: 'Diamond', mat: 'diamond', item: I.DIAMOND, pts: [3, 8, 6, 3], factor: 33 },
+  { name: 'Emberite', mat: 'emberite', item: I.EMBERITE, pts: [3, 8, 6, 3], factor: 40 }];   // 20 % less lava damage per piece
+const EMBERITE_ARMOR = 6;
 const ARMOR_PIECES = [
   { name: 'Helmet', base: 11, shape: ['MMM', 'M M'] },
   { name: 'Chestplate', base: 16, shape: ['M M', 'MMM', 'MMM'] },
@@ -461,9 +468,9 @@ function restack(s, count = s.count) {
 
 // Furnace tables: what smelts into what, and how many seconds a fuel item burns.
 const SMELT = { [I.RAW_IRON]: I.STEEL, [I.RAW_COPPER]: I.COPPER, [I.RAW_GOLD]: I.GOLD, [B.SAND]: B.GLASS, [B.COBBLE]: B.STONE,
-  [B.STONE_BRICKS]: B.CRACKED_BRICKS };
+  [B.STONE_BRICKS]: B.CRACKED_BRICKS, [I.RAW_EMBERITE]: I.EMBERITE };
 const FUEL = { [I.COAL]: 40, [B.LOG]: 15, [B.PLANKS]: 15, [I.STICK]: 5, [B.CHEST]: 15, [B.TABLE]: 15, [B.COAL_BLOCK]: 400, [B.STAIRS_PLANKS]: 15,
-  [I.LAVA_BUCKET]: 1000 };
+  [I.LAVA_BUCKET]: 1000, [I.EMBER_DUST]: 60 };
 const FUEL_LEFT = { [I.LAVA_BUCKET]: I.BUCKET };   // a burnt fuel that leaves an item in the fuel slot
 const SMELT_TIME = 5;
 
@@ -508,7 +515,7 @@ function setEnchantSeed(v) { enchantSeed = v; }
 export {
   altarOffers, ARMOR_PIECES, ARMOR_TIERS, armorId, ATTEN, B, baseOf, blockDrop, BLOCKS, breakTime, CLIMB,
   CRYSTAL_GROW, DIR_FACE, DIR4, EMIT, EMIT_CRY, ENCH, ENCH_MAX, ENCH_SLOTS, enchantable, enchantSeed,
-  enchLevel, FUEL, FUEL_LEFT, GLOWS, I, IDS_VERSION, IS_CROP, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_ORE, IS_RAIL, IS_SAPLING,
+  EMBERITE_ARMOR, enchLevel, FUEL, FUEL_LEFT, GLOWS, I, IDS_VERSION, IS_CROP, IS_FARMLAND, IS_LAVA, IS_LEAF, IS_ORE, IS_RAIL, IS_SAPLING,
   IS_STAIR, IS_WATER, ITEMS, LEAF_COLOR, LEAF_DECAYS, LEAF_NATURAL, LIGHT_STOP, LIQ_KIND, LIQ_LEVEL, liquidId,
   migrateIds, NEEDS_SUPPORT, OPAQUE, pickaxeFor, RAIL_ENDS, railShapeFor, railUp, REPLACEABLE, restack, ROMAN,
   setEnchantSeed, SHAPE, SHAPE_OF, SKY_FREE, SMELT, SMELT_TIME, SOLID, STAIR_BOXES, STAIR_SIDE, stairKey,

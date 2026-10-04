@@ -18,8 +18,9 @@ shaped(['C  ', 'CC ', 'CCC'], { C: B.COBBLE }, B.STAIRS_COBBLE, 4);
 shaped(['P  ', 'PP ', 'PPP'], { P: B.PLANKS }, B.STAIRS_PLANKS, 4);
 shaped(['SS', 'SS'], { S: B.STONE }, B.STONE_BRICKS, 4);
 shaped(['SS', 'SS'], { S: B.SAND }, B.SANDSTONE, 1);
+shaped(['DD', 'DD'], { D: I.EMBER_DUST }, B.EMBER_LAMP, 1);
 shaped(['S', 'S'], { S: B.SANDSTONE }, B.CHISELED_SANDSTONE, 1);
-const TOOL_MATS = [[B.PLANKS, 1], [B.COBBLE, 2], [I.COPPER, 3], [I.STEEL, 4], [I.GOLD, 5], [I.RUBY, 6], [I.DIAMOND, 7]];
+const TOOL_MATS = [[B.PLANKS, 1], [B.COBBLE, 2], [I.COPPER, 3], [I.STEEL, 4], [I.GOLD, 5], [I.RUBY, 6], [I.DIAMOND, 7], [I.EMBERITE, 8]];
 for (const [mat, tier] of TOOL_MATS) {
   shaped(['MMM', ' S ', ' S '], { M: mat, S: I.STICK }, toolId('pickaxe', tier));
   shaped(['M', 'M', 'S'], { M: mat, S: I.STICK }, toolId('sword', tier));

@@ -234,6 +234,15 @@ const particles = (() => {
       emit(x + randRange(-w, w) / 2, y, z + randRange(-w, w) / 2, 0, randRange(0.4, 1), 0,
         { color: Math.random() < 0.5 ? [1, 0.75, 0.25] : [1, 0.4, 0.08], life: randRange(0.25, 0.5), size: randRange(0.1, 0.18), grav: -0.5, drag: 1, flags: 6 });
     },
+    flameBurst(x, y, z) {   // a fireball bursts: a puff of flame and a little smoke
+      for (let i = 0; i < 18; i++) emit(x, y, z, randRange(-3, 3), randRange(-1.5, 3.5), randRange(-3, 3),
+        { color: Math.random() < 0.5 ? [1, 0.8, 0.3] : [1, 0.38, 0.06], life: randRange(0.2, 0.45), size: randRange(0.1, 0.2), grav: -1, drag: 3, flags: 6 });
+      for (let i = 0; i < 5; i++) {
+        const g = randRange(0.25, 0.4);
+        emit(x, y, z, randRange(-0.6, 0.6), randRange(0.4, 1.2), randRange(-0.6, 0.6),
+          { color: [g, g, g], life: randRange(0.6, 1), size: randRange(0.15, 0.25), grow: 0.2, grav: -0.4, drag: 2, flags: 4 });
+      }
+    },
     ember(x, y, z, w = 0.6, h = 1) {   // a glowing speck that drifts up from a Magma Brute
       emit(x + randRange(-w, w) / 2, y + randRange(0, h), z + randRange(-w, w) / 2, randRange(-0.2, 0.2), randRange(0.5, 1.2), randRange(-0.2, 0.2),
         { color: Math.random() < 0.5 ? [1, 0.6, 0.1] : [1, 0.3, 0.05], life: randRange(0.5, 1), size: randRange(0.04, 0.08), grav: -0.4, drag: 1, flags: 6 });

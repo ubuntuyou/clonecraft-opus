@@ -9,10 +9,15 @@
  * Hostile mobs (zombie, creeper) spawn in the dark: light = max(sky * daylight, block) <= 7,
  * so dark caves spawn them by day too. Zombies burn in direct sunlight; creepers under
  * open sky despawn by day. Creepers hiss for 1.5 s near the player, then explode.
+ * Ember Realm mobs (SPEC_realms Phase 4): the Ember Wisp flies (`def.flies`). It hovers 2..6 blocks
+ * above the floor below it. While it chases, it stays 2..4 blocks above the player's feet too,
+ * keeps 8..16 blocks from the player, and shoots a fireball every 3 s
+ * while it sees the player. The Cinder Knight is a melee mob with half knockback and half arrow
+ * damage (`def.arrowRes`, read in projectiles.js).
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { clamp, EYE, GRAVITY, JUMP_V, randInt, randRange, UNLOADED, VOID_Y } from './config.js';
-import { B, I, IS_LAVA, LIQ_KIND, OPAQUE, SOLID } from './blocks.js';
+import { B, I, IS_LAVA, LIQ_KIND, OPAQUE, SOLID, toolId } from './blocks.js';
 import { mobTexture } from './atlas.js';
 import { game, player, scene, world } from './engine.js';
 import { damagePlayer, touchesAny } from './player.js';
@@ -88,6 +93,25 @@ const MOB_TEXTURES = {
     for (let x = 5; x < 11; x++) set(x, 12, [120, 30, 10]);
   }),
   mb_core: () => mtex('mb_core', [255, 150, 40], 0.3),
+  wisp_core: () => mtex('wisp_core', [255, 190, 64], 0.16, (set, r) => { for (let i = 0; i < 30; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 240, 170]); }),
+  wisp_face: () => mtex('wisp_face', [255, 190, 64], 0.14, (set) => {
+    for (let y = 5; y < 9; y++) for (const x of [3, 4, 11, 12]) set(x, y, [70, 16, 4]);   // hollow eyes
+    for (let x = 5; x < 11; x++) set(x, 11, [100, 26, 6]);
+    for (let x = 6; x < 10; x++) set(x, 12, [100, 26, 6]);
+  }),
+  wisp_flame: () => mtex('wisp_flame', [240, 96, 20], 0.3, (set, r) => { for (let i = 0; i < 40; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [255, 176, 44] : [176, 36, 10]); }),
+  ck_armor: () => mtex('ck_armor', [52, 44, 48], 0.18, (set, r) => {
+    for (const y of [0, 5, 10, 15]) for (let x = 0; x < 16; x++) set(x, y, [30, 26, 30]);   // plate seams
+    for (const y of [2, 7, 12]) { set(2, y, [130, 120, 120]); set(13, y, [130, 120, 120]); }   // rivets
+    for (let i = 0; i < 6; i++) set(r() * 16 | 0, (r() * 3 | 0) * 5 + 1, [255, 110, 24]);   // embers in the seams
+  }),
+  ck_helm: () => mtex('ck_helm', [52, 44, 48], 0.16, (set) => { for (let x = 0; x < 16; x++) set(x, 13, [30, 26, 30]); }),
+  ck_visor: () => mtex('ck_visor', [52, 44, 48], 0.16, (set) => {
+    for (let x = 2; x < 14; x++) { set(x, 6, [16, 10, 10]); set(x, 7, x === 4 || x === 5 || x === 10 || x === 11 ? [255, 150, 40] : [16, 10, 10]); }   // eye slit
+    for (let y = 8; y < 13; y++) { set(7, y, [16, 10, 10]); set(8, y, [16, 10, 10]); }   // breath slit
+  }),
+  ck_trim: () => mtex('ck_trim', [128, 66, 34], 0.2),
+  ck_plume: () => mtex('ck_plume', [210, 60, 22], 0.25, (set, r) => { for (let i = 0; i < 20; i++) set(r() * 16 | 0, r() * 16 | 0, [255, 150, 40]); }),
   c_skin: () => mtex('c_skin', [86, 172, 74], 0.5, (set, r) => { for (let i = 0; i < 50; i++) set(r() * 16 | 0, r() * 16 | 0, r() < 0.5 ? [40, 90, 40] : [170, 220, 160]); }),
   c_face: () => mtex('c_face', [86, 172, 74], 0.45, (set) => {
     const k = [16, 22, 16];
@@ -216,6 +240,41 @@ const MOB_TYPES = {
       return { head, legs, arms };
     },
   },
+  wisp: {
+    hostile: true, hp: 10, w: 0.7, h: 0.9, speed: 2.6, sound: 'whistle', fireproof: true, flies: true, sense: 28,
+    glow: 1, kill: 'was burned by an Ember Wisp',
+    drops: () => [[I.EMBER_DUST, randInt(0, 2)]],
+    build(root, M) {
+      const head = limb(root, M, 0.5, 0.5, 0.5, headFaces('wisp_core', 'wisp_face'), 0, 0.45, 0);
+      // 4 flame shards circle the core; a flame tail flickers under it
+      const orbit = new THREE.Group(); orbit.position.y = 0.45; root.add(orbit);
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2, s = limb(orbit, M, 0.14, 0.32, 0.14, 'wisp_flame', Math.sin(a) * 0.45, i % 2 ? 0.1 : -0.1, Math.cos(a) * 0.45);
+        s.rotation.z = i % 2 ? 0.4 : -0.4;
+      }
+      const tail = limb(root, M, 0.24, 0.3, 0.24, 'wisp_flame', 0, 0.2, 0, 0, -0.1, 0);
+      return { head, legs: [], orbit, tail };
+    },
+  },
+  knight: {
+    hostile: true, hp: 30, w: 0.7, h: 2.05, speed: 2.4, sound: 'clank', damage: 6, reach: 1.3, kbRes: 0.5, arrowRes: 0.5,
+    fireproof: true, armBase: 0, kill: 'was slain by a Cinder Knight',
+    drops: () => [[I.COAL, randInt(0, 2)], [I.RAW_EMBERITE, Math.random() < 1 / 3 ? 1 : 0]],
+    build(root, M, mob) {
+      limb(root, M, 0.56, 0.78, 0.32, 'ck_armor', 0, 1.15, 0);
+      limb(root, M, 0.6, 0.1, 0.36, 'ck_trim', 0, 0.8, 0);   // belt
+      const head = limb(root, M, 0.5, 0.5, 0.5, headFaces('ck_helm', 'ck_visor'), 0, 1.54, 0, 0, 0.25, 0);
+      limb(head, M, 0.08, 0.16, 0.44, 'ck_plume', 0, 0.58, -0.02);
+      const arms = [-0.41, 0.41].map((x) => limb(root, M, 0.26, 0.78, 0.26, 'ck_armor', x, 1.5, 0, 0, -0.33, 0));
+      for (const a of arms) limb(a, M, 0.34, 0.18, 0.36, 'ck_trim', 0, 0.02, 0);   // pauldrons
+      const legs = [-0.14, 0.14].map((x) => limb(root, M, 0.26, 0.76, 0.26, 'ck_armor', x, 0.76, 0, 0, -0.38, 0));
+      // a steel sword in the right hand, pointing forward
+      const sw = makeItemMesh(toolId('sword', 4)); sw.userData.shared = true; mob.mats.push(sw.material);
+      sw.scale.setScalar(0.8); sw.position.set(0, -0.66, 0.12); sw.rotation.set(0, -Math.PI / 2, -Math.PI / 4);
+      arms[0].add(sw);
+      return { head, legs, arms };
+    },
+  },
   creeper: {
     hostile: true, hp: 20, w: 0.6, h: 1.7, speed: 2.1, sound: null,
     drops: () => [[I.GUNPOWDER, randInt(0, 2)]],
@@ -314,10 +373,19 @@ class Mob {
     // a spider in bright light stays neutral until the player hits it
     const calm = def.brightNeutral && !this.angry
       && Math.max(Math.round(world.getSky(hx, hy, hz) * game.daylight), world.getBlk(hx, hy, hz)) >= def.brightNeutral;
-    const canChase = def.hostile && !calm && !p.dead && dist3 < 16 && game.state !== 'paused';
+    const canChase = def.hostile && !calm && !p.dead && dist3 < (def.sense || 16) && game.state !== 'paused';
     if (canChase) {
       mx = dx / (dist || 1); mz = dz / (dist || 1); lookAtPlayer = true;
-      if (def.ranged) {
+      if (def.flies) {
+        // keep 8..16 blocks away and drift sideways; shoot every 3 s while the player is in sight
+        if ((this.seeT -= dt) <= 0) { this.seeT = 0.25; this.sees = lineOfSight(this.pos.x, this.pos.y + this.h / 2, this.pos.z, p.pos.x, p.pos.y + EYE, p.pos.z); }
+        if ((this.strafeT -= dt) <= 0) { this.strafeT = randRange(1.5, 3.5); this.strafe = Math.random() < 0.5 ? -1 : 1; }
+        const ux = mx, uz = mz;
+        if (dist < 8) { mx = -ux; mz = -uz; }
+        else if (dist <= 16) { mx = uz * this.strafe * 0.6; mz = -ux * this.strafe * 0.6; }
+        this.shootCD -= dt;
+        if (this.sees && this.shootCD <= 0) { this.shootFireball(p); this.shootCD = 3; }
+      } else if (def.ranged) {
         // keep 6..12 blocks away and strafe; shoot every 2 s while the player is in sight
         if ((this.seeT -= dt) <= 0) { this.seeT = 0.25; this.sees = lineOfSight(this.pos.x, this.pos.y + 1.6, this.pos.z, p.pos.x, p.pos.y + EYE, p.pos.z); }
         if ((this.strafeT -= dt) <= 0) { this.strafeT = randRange(1.5, 3.5); this.strafe = Math.random() < 0.5 ? -1 : 1; }
@@ -358,7 +426,7 @@ class Mob {
       }
       if (!def.hostile && dist3 < 6 && !this.goal && this.fleeT <= 0) lookAtPlayer = true;
       // stay away from drops of 3+ blocks and (for passive mobs) open water
-      if (mx || mz) {
+      if ((mx || mz) && !def.flies) {
         const ax = Math.floor(this.pos.x + mx * 0.9), az = Math.floor(this.pos.z + mz * 0.9), fy = Math.floor(this.pos.y);
         let drop = 0;
         while (drop < 4 && !SOLID[world.getBlock(ax, fy - 1 - drop, az)] && !LIQ_KIND[world.getBlock(ax, fy - 1 - drop, az)]) drop++;
@@ -380,16 +448,29 @@ class Mob {
       for (let k = 0; k < 4; k++) particles.fire(this.pos.x, this.pos.y + randRange(0.1, this.h), this.pos.z, this.w);
       if (this.dead) return true;
     }
-    const a = 1 - Math.exp(-(this.onGround ? 10 : 3) * dt);
+    const a = 1 - Math.exp(-(def.flies ? 4 : this.onGround ? 10 : 3) * dt);
     this.vel.x += (mx * speed - this.vel.x) * a;
     this.vel.z += (mz * speed - this.vel.z) * a;
-    if (this.inWater) { this.vel.y += (2.2 - this.vel.y) * Math.min(1, dt * 3); }
+    if (def.flies) {
+      // hover `this.hover` blocks above the floor; with no floor in reach, sink slowly; rise over a wall.
+      // A chasing flyer also stays 1 + hover/2 blocks above the player's feet: over a low floor (the
+      // lava sea beside a bridge) it does not sink below the deck and lose sight of the player.
+      if ((this.hoverT -= dt) <= 0 || this.hover === undefined) { this.hoverT = randRange(3, 7); this.hover = randRange(2, 6); }
+      const floor = this.floorBelow();
+      let ty = floor === null ? this.pos.y - 2 : floor + this.hover;
+      if (canChase) ty = Math.max(ty, p.pos.y + 1 + this.hover / 2);
+      const vy = clamp((ty - this.pos.y) * 1.5, -3, 3) + Math.sin(this.age * 2.2) * 0.4;
+      this.vel.y += (vy - this.vel.y) * Math.min(1, dt * 3);
+      if (this.hitWall && (mx || mz)) this.vel.y = Math.max(this.vel.y, 2.5);
+    } else if (this.inWater) { this.vel.y += (2.2 - this.vel.y) * Math.min(1, dt * 3); }
     else {
       this.vel.y -= GRAVITY * dt;
       if (this.type === 'chicken') this.vel.y = Math.max(this.vel.y, -2.5);
     }
-    if (def.climbs && this.hitWall && (mx || mz)) this.vel.y = 2.6;   // a spider walks up walls
-    else if (this.hitWall && this.onGround && (mx || mz)) this.vel.y = JUMP_V * 0.95;
+    if (!def.flies && this.hitWall && (mx || mz)) {   // a flyer rises over a wall above, so it skips this
+      if (def.climbs) this.vel.y = 2.6;   // a spider walks up walls
+      else if (this.onGround) this.vel.y = JUMP_V * 0.95;
+    }
     moveEntity(this, dt);
     // mobs push each other and the player apart
     for (const o of mobs) {
@@ -405,7 +486,7 @@ class Mob {
 
     // ---- animation
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    if (def.ranged && canChase) this.yaw = angleLerp(this.yaw, Math.atan2(dx, dz), Math.min(1, dt * 8));   // an archer faces its target
+    if ((def.ranged || def.flies) && canChase) this.yaw = angleLerp(this.yaw, Math.atan2(dx, dz), Math.min(1, dt * 8));   // an archer faces its target
     else if (hs > 0.2) this.yaw = angleLerp(this.yaw, Math.atan2(this.vel.x, this.vel.z), Math.min(1, dt * 8));
     else if (lookAtPlayer && canChase) this.yaw = angleLerp(this.yaw, Math.atan2(dx, dz), Math.min(1, dt * 6));
     this.walkAmt += ((hs > 0.2 ? 1 : 0) - this.walkAmt) * Math.min(1, dt * 8);
@@ -421,6 +502,7 @@ class Mob {
       l.rotation.y = l.userData.fan + Math.sin(ph) * 0.35 * this.walkAmt;
       l.rotation.z = l.userData.side * (-0.55 + Math.max(0, Math.cos(ph)) * 0.3 * this.walkAmt);
     });
+    if (this.parts.orbit) { this.parts.orbit.rotation.y += dt * 2.4; this.parts.tail.scale.set(1, 1 + Math.sin(this.age * 9) * 0.25, 1); }
     if (this.parts.wings) { const f = this.onGround ? 0 : Math.abs(Math.sin(this.age * 22)) * 1.1; this.parts.wings[0].rotation.z = f; this.parts.wings[1].rotation.z = -f; }
     let hy2 = 0;
     if (lookAtPlayer) hy2 = clamp(angleLerp(0, Math.atan2(dx, dz) - this.yaw, 1), -1, 1);
@@ -448,6 +530,25 @@ class Mob {
   }
 
   paint(r, g, b) { for (const m of this.mats) m.color.setRGB(r, g, b); }
+
+  // The y just above the first solid or liquid cell at or below the mob, within 16 cells; null when none.
+  floorBelow() {
+    const x = Math.floor(this.pos.x), z = Math.floor(this.pos.z);
+    for (let y = Math.floor(this.pos.y), k = 0; k < 16; y--, k++) {
+      const id = world.getBlock(x, y, z);
+      if (SOLID[id] || LIQ_KIND[id] || id === UNLOADED) return y + 1;
+    }
+    return null;
+  }
+
+  // Wisp shot: a straight fireball at the player's chest, from just outside the wisp's box.
+  shootFireball(p) {
+    const ex = this.pos.x, ey = this.pos.y + this.h / 2, ez = this.pos.z;
+    const tx = p.pos.x + randRange(-0.3, 0.3) - ex, ty = p.pos.y + 1.1 - ey, tz = p.pos.z + randRange(-0.3, 0.3) - ez;
+    const d = Math.hypot(tx, ty, tz) || 1;
+    projectiles.fireball(ex + tx / d * 0.65, ey + ty / d * 0.65, ez + tz / d * 0.65, tx / d, ty / d, tz / d, 5, this);
+    audio.fireballShoot(this.pos);
+  }
 
   // Skeleton shot: aim at the player's chest, lead the drop by gravity, add a little spread.
   shootAt(p) {

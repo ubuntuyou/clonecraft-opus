@@ -13,6 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Added
 
+- Ember content (SPEC_realms.md, Phase 4): the Ember Realm now has fortresses, Emberite gear, and two new mobs.
+  - Raw Emberite smelts into an Emberite Ingot. The Emberite tier adds a pickaxe, sword, axe, shovel, hoe, and 4 armor pieces. Each worn armor piece cuts lava damage by 20 %.
+  - Ember Dust burns 60 s in a furnace. 4 Ember Dust craft 1 Ember Lamp.
+  - One fortress stands in each 96-block cell: a brick keep on pillars with 2..4 bridges over the lava. A bridge is 32..64 long and can end in a room with a chest.
+  - The keep holds a Cinder Knight spawner and the heart chest. The heart chest always holds 1 Ember Heart.
+  - Ember Wisp: a flying mob that keeps 8..16 blocks away and shoots a fireball every 3 s. A fireball deals 5 and breaks no block. It drops 0..2 Ember Dust.
+  - Cinder Knight: an armored melee mob, 30 HP, half knockback, and half damage from arrows. It spawns only inside a fortress. It drops 0..2 coal and Raw Emberite 1 time in 3.
+  - Ember Realm spawns ignore the time of day and need block light 11 or less. Magma Brutes spawn there too.
 - Ember portal (SPEC_realms.md, Phase 3): an obsidian frame lit with a Magma Core opens a portal between the overworld and the Ember Realm.
   - A frame opening is 2..4 wide and 3..5 tall, along x or z. The corners are optional. A Magma Core on an incomplete frame shows "The frame is not complete" and keeps the core.
   - The pane shows a moving orange swirl and sparks, gives light 11, and hums nearby. The player walks through it, and the crosshair passes through it.

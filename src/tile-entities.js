@@ -2,7 +2,7 @@
 import { THREE } from './three.js';
 import { mulberry32, randRange, SEED, UNLOADED } from './config.js';
 import {
-  ARMOR_TIERS, armorId, B, baseOf, BLOCKS, ENCH, ENCH_MAX, FUEL, FUEL_LEFT, I, ITEMS, SMELT, SMELT_TIME,
+  armorId, B, baseOf, BLOCKS, ENCH, ENCH_MAX, FUEL, FUEL_LEFT, I, ITEMS, SMELT, SMELT_TIME,
   toolId,
 } from './blocks.js';
 import { WG } from './gen-service.js';
@@ -36,8 +36,9 @@ function spillTileEntity(x, y, z) {
 // open (tileEntity), break, or explosion (spillTileEntity). The rng seeds from the world seed, the
 // position, and the structure type, so the loot is the same on every visit. `looted` holds the
 // filled positions ("x,y,z"), so a chest never fills twice, even when a new chest takes its place.
-// A LOOT entry is [item, min, max, weight]. 'ench' is an enchanted steel-to-diamond tool and
-// 'armor' a diamond armor piece. The golden apple comes only from loot.
+// A LOOT entry is [item, min, max, weight]. 'ench' is an enchanted steel-to-diamond tool, 'ench_diamond'
+// an enchanted diamond tool, and 'armor' a diamond armor piece. The golden apple comes only from loot.
+// `always` lists stacks that every chest of the type holds first: each heart chest holds 1 Ember Heart.
 const LOOT = {
   dungeon: { rolls: [4, 7], items: [[I.BONE, 1, 4, 10], [I.FLESH, 1, 4, 10], [I.STRING, 1, 3, 8], [I.GUNPOWDER, 1, 4, 8],
     [I.BREAD, 1, 3, 8], [I.STEEL, 1, 4, 6], [I.GOLD, 1, 3, 4], [I.ARROW, 2, 8, 5], [I.BUCKET, 1, 1, 3], [I.SEEDS, 2, 6, 4],
@@ -51,7 +52,11 @@ const LOOT = {
   mine: { rolls: [3, 6], items: [[I.COAL, 3, 10, 12], [B.RAIL, 4, 12, 10], [B.TORCH, 4, 12, 8], [I.RAW_IRON, 1, 5, 8],
     [I.RAW_GOLD, 1, 3, 5], [I.BREAD, 1, 3, 6], [I.RUBY, 1, 2, 2], [I.DIAMOND, 1, 2, 2], [I.GOLDEN_APPLE, 1, 1, 1],
     [I.MAGMA_CORE, 1, 1, 1], ['ench', 1, 1, 1]] },
+  fortress: { rolls: [3, 6], items: [[I.EMBERITE, 1, 2, 4], [I.RAW_EMBERITE, 1, 3, 6], [I.EMBER_DUST, 2, 8, 12],
+    [I.MAGMA_CORE, 1, 3, 8], [I.DIAMOND, 1, 3, 5], [B.OBSIDIAN, 2, 6, 6], [I.GOLDEN_APPLE, 1, 2, 4], ['ench_diamond', 1, 1, 3]] },
 };
+LOOT.heart = { ...LOOT.fortress, always: [[I.EMBER_HEART, 1]] };
+const DIAMOND_ARMOR = 5;   // a fixed tier: a new armor tier must not change old loot
 const looted = new Set();
 // The chest feature at (x, y, z), or null.
 function featureAt(x, y, z, kind) {
@@ -61,9 +66,10 @@ function featureAt(x, y, z, kind) {
 // One loot stack drawn with `rnd`.
 function lootStack(entry, rnd) {
   const [what, lo, hi] = entry, count = lo + Math.floor(rnd() * (hi - lo + 1));
-  if (what === 'armor') { const id = armorId(ARMOR_TIERS.length - 1, Math.floor(rnd() * 4)); return { id, count: 1, dur: ITEMS[id].maxDur }; }
-  if (what === 'ench') {
-    const kinds = ['pickaxe', 'sword', 'axe', 'shovel'], id = toolId(kinds[Math.floor(rnd() * 4)], 4 + Math.floor(rnd() * 4));
+  if (what === 'armor') { const id = armorId(DIAMOND_ARMOR, Math.floor(rnd() * 4)); return { id, count: 1, dur: ITEMS[id].maxDur }; }
+  if (what === 'ench' || what === 'ench_diamond') {
+    const kinds = ['pickaxe', 'sword', 'axe', 'shovel'], kind = kinds[Math.floor(rnd() * 4)];
+    const id = toolId(kind, what === 'ench' ? 4 + Math.floor(rnd() * 4) : 7);
     const keys = Object.keys(ENCH).filter((k) => ENCH[k].fits(ITEMS[id])), ench = {};
     const n = 1 + (rnd() < 0.35 ? 1 : 0);
     for (let i = 0; i < n && keys.length; i++) ench[keys.splice(Math.floor(rnd() * keys.length), 1)[0]] = 1 + Math.floor(rnd() * ENCH_MAX);
@@ -80,6 +86,7 @@ function lootChest(x, y, z) {
   looted.add(k);
   const rnd = mulberry32(WG.hash3(SEED ^ 0x100f, x, WG.hash3(y, z, f.type.length)));
   const slots = new Array(27).fill(null), total = table.items.reduce((a, e) => a + e[3], 0);
+  (table.always || []).forEach(([id, count], i) => { slots[i] = { id, count }; });
   const rolls = table.rolls[0] + Math.floor(rnd() * (table.rolls[1] - table.rolls[0] + 1));
   for (let i = 0; i < rolls; i++) {
     let w = rnd() * total, e = table.items[0];

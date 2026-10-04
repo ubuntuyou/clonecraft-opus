@@ -183,6 +183,11 @@ const audio = {
     this.tone({ type: 'triangle', f0: 220, f1: 210, dur: 0.5, vol: 0.3, filter: 1200 });
     this.tone({ type: 'triangle', f0: 156, f1: 150, dur: 0.8, vol: 0.3, filter: 1200, delay: 0.4 });
   },
+  fireballShoot(pos) { this.noise({ ftype: 'bandpass', f0: 500, f1: 1500, q: 0.8, dur: 0.4, vol: 0.4, attack: 0.05, pos: { x: pos.x, y: pos.y + 0.5, z: pos.z } }); },
+  fireballHit(x, y, z) {
+    this.noise({ ftype: 'lowpass', f0: 1400, f1: 200, dur: 0.35, vol: 0.45, pos: { x, y, z } });
+    this.noise({ ftype: 'highpass', f0: 3000, f1: 5000, q: 0.5, dur: 0.25, vol: 0.15, delay: 0.05, pos: { x, y, z } });
+  },
   hiss(pos) { this.noise({ ftype: 'highpass', f0: 2500, f1: 5000, q: 0.4, dur: 1.5, vol: 0.55, attack: 0.9, pos }); },
   explode(x, y, z) {
     const pos = { x, y, z };
@@ -218,6 +223,14 @@ const audio = {
       case 'spider':
         this.noise({ ftype: 'bandpass', f0: 3200 * h, f1: 2200, q: 1.5, dur: hurt ? 0.2 : 0.5, vol: 0.3, attack: 0.05, pos: p });
         for (let i = 0; i < 3; i++) this.tone({ type: 'square', f0: 180 * h, f1: 150, dur: 0.04, vol: 0.08, delay: 0.1 + i * 0.09, filter: 1200, pos: p });
+        break;
+      case 'wisp':   // a breathy whistle over a crackle
+        this.tone({ type: 'sine', f0: 820 * h, f1: 600 * h, dur: hurt ? 0.25 : 0.8, vol: 0.18, attack: 0.15, vib: [7, 40], pos: p });
+        this.noise({ ftype: 'bandpass', f0: 1800, f1: 900, q: 0.7, dur: hurt ? 0.25 : 0.7, vol: 0.12, attack: 0.1, pos: p });
+        break;
+      case 'knight':   // plate armor clanks under a low growl
+        for (let i = 0; i < 2; i++) this.noise({ ftype: 'bandpass', f0: randRange(2400, 3200) * h, f1: 2000, q: 9, dur: 0.12, vol: 0.3, delay: i * 0.16, pos: p });
+        this.tone({ type: 'sawtooth', f0: 85 * h, f1: 65 * h, dur: hurt ? 0.3 : 0.8, vol: 0.3, attack: 0.08, filter: 380, vib: [4, 5], pos: p });
         break;
       case 'brute':   // a deep rumble with a crackle
         this.tone({ type: 'sawtooth', f0: 60 * h, f1: 42 * h, dur: hurt ? 0.5 : 1.2, vol: 0.5, attack: 0.1, filter: 300, vib: [6, 4], pos: p });
