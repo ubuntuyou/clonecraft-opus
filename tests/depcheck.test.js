@@ -11,7 +11,8 @@ function planted(edit) {
   const dir = mkdtempSync(join(tmpdir(), 'depcheck-'));
   try {
     cpSync('src', dir, { recursive: true });
-    edit((name, fn) => { const p = join(dir, `${name}.js`); writeFileSync(p, fn(readFileSync(p, 'utf8'))); });
+    // LF first: a CRLF checkout (core.autocrlf) must not stop a "\n" pattern from matching.
+    edit((name, fn) => { const p = join(dir, `${name}.js`); writeFileSync(p, fn(readFileSync(p, 'utf8').replace(/\r\n/g, '\n'))); });
     return depcheck(dir);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
