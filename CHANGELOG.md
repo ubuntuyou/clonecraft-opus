@@ -235,6 +235,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- Rain, snow, ash, and fireflies no longer hide behind water. They now draw after the water mesh, so water no longer covers drops in front of it.
 - MSAA no longer shows pinpoint flashes on distant terrain. The terrain shaders sample their varyings at the centroid, so an edge pixel stays inside its atlas tile.
 - A dungeon floor no longer hangs in mid-air in a cave. A room is built only where every cell under its floor is solid.
 - Weather no longer speckles a slope with patches of snow amid rain. Outside snowy biomes, the drop's height decides the kind: snow above y 158, rain below.

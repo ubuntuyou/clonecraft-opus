@@ -33,7 +33,7 @@ const fireflies = (() => {
   const mat = new THREE.PointsMaterial({ size: 0.35, map: new THREE.CanvasTexture(cv), vertexColors: true,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false; points.visible = false; scene.add(points);
+  points.frustumCulled = false; points.renderOrder = 3; points.visible = false; scene.add(points);   // after the water (1)
   for (let i = 0; i < N; i++) d[i * S + 9] = d[i * S + 10] = 0;   // age = life = 0: spawn on the first frame
 
   let t = 0, level = 0, shown = 0;

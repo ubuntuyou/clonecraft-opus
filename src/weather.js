@@ -68,7 +68,7 @@ const weather = (() => {
     const mat = snow ? new THREE.PointsMaterial({ color: 0xffffff, map: flakeTex, size: 0.16, transparent: true, opacity: 0.95, depthWrite: false })
       : new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
     const obj = snow ? new THREE.Points(g, mat) : new THREE.LineSegments(g, mat);
-    obj.frustumCulled = false; group.add(obj);
+    obj.frustumCulled = false; obj.renderOrder = 3; group.add(obj);   // after the water (1): see DISCOVERY_engine.md
     for (let i = 0; i < n; i++) d[i * 5 + 3] = 1e9;   // floor above everything: respawn on the first frame
     return { n, d, pos, g, mat, snow };
   }
