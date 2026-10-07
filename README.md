@@ -10,7 +10,7 @@ The source is the modules in `src/`. `npm run build` writes them into the root `
 2. Open `http://localhost:8765/index.html`.
 3. Wait for the loading bar, then click **Play**.
 
-Opening `index.html` directly from disk (`file://`) is not verified.
+Or simply open `index.html` directly from disk.
 
 ## Develop
 
