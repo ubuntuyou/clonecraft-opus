@@ -32,6 +32,7 @@ This spec deepens ten modules and fixes the bugs that the scan found on the way.
 | K9 | B9 | C, doc | D6 and the `engine.js` header list `travel` and `victory`. |
 | K10 | B10 | C | `validSlice` leaves the exports of `save-format.js`. |
 | K11 | B11 | C, benign | No code. `DISCOVERY_engine.md` records the reason. |
+| K12 | N1 | C | A failed `store.remove(SAVE_KEY)` after a good backup keeps the save, so a reload cannot loop. Added by Joe, 2026-11-01 12:51 CT ("Fix N1"). |
 
 ### Constraints
 
@@ -316,6 +317,10 @@ Design B shows that no reachable cell lets the lower door half place and the upp
 
 After an apply throw, `openSave` writes the notice to the session. When that write fails and the backup succeeded (`!keep`), it writes the notice to `store` under `BOOT_NOTICE` and returns `reload: true`. The reload is loop-safe because `SAVE_KEY` is gone. When the backup failed (`keep`), it returns `reload: false`, as today. The reload happens on `!keep` even when the store write also fails; the notice is then lost, but the world is clean. Rejected: design A's reload with no carrier.
 
+### K12: a failed save-key remove keeps the save (S10)
+
+N1, found in the S1 review. `backup` returns `keep: false` when the copy write succeeds, even when `store.remove(key)` then fails. After an apply throw, the page reloads and applies the same save again, so every boot writes a new `.rejected.` copy and reloads. Fix: `backup` returns `keep: false` only when both the copy write and the remove succeed. When the remove fails, `backup` removes the copy (best effort) and returns the "It was kept" notice with `keep: true`. The keep path then blocks saving, and a carried keep notice skips the save key on the next boot, so no reload loops. The user-visible text is the existing "It was kept" text. Rejected: a reload counter in the session (a blocked session defeats it).
+
 ### K8, K9, K10, K11
 
 - **K8** (S5 docs): the Seams row "realms to the scoped modules" states `SCOPED`, the guard, `CLEARED`, and the pair `realm.data()` / `realm.load(d)`.
@@ -501,6 +506,11 @@ Node tests run under `npm test`. QA means the runtime QA agent. A test is named 
 
 **K7** (QA, repro first). A valid save under a throwaway seed; `sessionStorage.setItem` throws; `enchantSeed` deleted from the save and a throwing `Object.prototype.enchantSeed` getter that fires only under `.apply`. Bug: no reload, `persist.blocked` true, a half-applied state. Fixed: one reload, a fresh world, the notice shows, `persist.blocked` false, the `.rejected.` key exists, `clonecraft.bootNotice` is gone from `localStorage`.
 
+**K12** (`tests/save-format.test.js`)
+1. Bad JSON, good copy write, failing remove: `keep` and `blocked` true; the message ends "It was kept. Saving is off until the next visit."; the save key stays; the copy is removed.
+2. Apply throw, failing remove, working session: `reload` true and the carried notice has `keep: true`. The next boot with the same store does not read the save key, does not call `apply`, writes no copy, and returns `reload: false` (no loop).
+3. Apply throw, failing remove, throwing session `setItem`: `reload` false; `blocked` true; the save key stays.
+
 **Existing tests that pass unchanged (every step):** all 109 in `tests/blocks.test.js`, `config.test.js`, `crafting.test.js`, `depcheck.test.js`, `ember-content.test.js`, `portals.test.js`, `save-format.test.js` (readSave, the save-reader rule and fail proofs, the live fixture, the sweep), and `worldgen.test.js` (golden hashes).
 
 ### Gate command
@@ -520,6 +530,7 @@ Node tests run under `npm test`. QA means the runtime QA agent. A test is named 
 | S7 | M3-4, M3-5; K5 repro and fix. |
 | S8 | A TNT blast, a door toggle, and a portal light each remesh once, with no hole. |
 | S9 | Rain and snow by kind across y 159, in snowy plains, in a desert. Rain over water draws in front of it. |
+| S10 | K12: a valid save under a throwaway seed, an apply throw, and a throwing `localStorage.removeItem`: one reload at most, the "It was kept" notice, the save key unchanged, no `.rejected.` key left, and no second reload. |
 
 ### Gates
 

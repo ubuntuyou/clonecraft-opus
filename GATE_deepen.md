@@ -264,5 +264,20 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: fb82c3e is the one `index.html` commit of W3; `npm run check` on `main` fb82c3e: depcheck pass, 261/261, "check: index.html equals a fresh build", exit 0. QA worktree dw3qa and branch `qa/deepen-w3a` removed (merge parents 7c3d7f6, c063c0d, a7802b3 on `main`).
 - [ ] **(owner)** Joe approves the W3 merge.
 
+## Follow-up: S10, K12 (N1) — `step/deepen-10-keep-on-remove-fail`
+Added by Joe, 2026-11-01 12:51 CT ("Fix N1").
+- [ ] K12 tests red on `main` before the fix: K12-1, K12-2, K12-3 (each red test named).
+- [ ] Unit: K12-1
+- [ ] Unit: K12-2
+- [ ] Unit: K12-3
+- [ ] The M4 and K7 tests pass unchanged.
+- [ ] Mutation: `backup` ignores the `store.remove` result → K12-1 fails.
+- [ ] Step gate passes; the string-literal diff shows no new user-visible text.
+- [ ] QA: the S10 row of Runtime QA; 0 game console errors; cleanup done.
+- [ ] Docs: `DISCOVERY_save-format.md` (N1 line resolved); `save-format.js` comment; `CHANGELOG.md` (Fixed K12).
+- [ ] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once.
+- [ ] Merged to `main`; branch removed.
+- [ ] **(owner)** Joe reviews the S10 diff.
+
 ## Release
 - [ ] **(owner)** Joe approves the release tag and the version number.
