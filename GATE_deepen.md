@@ -266,17 +266,17 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 
 ## Follow-up: S10, K12 (N1) — `step/deepen-10-keep-on-remove-fail`
 Added by Joe, 2026-11-01 12:51 CT ("Fix N1").
-- [ ] K12 tests red on `main` before the fix: K12-1, K12-2, K12-3 (each red test named).
-- [ ] Unit: K12-1
-- [ ] Unit: K12-2
-- [ ] Unit: K12-3
-- [ ] The M4 and K7 tests pass unchanged.
-- [ ] Mutation: `backup` ignores the `store.remove` result → K12-1 fails.
-- [ ] Step gate passes; the string-literal diff shows no new user-visible text.
-- [ ] QA: the S10 row of Runtime QA; 0 game console errors; cleanup done.
-- [ ] Docs: `DISCOVERY_save-format.md` (N1 line resolved); `save-format.js` comment; `CHANGELOG.md` (Fixed K12).
-- [ ] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once.
-- [ ] Merged to `main`; branch removed.
+- [x] K12 tests red on `main` before the fix: K12-1, K12-2, K12-3 (each red test named). Note: rsh ran the tests without the fix: all 3 red by name (f640310 on 09ca410 code; again after f425e55).
+- [x] Unit: K12-1
+- [x] Unit: K12-2
+- [x] Unit: K12-3
+- [x] The M4 and K7 tests pass unchanged. Note: their bodies are unchanged; the fake store gains an optional `failRemove` key that they do not pass; 264/264.
+- [x] Mutation: `backup` ignores the `store.remove` result → K12-1 fails. Note: rsh: K12-1, K12-2, K12-3 fail; reverted.
+- [x] Step gate passes; the string-literal diff shows no new user-visible text. Note: the only literal line moves the existing "A copy is in" text behind `if (store.remove(key))`.
+- [x] QA: the S10 row of Runtime QA; 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/k12-qa.md`, seed 795001: fixed build 1 automatic reload then none in 12 s, "It was kept" notice, save key byte-identical, no `.rejected.` key, `persist.blocked` true; unfixed 09ca410 looped (6 loads, 6 copies).
+- [x] Docs: `DISCOVERY_save-format.md` (N1 line resolved); `save-format.js` comment; `CHANGELOG.md` (Fixed K12). Note: 4c93bfc.
+- [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: 8b5a2c7; check 264/264, index.html equals a fresh build.
+- [x] Merged to `main`; branch removed. Note: 65442f1.
 - [ ] **(owner)** Joe reviews the S10 diff.
 
 ## Release
