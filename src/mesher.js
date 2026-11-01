@@ -17,6 +17,7 @@ import {
 } from './blocks.js';
 import { BIOME_FOLIAGE, BIOME_GRASS } from './biomes.js';
 import { FACE_TILE, TILE } from './atlas.js';
+import { FACE_KIND, faceByte } from './face-kind.js';
 import { terrainMaterial, waterMaterial } from './order.js';
 
 const PAD = 18, PSY = PAD * PAD, PVOL = PSY * (H + 2);
@@ -63,15 +64,11 @@ for (const F of FACES) {
 const UV_CORNERS = [[0, 1], [1, 1], [1, 0], [0, 0]];   // BL, BR, TR, TL -> (u, v) with v down
 
 const _vx = new Int32Array(12), _vuv = new Int32Array(8), _vl = new Uint8Array(16), _vc = new Uint8Array(4);
-// Wind sway and glow, stored in the aTint alpha: 255 = still, 128 = leaves (half sway),
-// 0 = full sway, 200 = glow (torch: bright texels are emissive), 214 = soft glow (lava, lit
-// furnace: bright texels ignore light but barely bloom), 232 = crystal (every texel glows and
-// keeps its facet shade), 160 = portal pane (the water pass draws the swirl). Plants sway only at
-// their top vertices, so their base stays in the ground.
-const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6, SWAY_PORTAL_CRY = 7;
-const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160, 172];
-const WET_ALPHA = 246;   // a still face whose neighbour cell is water: the shader draws caustics on it
-let swayMode = SWAY_NONE;
+// Wind sway and glow ride in the aTint alpha. face-kind.js owns the byte of each kind.
+// Plants sway only at their top vertices, so their base stays in the ground.
+const { STILL: K_STILL, LEAF: K_LEAF, PLANT: K_PLANT, GLOW: K_GLOW, SOFT_GLOW: K_SOFT_GLOW, CRYSTAL: K_CRYSTAL,
+  PORTAL_EMBER: K_PORTAL_EMBER, PORTAL_CRYSTAL: K_PORTAL_CRYSTAL } = FACE_KIND;
+let swayMode = K_STILL;   // the FACE_KIND of the quads being emitted
 let wetFace = false;   // emitCubeFace sets it per face
 let flatCry = 0;   // crystal light (0..15) of emitFlat quads; buildChunkMesh sets it per cell
 // Writes one quad from the scratch arrays; `flip` rotates the vertex order to flip the diagonal.
@@ -85,7 +82,7 @@ function pushQuad(buf, tint, flip) {
     buf.uv[v * 2] = _vuv[s * 2]; buf.uv[v * 2 + 1] = _vuv[s * 2 + 1];
     buf.light[v * 4] = _vl[s * 4]; buf.light[v * 4 + 1] = _vl[s * 4 + 1]; buf.light[v * 4 + 2] = _vl[s * 4 + 2]; buf.light[v * 4 + 3] = _vl[s * 4 + 3];
     buf.tint[v * 4] = tint[0]; buf.tint[v * 4 + 1] = tint[1]; buf.tint[v * 4 + 2] = tint[2];
-    buf.tint[v * 4 + 3] = swayMode === SWAY_PLANT ? (_vx[s * 3 + 1] > yMin ? 0 : 255) : swayMode === SWAY_NONE && wetFace ? WET_ALPHA : SWAY_ALPHA[swayMode];
+    buf.tint[v * 4 + 3] = faceByte(swayMode, _vx[s * 3 + 1] > yMin, wetFace);
     buf.cry[v] = _vc[s];
   }
 }
@@ -376,14 +373,14 @@ function buildChunkMesh(world, chunk) {
         _tint[0] = T[k]; _tint[1] = T[k + 1]; _tint[2] = T[k + 2];
       }
       const tint = tintable ? _tint : WHITE;
-      swayMode = IS_LEAF[id] ? SWAY_LEAF : GLOWS[id] ? SWAY_SOFTGLOW : SWAY_NONE;
+      swayMode = IS_LEAF[id] ? K_LEAF : GLOWS[id] ? K_SOFT_GLOW : K_STILL;
       const glass = id === B.GLASS;
       for (let f = 0; f < 6; f++) {
         const nb = PB[p + FACES[f].off];
         if (OPAQUE[nb] || (glass && nb === B.GLASS)) continue;
         emitCubeFace(ob, x, y, z, p, f, FACE_TILE[id * 6 + f], tint, 16, true);
       }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.WATER) {
       // Liquid. Each top corner averages the heights of the 4 cells that share it (Minecraft
       // rule): same kind above any of them -> full height; near-full cells weigh 10x.
@@ -403,13 +400,13 @@ function buildChunkMesh(world, chunk) {
         LIQ_H[cx + cz * 2] = top ? 16 : Math.max(1, Math.round(sum / (wsum || 1)));
       }
       const lava = kind === 2, buf = lava ? ob : wb, tile = lava ? TILE.lava : TILE.water;
-      if (lava) swayMode = SWAY_SOFTGLOW;
+      if (lava) swayMode = K_SOFT_GLOW;
       for (let f = 0; f < 6; f++) {
         const nb = PB[p + FACES[f].off];
         if (LIQ_KIND[nb] === kind || OPAQUE[nb]) continue;
         emitCubeFace(buf, x, y, z, p, f, tile, WHITE, full ? 16 : -1, false);
       }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.DOOR) {
       boxFit(ob, x, y, z, doorBox(id), FACE_TILE[id * 6], PS[p], PL[p]);
     } else if (shape === SHAPE.STAIRS) {
@@ -424,7 +421,7 @@ function buildChunkMesh(world, chunk) {
     } else if (shape === SHAPE.CROP) {   // 4 planes in a # pattern, sunk 1/16 into the farmland
       const tile = FACE_TILE[id * 6], r = tileRect(tile, 0, 0, 16, 16);
       const X = x * 16, Y = y * 16 - 1, Z = z * 16;
-      swayMode = SWAY_PLANT;
+      swayMode = K_PLANT;
       for (const o of [4, 12]) {
         const q = [
           [X, Y, Z + o, X + 16, Y, Z + o, X + 16, Y + 16, Z + o, X, Y + 16, Z + o],
@@ -434,7 +431,7 @@ function buildChunkMesh(world, chunk) {
         ];
         for (const c of q) { for (let i = 0; i < 12; i++) _corners[i] = c[i]; emitFlat(ob, _corners, r, PS[p], PL[p], 0.9, WHITE); }
       }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.CROSS) {
       const tile = FACE_TILE[id * 6], r = tileRect(tile, 0, 0, 16, 16);
       const tint = id === B.TALL_GRASS ? (() => { const k = ((z + 1) * PAD + (x + 1)) * 3; _tint[0] = TINT_G[k]; _tint[1] = TINT_G[k + 1]; _tint[2] = TINT_G[k + 2]; return _tint; })() : WHITE;
@@ -445,16 +442,16 @@ function buildChunkMesh(world, chunk) {
         [X + a, Y, Z + b, X + b, Y, Z + a, X + b, Y + top, Z + a, X + a, Y + top, Z + b],
         [X + b, Y, Z + a, X + a, Y, Z + b, X + a, Y + top, Z + b, X + b, Y + top, Z + a],
       ];
-      swayMode = SWAY_PLANT;
+      swayMode = K_PLANT;
       for (const q of quads) { for (let i = 0; i < 12; i++) _corners[i] = q[i]; emitFlat(ob, _corners, r, PS[p], PL[p], 0.9, tint); }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.TORCH) {
       const t = TILE.torch;
-      swayMode = SWAY_GLOW;
+      swayMode = K_GLOW;
       const f = BLOCKS[id].facing;
       if (f >= 0) wallTorch(ob, x, y, z, f, PS[p]);
       else box(ob, x, y, z, 7, 0, 7, 9, 10, 9, t, PS[p], 15, tileRect(t, 7, 6, 9, 16), tileRect(t, 7, 6, 9, 8), true);
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.LADDER) {   // two rails and four rungs as boxes against the wall
       const f = BLOCKS[id].facing, [dx] = DIR4[f], back = DIR4[f][0] + DIR4[f][1] > 0, t = TILE.ladder;
       // local u (out from the wall), w (along the wall), h (up), in 1/16 units
@@ -475,13 +472,13 @@ function buildChunkMesh(world, chunk) {
       const c = along ? [X, Y, Z + 8, X + 16, Y, Z + 8, X + 16, Y + 16, Z + 8, X, Y + 16, Z + 8]
         : [X + 8, Y, Z + 16, X + 8, Y, Z, X + 8, Y + 16, Z, X + 8, Y + 16, Z + 16];
       for (let i = 0; i < 12; i++) _corners[i] = c[i];
-      swayMode = id === B.PORTAL_CRYSTAL ? SWAY_PORTAL_CRY : SWAY_PORTAL;
+      swayMode = id === B.PORTAL_CRYSTAL ? K_PORTAL_CRYSTAL : K_PORTAL_EMBER;
       emitFlat(wb, _corners, tileRect(FACE_TILE[id * 6], 0, 0, 16, 16), PS[p], PL[p], 0.8, WHITE);
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.CRYSTAL) {
-      swayMode = SWAY_CRYSTAL; flatCry = 15;
+      swayMode = K_CRYSTAL; flatCry = 15;
       crystalCluster(ob, x, y, z, id, PS[p], PL[p]);
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.CACTUS) {
       const side = TILE.cactus_side, top = TILE.cactus_top;
       const sk = PS[p], bl = PL[p];
