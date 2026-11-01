@@ -283,11 +283,12 @@ function railJoin(x, y, z) {
 
 function placeBlock(x, y, z, id) {
   if (LEAF_DECAYS[id]) id = B.LEAVES_PLACED + LEAF_COLOR[id];   // a placed leaf never decays
-  const own = IS_RAIL(id) && !world.batch;   // one remesh for the rail and the rails it re-shapes
-  if (own) world.beginBatch();
-  const ok = world.setBlock(x, y, z, id);
-  if (ok && IS_RAIL(id)) railJoin(x, y, z);
-  if (own) world.endBatch();
+  const set = () => {
+    const done = world.setBlock(x, y, z, id);
+    if (done && IS_RAIL(id)) railJoin(x, y, z);
+    return done;
+  };
+  const ok = IS_RAIL(id) ? world.batched(set) : set();   // one remesh for the rail and the rails it re-shapes
   if (!ok) return false;
   if (baseOf(id) === B.TORCH) {
     torches.add(`${x},${y},${z}`);
@@ -365,10 +366,10 @@ function toggleDoor(x, y, z) {
   if (baseOf(id) !== B.DOOR) return false;
   if ((id - B.DOOR) & 8) { y--; id = world.getBlock(x, y, z); if (baseOf(id) !== B.DOOR) return false; }
   const v = id - B.DOOR, open = !(v & 4), nv = (v & 3) | (open ? 4 : 0);
-  world.beginBatch();
-  world.setBlock(x, y, z, B.DOOR + nv);
-  if (baseOf(world.getBlock(x, y + 1, z)) === B.DOOR) world.setBlock(x, y + 1, z, B.DOOR + 8 + nv);
-  world.endBatch();
+  world.batched(() => {
+    world.setBlock(x, y, z, B.DOOR + nv);
+    if (baseOf(world.getBlock(x, y + 1, z)) === B.DOOR) world.setBlock(x, y + 1, z, B.DOOR + 8 + nv);
+  });
   const k = `${x},${y},${z}`;
   if (open) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay); else doorTimers.delete(k);
   audio.door(open, x + 0.5, y + 1, z + 0.5);
@@ -501,9 +502,7 @@ function useItem() {
   if (item.kind === 'door') {
     const up = world.getBlock(x, y + 1, z);
     if (y + 1 >= H || up === UNLOADED || !REPLACEABLE[up] || cellBlockedByEntity(x, y + 1, z)) return;
-    world.beginBatch();
-    const ok = placeBlock(x, y, z, id) && world.setBlock(x, y + 1, z, id + 8);
-    world.endBatch();
+    const ok = world.batched(() => placeBlock(x, y, z, id) && world.setBlock(x, y + 1, z, id + 8));
     if (ok) { inv.consumeHeld(1); viewModel.swing(); }
     return;
   }
