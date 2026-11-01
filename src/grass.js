@@ -73,16 +73,15 @@ const grass = (() => {
     return grassNear(x, y, z) ? B.GRASS : 0;
   }
   function apply() {
-    const own = !world.batch;   // beginBatch does not nest
-    if (own) world.beginBatch();
     try {
-      for (let k = 0; k < changes.length; k += 4) {
-        const x = changes[k], y = changes[k + 1], z = changes[k + 2], to = changes[k + 3];
-        if (next(x, y, z) === to) world.setBlock(x, y, z, to);   // an earlier change this frame can void it
-      }
+      world.batched(() => {
+        for (let k = 0; k < changes.length; k += 4) {
+          const x = changes[k], y = changes[k + 1], z = changes[k + 2], to = changes[k + 3];
+          if (next(x, y, z) === to) world.setBlock(x, y, z, to);   // an earlier change this frame can void it
+        }
+      });
     } finally {
       changes.length = 0;
-      if (own) world.endBatch();
     }
   }
 

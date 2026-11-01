@@ -497,3 +497,23 @@ test('K1-7 brightnessAt uses the normalized curves: block light, sky light, and 
   const [dx, dy, dz] = darkCell(world);
   near(world.brightnessAt(dx, dy, dz, 1), 0.04);
 });
+
+// SPEC_deepen M8: one batch API. T8.2 writes the M8-1 case. The helper below is the S8 contract fake.
+import { readdirSync } from 'node:fs';
+
+// Every read of the old batch API in the .js files of `dir` except world.js, as "file:line: text".
+// The API is beginBatch, endBatch, and world.batch; `world.batched` does not match.
+export function batchReads(dir = 'src') {
+  const out = [];
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.js') && n !== 'world.js')) {
+    readFileSync(join(dir, f), 'utf8').split('\n').forEach((line, i) => {
+      if (/\b(beginBatch|endBatch)\b|\bworld\.batch\b/.test(line)) out.push(`${f}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  return out;
+}
+
+test('M8-1 no src/*.js except world.js reads beginBatch, endBatch, or world.batch', () => {
+  const hits = batchReads();
+  assert.equal(hits.length, 0, `old batch API still read in ${hits.length} places:\n${hits.join('\n')}`);
+});

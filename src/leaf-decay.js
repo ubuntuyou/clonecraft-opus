@@ -62,16 +62,16 @@ const leafDecay = (() => {
       if (!queue.size) return;
       const now = game.clock, t0 = performance.now();
       let n = 0;
-      world.beginBatch();
-      for (const [k, c] of queue) {
-        if (c[3] > now) continue;
-        if ((n++ & 7) === 0 && performance.now() - t0 > BUDGET_MS) break;   // the rest waits a frame
-        const id = world.getBlock(c[0], c[1], c[2]);
-        if (id === UNLOADED) { c[3] = now + 2; continue; }
-        queue.delete(k);
-        if (LEAF_DECAYS[id] && !supported(c[0], c[1], c[2])) decay(c[0], c[1], c[2], id);
-      }
-      world.endBatch();
+      world.batched(() => {
+        for (const [k, c] of queue) {
+          if (c[3] > now) continue;
+          if ((n++ & 7) === 0 && performance.now() - t0 > BUDGET_MS) break;   // the rest waits a frame
+          const id = world.getBlock(c[0], c[1], c[2]);
+          if (id === UNLOADED) { c[3] = now + 2; continue; }
+          queue.delete(k);
+          if (LEAF_DECAYS[id] && !supported(c[0], c[1], c[2])) decay(c[0], c[1], c[2], id);
+        }
+      });
     },
     get pending() { return queue.size; },
     save() { return [...queue.values()].map((c) => [c[0], c[1], c[2]]); },

@@ -11,19 +11,19 @@ import { particles, audio } from './order.js';
 function explode(x, y, z, r, cause = 'was blown up by a creeper') {
   audio.explode(x, y, z);
   particles.explosion(x, y, z, r);
-  world.beginBatch();
-  const R = Math.ceil(r);
-  for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
-    const d = Math.hypot(dx, dy, dz);
-    if (d > r - Math.random() * 1.1) continue;
-    const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz;
-    const id = world.getBlock(bx, by, bz);
-    if (id === B.AIR || LIQ_KIND[id] || id === UNLOADED || BLOCKS[id].hardness < 0) continue;
-    if (id === B.TNT) { primeTnt(bx, by, bz, 0.5 + Math.random()); continue; }   // chain reaction
-    const drop = Math.random() < 0.3;
-    breakBlock(bx, by, bz, drop, true);
-  }
-  world.endBatch();
+  world.batched(() => {
+    const R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy, dz);
+      if (d > r - Math.random() * 1.1) continue;
+      const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz;
+      const id = world.getBlock(bx, by, bz);
+      if (id === B.AIR || LIQ_KIND[id] || id === UNLOADED || BLOCKS[id].hardness < 0) continue;
+      if (id === B.TNT) { primeTnt(bx, by, bz, 0.5 + Math.random()); continue; }   // chain reaction
+      const drop = Math.random() < 0.3;
+      breakBlock(bx, by, bz, drop, true);
+    }
+  });
   // damage and knockback fall off with distance (up to twice the radius)
   const hitEntity = (e, isPlayer) => {
     const ex = e.pos.x - x, ey = e.pos.y + e.h / 2 - y, ez = e.pos.z - z;
