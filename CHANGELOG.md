@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- The realm-scoped table (SPEC_deepen M1): one table, `SCOPED` in `realms.js`, drives the realm slice, `leave`, and `enter`. Each entry is an adapter `{ data, load, clear }`. `CLEARED` lists the state that a travel clears but never saves. A load-time guard keeps `SCOPED` equal to `SLICE_FIELDS`. A new realm-scoped field now adds one entry instead of three edits.
+- The realm save layout (SPEC_deepen M2): `realm.data()` writes the realm part of the save, and `persist.data()` spreads it. `enchantSeed` and `weather` move after `boss` in the key order. The saved key paths do not change.
 - The realm look (SPEC_deepen M7): each `REALMS` row holds its sky look (`look`) and its ambient effects (`fx`). `sky.js` reads the row instead of its own Ember and Crystal constants. Ash and fireflies read `fx.ash` and `fx.fireflies` instead of the realm name. The picture does not change: the terrain uniforms and the screenshots match.
 - The boot policy (SPEC_deepen M4): one pure function, `openSave` in `save-format.js`, holds the boot fallback policy. It reads the carried notice, reads and checks the save, backs up a rejected save, and handles an apply throw. `boot.js` makes one call. Node tests now prove each branch with fake stores. The behavior and the notice texts do not change.
 - The face kind (SPEC_deepen M5): the new pure module `face-kind.js` owns the byte in the `aTint` alpha. The mesher writes it with `faceByte`, and the terrain shader and the shadow pass decode it with `FACE_GLSL`. The decode is an exact byte match, not a hand-picked window. The picture does not change: screenshots of the overworld, the Ember Realm, and the Crystal Realm match to the pixel.
@@ -20,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- The Seams row "realms to the scoped modules" in `ARCHITECTURE.md` now states `SCOPED`, `CLEARED`, the guard, and `realm.data()` and `realm.load(d)` (SPEC_deepen K8). Before, it named only a `save()` and `load(d)` call per module.
 - Each realm with a light floor now tints it with its own `look.ambientTint` (SPEC_deepen K2). Before, every realm took the Ember tint. Only the Ember Realm has a light floor today, so nothing looks different.
 - The atlas now fails at load with a clear message when a block's `tex` names no tile (SPEC_deepen K3), or when a new tile does not fit the 256-tile atlas (K4). Before, the first drew tile 0 on the face, and the second painted the tile off the canvas. Neither happens in the current game.
 - A save that throws while it loads now gives a clean world when `sessionStorage` is blocked (SPEC_deepen K7). The notice waits in `localStorage` instead, and the page reloads once. Before, the page did not reload: the game stayed half restored, and saving was off.

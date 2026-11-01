@@ -10,6 +10,7 @@ Gotchas, pointers, and invariants for `src/save-format.js`: the save checks, the
 - `BOOT_NOTICE` (`clonecraft.bootNotice`) lives only in `save-format.js`.
 - `save-format.js` is pure. It imports only from `config.js` and `blocks.js`. It is in `PURE` in `tools/depcheck.js`.
 - A save that `persist.data()` writes passes `validSave`. The live fixture proves this.
+- `persist.data()` spreads `realm.data()`. `realms.js` owns the realm layout: the overworld slice at the top level, `realms`, `realm`, `portals`, and `boss` (SPEC_deepen M2). A new realm-scoped field goes in `SCOPED` and `SLICE_FIELDS`, not in `persist.js`.
 - Boot never deletes a rejected save. It writes the backup key `clonecraft.world.<seed>.rejected.<epoch ms>` first.
 - Each check in `SAVE_CHECKS` and `SLICE_CHECKS` names one field. `readSave` puts that name in its reason.
 
