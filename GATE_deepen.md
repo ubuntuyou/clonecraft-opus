@@ -6,7 +6,7 @@ The gate file for `SPEC_deepen.md`. Check a box only after you verify it yoursel
 - [ ] **(owner)** Joe approves `SPEC_deepen.md` and this gate before Step 1. Note by rsh, 2026-11-01: Joe said "Spec everything kept including bugs then fix" (09:24 CT), so the build starts. This box stays open for Joe's review of the spec text.
 
 ## Bugs with no code
-- [ ] K6: not reproduced, unpatched. Design B found no reachable cell where the lower door half places and the upper half fails. (rsh may check this box.)
+- [x] K6: not reproduced, unpatched. Design B found no reachable cell where the lower door half places and the upper half fails. (rsh, 2026-11-01: a scan of the arrival and exit lock boxes found 0 such cells.)
 - [ ] K11: no code. The invariant is in `DISCOVERY_engine.md` (S7 close).
 
 ## Every step (repeat in each step's Integrate box)
@@ -15,8 +15,8 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 ## Wave 1
 
 ### S1: boot policy (M4, K7, K10) — `step/deepen-1-boot-policy`
-- [ ] Contract commit written by the W1 contract agent (opus); rsh reviewed it.
-- [ ] Wave dispatched: T1.1 sonnet, T1.2 sonnet, T1.3 sonnet.
+- [x] Contract commit written by the W1 contract agent (opus); rsh reviewed it. S1 6e14dc1; rsh checked Owns by `git diff --stat main`.
+- [x] Wave dispatched: T1.1 sonnet, T1.2 sonnet, T1.3 sonnet. (rsh dispatch, 2026-11-01 10:07 CT.)
 - [x] Owns check: `git diff --stat` per task touches only its Owns list. Note: `boot.js`, `save-format.js`, `tests/save-format.test.js` only (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] Integrate: the "Every step" checks pass. Note: S1 tip 574603e: depcheck pass, 123/123, build ok; tests add lines only; fixtures unchanged; notice texts byte-equal (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] K7 repro (QA, wave base): no reload, `persist.blocked` true, half-applied state. If it does not reproduce, record it here and skip the K7 fix boxes. Note: reproduced at 8ebe3a7 (seed 790007, forced apply throw): no reload, `blocked` true, realm ember, inventory kept, fresh spawn (`/tmp/deepen-clonecraft/wave-notes.md`).
@@ -50,8 +50,8 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Merged to `main`; task worktrees and branches removed. Note: 5e07936; worktrees d1, d1a..d1c and their branches removed.
 
 ### S2: face kind (M5) — `step/deepen-2-face-kind`
-- [ ] Contract commit (W1 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T2.1 opus, T2.2 sonnet, T2.3 sonnet.
+- [x] Contract commit (W1 contract agent, opus); rsh reviewed it. S2 6ff79bf.
+- [x] Wave dispatched: T2.1 opus, T2.2 sonnet, T2.3 sonnet.
 - [x] Owns check by `git diff --stat`. Note: by file; the hunks outside the line ranges are import lines and the `order.js:35` header fix (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] Integrate: the "Every step" checks pass. Note: S2 tip 4b079ca: depcheck pass, 130/130, build ok; no user-visible text (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] Unit: M5-1 Note: green on `main` 5bacd88.
@@ -77,8 +77,8 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Merged to `main`; worktrees and branches removed. Note: e970ebd; worktrees d2, d2a..d2c and their branches removed.
 
 ### S3: atlas checks (K3, K4) — `step/deepen-3-atlas-checks`
-- [ ] Contract commit (W1 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T3.1 sonnet, T3.2 sonnet.
+- [x] Contract commit (W1 contract agent, opus); rsh reviewed it. S3 cd8bec9.
+- [x] Wave dispatched: T3.1 sonnet, T3.2 sonnet.
 - [x] Owns check by `git diff --stat`. Note: `atlas.js`, `tests/atlas.test.js` only (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] Integrate: the "Every step" checks pass. Note: S3 tip 2408024: depcheck pass, 115/115, build ok (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] K4 repro: K3/4-4 is red on the contract commit, before the fix. Note: red on T3.2 7c6bba2 (the contract plus the tests, before T3.1) (`/tmp/deepen-clonecraft/wave-notes.md`).
@@ -97,8 +97,8 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Merged to `main`; worktrees and branches removed. Note: 1bb34ac; worktrees d3, d3a, d3b and their branches removed.
 
 ### S4: realm look (M7, K2) — `step/deepen-4-realm-look`
-- [ ] Contract commit (W1 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T4.1 sonnet, T4.2 sonnet, T4.3 sonnet.
+- [x] Contract commit (W1 contract agent, opus); rsh reviewed it. S4 b3acd5f.
+- [x] Wave dispatched: T4.1 sonnet, T4.2 sonnet, T4.3 sonnet.
 - [x] Owns check by `git diff --stat`. Note: `/tmp/deepen-clonecraft/w1-integrate.md`.
 - [x] Integrate: the "Every step" checks pass. Note: S4 tip c23f4e4: depcheck pass, 126/126, build ok; `enter` texts byte-equal (`/tmp/deepen-clonecraft/w1-integrate.md`).
 - [x] Unit: M7-1 Note: green on `main` 5bacd88.

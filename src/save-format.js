@@ -98,7 +98,6 @@ function saveProblem(d) {
   for (const [k, sl] of Object.entries(d.realms || {})) { const p = sliceProblem(sl, false); if (p) return `realms.${k}.${p}`; }
   return null;
 }
-const validSlice = (s, top) => sliceProblem(s, top) === null;
 const validSave = (d) => saveProblem(d) === null;
 
 // ---- the boot reader ---------------------------------------------------------------------
@@ -170,5 +169,4 @@ function openSave({ store, session, key, seed, now, apply }) {
   return { save, notice, blocked, reload };
 }
 
-// K10: validSlice is not exported (no reader outside this file).
 export { BOOT_NOTICE, editsOf, mapsOf, openSave, readSave, SLICE_FIELDS, validSave };
