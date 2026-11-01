@@ -88,22 +88,24 @@ Merged on main (4eaa7ba code, 40b6fef exit box from boss.EXIT, docs accc3b5), 20
 
 ## Step 3: boss kill and travel ratio (H5, H10)
 
+Merged on main (code cb40199, docs ec1686f), 2026-10-31. Case A seed 780001 (travel 23 ms after dying), Case B seed 780002 (real portal walk at deathT 2.5). Both: Jewel Heart in the crystal stash, `defeated: true` saved, 18 frame + 12 pane cells after the reload, no Titan, victory once. 0 game console errors.
+
 ### H5: kill survives a travel
-- [ ] Playwright: 0 HP, then death and respawn within 3 s. Before the reload, the crystal stash holds the loot drops.
-- [ ] Playwright: after that reload, the save holds `defeated: true`, the exit portal stands in the Crystal Realm, and no Titan spawns. Correction by rsh, 2026-10-31: dropped items are never saved (`persist.js` header, D47), so the loot cannot survive a reload for any kill. The loot check moved before the reload.
-- [ ] Playwright: 0 HP, then walking into the arrival portal within 3 s gives the same results (stash loot before the reload; `defeated` and the exit portal after it).
-- [ ] The victory screen shows exactly once.
+- [x] Playwright: 0 HP, then death and respawn within 3 s. Before the reload, the crystal stash holds the loot drops.
+- [x] Playwright: after that reload, the save holds `defeated: true`, the exit portal stands in the Crystal Realm, and no Titan spawns. Correction by rsh, 2026-10-31: dropped items are never saved (`persist.js` header, D47), so the loot cannot survive a reload for any kill. The loot check moved before the reload.
+- [x] Playwright: 0 HP, then walking into the arrival portal within 3 s gives the same results (stash loot before the reload; `defeated` and the exit portal after it).
+- [x] The victory screen shows exactly once.
 
 ### H10: one travel ratio
 - [x] Grep: `defaultTarget` holds no bare 8, 64, 33, or 110. No code reads `label`, and `label` is deleted.
 - [x] One `defaultTarget('ember')` result is equal before and after the change. Four samples matched (agent, Node run of the real function body), e.g. overworld (100,70,-40) to ember [12.5,33,-5].
 
 ### Step 3 close
-- [ ] `npm run build`, then `npm run check` passes. `index.html` is committed once.
-- [ ] 0 game console errors in Chromium.
-- [ ] `ARCHITECTURE.md` D53 notes that `leave` finishes a dying Titan.
-- [ ] `CHANGELOG.md` `[Unreleased]` lists H5 and H10.
-- [ ] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
+- [x] `npm run build`, then `npm run check` passes. `index.html` is committed once.
+- [x] 0 game console errors in Chromium.
+- [x] `ARCHITECTURE.md` D53 notes that `leave` finishes a dying Titan.
+- [x] `CHANGELOG.md` `[Unreleased]` lists H5 and H10.
+- [x] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
 - [ ] **(owner)** Joe approves the Step 3 merge.
 
 ## Release
