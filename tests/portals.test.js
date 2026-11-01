@@ -161,3 +161,13 @@ function sealedIn(liquid) {
 test('portal-seal: a platform in water leaves no water next to the structure', () => sealedIn(B.WATER));
 
 test('portal-seal: a platform in lava leaves no lava next to the structure', () => sealedIn(B.LAVA));
+
+// SPEC_deepen M3: the ring box of a frame (ringHas). T7.2 writes the M3-1..M3-3 cases.
+// The helpers below are the S7 contract fakes.
+import { ringHas } from '../src/portal-frame.js';
+import { WG } from '../src/gen-service.js';
+
+// The arrival frame (axis 'x') and a frame shaped like boss.js EXIT_FRAME. boss.js does not load
+// in Node, so exitFrame() rebuilds EXIT_FRAME from its source values: x0 -1, the arena floor, z 0, 3 x 4.
+export const arrivalFrame = () => ({ ...WG.CRYSTAL_ARRIVAL });
+export const exitFrame = () => ({ axis: 'x', x0: -1, y0: WG.CRYSTAL_TOP + 1, z0: 0, w: 3, h: 4 });

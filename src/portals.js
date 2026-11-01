@@ -67,7 +67,8 @@ const portals = (() => {
   let known = null;                 // the override map that `cells` mirrors
   let t = 0, armed = false, warned = false, removing = false, kind = PE;
   const get = (x, y, z) => world.getBlock(x, y, z);
-  world.locked = (x, y, z) => world.realm === 'crystal' && (inArrival(x, y, z) || (realm.boss.defeated && inExit(x, y, z)));
+  // TODO M3 (T7.1): world.realm === 'crystal' && (ringHas(A, x, y, z) || boss.locks(x, y, z)); delete inArrival and inExit.
+  world.locked = (x, y, z) => world.realm === 'crystal' && (inArrival(x, y, z) || (boss.defeated && inExit(x, y, z)));
 
   function sync() {
     if (known === world.overrides) return;
@@ -89,7 +90,7 @@ const portals = (() => {
     }
     if (!out.length) return;
     removing = true;
-    const own = !world.batch;
+    const own = !world.batch;   // TODO M8 (T7.1): world.batched
     if (own) world.beginBatch();
     for (const c of out) world.setBlock(c[0], c[1], c[2], B.AIR);
     if (own) world.endBatch();
@@ -114,7 +115,7 @@ const portals = (() => {
     if (N6.some(([dx, dy, dz]) => get(x + dx, y + dy, z + dz) === P)) return 'busy';
     const f = findFrame(get, x, y, z, KINDS[P].ring);
     if (!f) return 'open';
-    const own = !world.batch;
+    const own = !world.batch;   // TODO M8 (T7.1): world.batched
     if (own) world.beginBatch();
     for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P);
     if (own) world.endBatch();
@@ -168,7 +169,7 @@ const portals = (() => {
   // Arrival with no portal: builds an Ember portal at the target (the chunks there are meshed now).
   function build(to) {
     const plan = buildPlan(get, to[0], to[1], to[2]);
-    const own = !world.batch;
+    const own = !world.batch;   // TODO M8 (T7.1): world.batched
     if (own) world.beginBatch();
     for (const [x, y, z, id] of plan.edits) world.setBlock(x, y, z, id);
     if (own) world.endBatch();
