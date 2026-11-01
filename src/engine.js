@@ -8,7 +8,7 @@
  * and 'dead'; it freezes in 'paused' and before the first start.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { CONFIG, PLAYER_H, PLAYER_W, SEA } from './config.js';
+import { CONFIG, MAX_HEALTH, PLAYER_H, PLAYER_W, SEA } from './config.js';
 import { World } from './world.js';
 
 const canvas = document.getElementById('view');
@@ -39,7 +39,7 @@ const game = {
 const player = {
   pos: new THREE.Vector3(0.5, SEA + 32, 0.5), vel: new THREE.Vector3(), w: PLAYER_W, h: PLAYER_H,
   yaw: 0, pitch: 0, onGround: false, hitWall: false, inWater: false, headInWater: false,
-  health: 20, maxHealth: 20, dead: false, invuln: 0, lastHurt: -99, regenT: 0, regenLeft: 0, fallPeak: null,
+  health: MAX_HEALTH, maxHealth: MAX_HEALTH, dead: false, invuln: 0, lastHurt: -99, regenT: 0, regenLeft: 0, fallPeak: null,
   passLeaves: true, climbing: false, sinking: false,   // leaves: see solidBoxes and updatePlayer
   trapNear: false, trapScanT: 0,                       // temple trap warning: see updatePlayer
   sprinting: false, flying: false, spawn: new THREE.Vector3(0.5, SEA + 32, 0.5),

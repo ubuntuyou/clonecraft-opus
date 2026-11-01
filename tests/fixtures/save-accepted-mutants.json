@@ -1,0 +1,1132 @@
+[
+ {
+  "path": "armor",
+  "mutant": "[]",
+  "reason": "armor is optional. apply fills each missing or null armor slot with an empty slot."
+ },
+ {
+  "path": "armor",
+  "mutant": "[null]",
+  "reason": "armor is optional. apply fills each missing or null armor slot with an empty slot."
+ },
+ {
+  "path": "armor",
+  "mutant": "delete",
+  "reason": "armor is optional. apply fills each missing or null armor slot with an empty slot."
+ },
+ {
+  "path": "armor[*]",
+  "mutant": "null",
+  "reason": "null is an empty slot."
+ },
+ {
+  "path": "armor[*].count",
+  "mutant": "1e9",
+  "reason": "The checks do not cap count at maxStack. An oversized stack loads without an error."
+ },
+ {
+  "path": "armor[*].dur",
+  "mutant": "-1",
+  "reason": "Any finite dur loads. A dur of 0 or less breaks the tool at its next use."
+ },
+ {
+  "path": "armor[*].dur",
+  "mutant": "1e9",
+  "reason": "Any finite dur loads. A dur of 0 or less breaks the tool at its next use."
+ },
+ {
+  "path": "armor[*].dur",
+  "mutant": "delete",
+  "reason": "dur is optional. The game reads a missing dur as full (dur ??= maxDur), and wear skips it."
+ },
+ {
+  "path": "armor[*].dur",
+  "mutant": "null",
+  "reason": "dur is optional. The game reads a missing dur as full (dur ??= maxDur), and wear skips it."
+ },
+ {
+  "path": "boss",
+  "mutant": "{}",
+  "reason": "boss is optional, as in a save from before the boss. It loads as not defeated."
+ },
+ {
+  "path": "boss",
+  "mutant": "delete",
+  "reason": "boss is optional, as in a save from before the boss. It loads as not defeated."
+ },
+ {
+  "path": "boss.defeated",
+  "mutant": "delete",
+  "reason": "boss.defeated is optional, as in a save from before the boss. It loads as not defeated."
+ },
+ {
+  "path": "clock",
+  "mutant": "-1",
+  "reason": "Any finite time loads. The day cycle and the timers continue from the saved value."
+ },
+ {
+  "path": "clock",
+  "mutant": "1e9",
+  "reason": "Any finite time loads. The day cycle and the timers continue from the saved value."
+ },
+ {
+  "path": "dayTime",
+  "mutant": "-1",
+  "reason": "Any finite time loads. The day cycle and the timers continue from the saved value."
+ },
+ {
+  "path": "dayTime",
+  "mutant": "1e9",
+  "reason": "Any finite time loads. The day cycle and the timers continue from the saved value."
+ },
+ {
+  "path": "edits",
+  "mutant": "[]",
+  "reason": "An empty edit list is a realm with no block edits."
+ },
+ {
+  "path": "edits[*][*]",
+  "mutant": "-1",
+  "reason": "Any integer chunk key loads. A key outside the ckey range never matches a chunk, so its edits stay unused."
+ },
+ {
+  "path": "edits[*][*]",
+  "mutant": "[]",
+  "reason": "A chunk with an empty edit list loads as an unedited chunk."
+ },
+ {
+  "path": "edits[*][*]",
+  "mutant": "1e9",
+  "reason": "Any integer chunk key loads. A key outside the ckey range never matches a chunk, so its edits stay unused."
+ },
+ {
+  "path": "enchantSeed",
+  "mutant": "-1",
+  "reason": "enchantSeed is optional, and any integer is a seed."
+ },
+ {
+  "path": "enchantSeed",
+  "mutant": "1e9",
+  "reason": "enchantSeed is optional, and any integer is a seed."
+ },
+ {
+  "path": "enchantSeed",
+  "mutant": "delete",
+  "reason": "enchantSeed is optional, and any integer is a seed."
+ },
+ {
+  "path": "farm",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "farm",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "farm[*][*]",
+  "mutant": "-1",
+  "reason": "A farm row is 5 finite numbers. Each loads without an error: a cell outside y 0..H-1 reads as bedrock or air and leaves the registry, the due time sets the wait, and the stage shifts only growth or drying."
+ },
+ {
+  "path": "farm[*][*]",
+  "mutant": "1e9",
+  "reason": "A farm row is 5 finite numbers. Each loads without an error: a cell outside y 0..H-1 reads as bedrock or air and leaves the registry, the due time sets the wait, and the stage shifts only growth or drying."
+ },
+ {
+  "path": "homes",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "homes",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "homes[*].name",
+  "mutant": "string",
+  "reason": "Any string is a home name."
+ },
+ {
+  "path": "homes[*].x",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].x",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].y",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].y",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].yaw",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].yaw",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].z",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "homes[*].z",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "inv.loose",
+  "mutant": "[]",
+  "reason": "inv.loose is optional. apply adds no loose stacks."
+ },
+ {
+  "path": "inv.loose",
+  "mutant": "delete",
+  "reason": "inv.loose is optional. apply adds no loose stacks."
+ },
+ {
+  "path": "inv.loose[*].count",
+  "mutant": "1e9",
+  "reason": "The checks do not cap count at maxStack. An oversized stack loads without an error."
+ },
+ {
+  "path": "inv.slots",
+  "mutant": "[]",
+  "reason": "apply fills each missing or null slot with an empty slot."
+ },
+ {
+  "path": "inv.slots",
+  "mutant": "[null]",
+  "reason": "apply fills each missing or null slot with an empty slot."
+ },
+ {
+  "path": "inv.slots[*]",
+  "mutant": "null",
+  "reason": "null is an empty slot."
+ },
+ {
+  "path": "inv.slots[*].count",
+  "mutant": "1e9",
+  "reason": "The checks do not cap count at maxStack. An oversized stack loads without an error."
+ },
+ {
+  "path": "inv.slots[*].dur",
+  "mutant": "-1",
+  "reason": "Any finite dur loads. A dur of 0 or less breaks the tool at its next use."
+ },
+ {
+  "path": "inv.slots[*].dur",
+  "mutant": "1e9",
+  "reason": "Any finite dur loads. A dur of 0 or less breaks the tool at its next use."
+ },
+ {
+  "path": "inv.slots[*].dur",
+  "mutant": "delete",
+  "reason": "dur is optional. The game reads a missing dur as full (dur ??= maxDur), and wear skips it."
+ },
+ {
+  "path": "inv.slots[*].dur",
+  "mutant": "null",
+  "reason": "dur is optional. The game reads a missing dur as full (dur ??= maxDur), and wear skips it."
+ },
+ {
+  "path": "inv.slots[*].ench",
+  "mutant": "delete",
+  "reason": "ench is optional. A stack without it has no enchantment."
+ },
+ {
+  "path": "leaves",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "leaves",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "leaves[*][*]",
+  "mutant": "-1",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "leaves[*][*]",
+  "mutant": "1e9",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "liquids",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "liquids[*]",
+  "mutant": "[]",
+  "reason": "An empty liquid queue is valid."
+ },
+ {
+  "path": "liquids[*][*][*]",
+  "mutant": "-1",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "liquids[*][*][*]",
+  "mutant": "1e9",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "looted",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "looted",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "-1",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "[]",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "{}",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "1e9",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "delete",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "null",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.flying",
+  "mutant": "string",
+  "reason": "apply reads !!P.flying, so any value loads as a boolean."
+ },
+ {
+  "path": "player.pitch",
+  "mutant": "-1",
+  "reason": "Any finite angle loads. The view turns to that angle."
+ },
+ {
+  "path": "player.pitch",
+  "mutant": "1e9",
+  "reason": "Any finite angle loads. The view turns to that angle."
+ },
+ {
+  "path": "player.pos[*]",
+  "mutant": "-1",
+  "reason": "Any finite coordinate loads. The player stands at that point."
+ },
+ {
+  "path": "player.pos[*]",
+  "mutant": "1e9",
+  "reason": "Any finite coordinate loads. The player stands at that point."
+ },
+ {
+  "path": "player.spawn[*]",
+  "mutant": "-1",
+  "reason": "Any finite coordinate loads. The player stands at that point."
+ },
+ {
+  "path": "player.spawn[*]",
+  "mutant": "1e9",
+  "reason": "Any finite coordinate loads. The player stands at that point."
+ },
+ {
+  "path": "player.yaw",
+  "mutant": "-1",
+  "reason": "Any finite angle loads. The view turns to that angle."
+ },
+ {
+  "path": "player.yaw",
+  "mutant": "1e9",
+  "reason": "Any finite angle loads. The view turns to that angle."
+ },
+ {
+  "path": "portals",
+  "mutant": "{}",
+  "reason": "portals is optional. crystalBack then loads as null."
+ },
+ {
+  "path": "portals",
+  "mutant": "delete",
+  "reason": "portals is optional. crystalBack then loads as null."
+ },
+ {
+  "path": "portals.crystalBack",
+  "mutant": "delete",
+  "reason": "crystalBack is optional. Travel from the Crystal Realm then goes to the spawn."
+ },
+ {
+  "path": "portals.crystalBack",
+  "mutant": "null",
+  "reason": "crystalBack is optional. Travel from the Crystal Realm then goes to the spawn."
+ },
+ {
+  "path": "portals.crystalBack[*]",
+  "mutant": "-1",
+  "reason": "Any finite point loads. Travel from the Crystal Realm goes to that point."
+ },
+ {
+  "path": "portals.crystalBack[*]",
+  "mutant": "1e9",
+  "reason": "Any finite point loads. Travel from the Crystal Realm goes to that point."
+ },
+ {
+  "path": "realm",
+  "mutant": "delete",
+  "reason": "realm is optional. A save without it loads in the overworld."
+ },
+ {
+  "path": "realms",
+  "mutant": "{}",
+  "reason": "realms is optional. A save without it has unvisited realms."
+ },
+ {
+  "path": "realms",
+  "mutant": "delete",
+  "reason": "realms is optional. A save without it has unvisited realms."
+ },
+ {
+  "path": "realms.crystal",
+  "mutant": "{}",
+  "reason": "A realm slice is optional or may be empty. The realm then loads as unvisited."
+ },
+ {
+  "path": "realms.crystal",
+  "mutant": "delete",
+  "reason": "A realm slice is optional or may be empty. The realm then loads as unvisited."
+ },
+ {
+  "path": "realms.crystal.edits",
+  "mutant": "[]",
+  "reason": "An empty edit list is a realm with no block edits."
+ },
+ {
+  "path": "realms.crystal.edits",
+  "mutant": "delete",
+  "reason": "A stored realm slice may omit edits (validSlice reads it as [])."
+ },
+ {
+  "path": "realms.crystal.edits[*][*]",
+  "mutant": "-1",
+  "reason": "Any integer chunk key loads. A key outside the ckey range never matches a chunk, so its edits stay unused."
+ },
+ {
+  "path": "realms.crystal.edits[*][*]",
+  "mutant": "[]",
+  "reason": "A chunk with an empty edit list loads as an unedited chunk."
+ },
+ {
+  "path": "realms.crystal.edits[*][*]",
+  "mutant": "1e9",
+  "reason": "Any integer chunk key loads. A key outside the ckey range never matches a chunk, so its edits stay unused."
+ },
+ {
+  "path": "realms.crystal.farm",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.farm",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.farm[*][*]",
+  "mutant": "-1",
+  "reason": "A farm row is 5 finite numbers. Each loads without an error: a cell outside y 0..H-1 reads as bedrock or air and leaves the registry, the due time sets the wait, and the stage shifts only growth or drying."
+ },
+ {
+  "path": "realms.crystal.farm[*][*]",
+  "mutant": "1e9",
+  "reason": "A farm row is 5 finite numbers. Each loads without an error: a cell outside y 0..H-1 reads as bedrock or air and leaves the registry, the due time sets the wait, and the stage shifts only growth or drying."
+ },
+ {
+  "path": "realms.crystal.homes",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.homes",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.homes[*].name",
+  "mutant": "string",
+  "reason": "Any string is a home name."
+ },
+ {
+  "path": "realms.crystal.homes[*].x",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].x",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].y",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].y",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].yaw",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].yaw",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].z",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.homes[*].z",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.crystal.leaves",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.leaves",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.leaves[*][*]",
+  "mutant": "-1",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.crystal.leaves[*][*]",
+  "mutant": "1e9",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.crystal.liquids",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.liquids[*]",
+  "mutant": "[]",
+  "reason": "An empty liquid queue is valid."
+ },
+ {
+  "path": "realms.crystal.liquids[*][*][*]",
+  "mutant": "-1",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.crystal.liquids[*][*][*]",
+  "mutant": "1e9",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.crystal.looted",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.looted",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.te",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.te",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.te[*].burn",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "realms.crystal.te[*].burnMax",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "realms.crystal.te[*].cook",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "realms.crystal.te[*].slots[*]",
+  "mutant": "null",
+  "reason": "null is an empty slot."
+ },
+ {
+  "path": "realms.crystal.te[*].slots[*].count",
+  "mutant": "1e9",
+  "reason": "The checks do not cap count at maxStack. An oversized stack loads without an error."
+ },
+ {
+  "path": "realms.crystal.te[*].x",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.crystal.te[*].x",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.crystal.te[*].y",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.crystal.te[*].y",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.crystal.te[*].z",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.crystal.te[*].z",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.crystal.vehicles",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.vehicles",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].x",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].x",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].y",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].y",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].yaw",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].yaw",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].z",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.crystal.vehicles[*].z",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember",
+  "mutant": "{}",
+  "reason": "A realm slice is optional or may be empty. The realm then loads as unvisited."
+ },
+ {
+  "path": "realms.ember",
+  "mutant": "delete",
+  "reason": "A realm slice is optional or may be empty. The realm then loads as unvisited."
+ },
+ {
+  "path": "realms.ember.edits",
+  "mutant": "[]",
+  "reason": "An empty edit list is a realm with no block edits."
+ },
+ {
+  "path": "realms.ember.edits",
+  "mutant": "delete",
+  "reason": "A stored realm slice may omit edits (validSlice reads it as [])."
+ },
+ {
+  "path": "realms.ember.edits[*][*]",
+  "mutant": "-1",
+  "reason": "Any integer chunk key loads. A key outside the ckey range never matches a chunk, so its edits stay unused."
+ },
+ {
+  "path": "realms.ember.edits[*][*]",
+  "mutant": "[]",
+  "reason": "A chunk with an empty edit list loads as an unedited chunk."
+ },
+ {
+  "path": "realms.ember.edits[*][*]",
+  "mutant": "1e9",
+  "reason": "Any integer chunk key loads. A key outside the ckey range never matches a chunk, so its edits stay unused."
+ },
+ {
+  "path": "realms.ember.farm",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.farm",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.farm[*][*]",
+  "mutant": "-1",
+  "reason": "A farm row is 5 finite numbers. Each loads without an error: a cell outside y 0..H-1 reads as bedrock or air and leaves the registry, the due time sets the wait, and the stage shifts only growth or drying."
+ },
+ {
+  "path": "realms.ember.farm[*][*]",
+  "mutant": "1e9",
+  "reason": "A farm row is 5 finite numbers. Each loads without an error: a cell outside y 0..H-1 reads as bedrock or air and leaves the registry, the due time sets the wait, and the stage shifts only growth or drying."
+ },
+ {
+  "path": "realms.ember.homes",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.homes",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.homes[*].name",
+  "mutant": "string",
+  "reason": "Any string is a home name."
+ },
+ {
+  "path": "realms.ember.homes[*].x",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].x",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].y",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].y",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].yaw",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].yaw",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].z",
+  "mutant": "-1",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.homes[*].z",
+  "mutant": "1e9",
+  "reason": "Any finite home position or yaw loads. Go home moves the player there."
+ },
+ {
+  "path": "realms.ember.leaves",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.leaves",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.leaves[*][*]",
+  "mutant": "-1",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.ember.leaves[*][*]",
+  "mutant": "1e9",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.ember.liquids",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.liquids[*]",
+  "mutant": "[]",
+  "reason": "An empty liquid queue is valid."
+ },
+ {
+  "path": "realms.ember.liquids[*][*][*]",
+  "mutant": "-1",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.ember.liquids[*][*][*]",
+  "mutant": "1e9",
+  "reason": "An x or z of any integer is a block cell (y must be 0..H-1). A cell in an unloaded chunk waits until its chunk loads."
+ },
+ {
+  "path": "realms.ember.looted",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.looted",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.te",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.te",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.te[*].burn",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "realms.ember.te[*].burnMax",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "realms.ember.te[*].cook",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "realms.ember.te[*].slots[*]",
+  "mutant": "null",
+  "reason": "null is an empty slot."
+ },
+ {
+  "path": "realms.ember.te[*].slots[*].count",
+  "mutant": "1e9",
+  "reason": "The checks do not cap count at maxStack. An oversized stack loads without an error."
+ },
+ {
+  "path": "realms.ember.te[*].x",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.ember.te[*].x",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.ember.te[*].y",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.ember.te[*].y",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.ember.te[*].z",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.ember.te[*].z",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "realms.ember.vehicles",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.vehicles",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "realms.ember.vehicles[*].x",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].x",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].y",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].y",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].yaw",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].yaw",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].z",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "realms.ember.vehicles[*].z",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "seed",
+  "mutant": "-1",
+  "reason": "Any 32-bit integer is a seed. readSave compares the seed with the URL seed; validSave does not."
+ },
+ {
+  "path": "seed",
+  "mutant": "1e9",
+  "reason": "Any 32-bit integer is a seed. readSave compares the seed with the URL seed; validSave does not."
+ },
+ {
+  "path": "te",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "te",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "te[*].burn",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "te[*].burnMax",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "te[*].cook",
+  "mutant": "1e9",
+  "reason": "Any finite furnace value of 0 or more loads. The furnace burns or cooks for that long."
+ },
+ {
+  "path": "te[*].slots[*]",
+  "mutant": "null",
+  "reason": "null is an empty slot."
+ },
+ {
+  "path": "te[*].slots[*].count",
+  "mutant": "1e9",
+  "reason": "The checks do not cap count at maxStack. An oversized stack loads without an error."
+ },
+ {
+  "path": "te[*].slots[*].dur",
+  "mutant": "-1",
+  "reason": "Any finite dur loads. A dur of 0 or less breaks the tool at its next use."
+ },
+ {
+  "path": "te[*].slots[*].dur",
+  "mutant": "1e9",
+  "reason": "Any finite dur loads. A dur of 0 or less breaks the tool at its next use."
+ },
+ {
+  "path": "te[*].slots[*].dur",
+  "mutant": "delete",
+  "reason": "dur is optional. The game reads a missing dur as full (dur ??= maxDur), and wear skips it."
+ },
+ {
+  "path": "te[*].slots[*].dur",
+  "mutant": "null",
+  "reason": "dur is optional. The game reads a missing dur as full (dur ??= maxDur), and wear skips it."
+ },
+ {
+  "path": "te[*].slots[*].ench",
+  "mutant": "delete",
+  "reason": "ench is optional. A stack without it has no enchantment."
+ },
+ {
+  "path": "te[*].x",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "te[*].x",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "te[*].y",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "te[*].y",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "te[*].z",
+  "mutant": "-1",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "te[*].z",
+  "mutant": "1e9",
+  "reason": "Any integer position loads. A tile entity with no block at its position is never opened."
+ },
+ {
+  "path": "vehicles",
+  "mutant": "[]",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "vehicles",
+  "mutant": "delete",
+  "reason": "A slice may omit this list or hold it empty. The realm then starts with none."
+ },
+ {
+  "path": "vehicles[*].x",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].x",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].y",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].y",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].yaw",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].yaw",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].z",
+  "mutant": "-1",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "vehicles[*].z",
+  "mutant": "1e9",
+  "reason": "Any finite vehicle position or yaw loads. The vehicle stands there."
+ },
+ {
+  "path": "weather",
+  "mutant": "delete",
+  "reason": "weather is optional. The weather keeps its boot state."
+ },
+ {
+  "path": "weather.left",
+  "mutant": "1e9",
+  "reason": "Any finite weather time of 0 or more loads."
+ }
+]

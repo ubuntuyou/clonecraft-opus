@@ -5,7 +5,7 @@
  * realm-scoped part of a save (SLICE_FIELDS); the **edits** are the save form of the block
  * overrides. The module is pure: Node tests import it. Rules: DISCOVERY_save-format.md.
  * ===================================================================================== */
-import { CS, REALMS, VOL, WEATHER_KINDS } from './config.js';
+import { CS, H, MAX_HEALTH, REALMS, VOL, WEATHER_KINDS } from './config.js';
 import { B, BLOCKS, IDS_VERSION, ITEMS, validEnch, VEHICLE_KINDS } from './blocks.js';
 
 // The realm-scoped save fields. The top-level fields hold the overworld slice; `realms` holds the others.
@@ -34,45 +34,70 @@ function mapsOf(edits) {
 }
 
 // ---- the save checks ---------------------------------------------------------------------
+// Each check names one field. saveProblem(d) returns the name of the first failed check, or null.
+// validSave(d) is true when nothing fails. A new save field needs a check here and an entry in the
+// live fixture (DISCOVERY_save-format.md).
+const num = (x) => typeof x === 'number' && Number.isFinite(x);
+const int = Number.isInteger, arr = Array.isArray;
+const obj = (o) => !!o && typeof o === 'object' && !arr(o);
+const vec = (a) => arr(a) && a.length === 3 && a.every(num);
+const cell = (c) => arr(c) && c.length === 3 && c.every(int) && c[1] >= 0 && c[1] < H;   // a queued block cell
+const stack = (s) => s === null || (obj(s) && int(s.id) && !!ITEMS[s.id] && int(s.count) && s.count > 0
+  && (s.dur == null || num(s.dur)) && validEnch(s));
+const optList = (a, each) => a === undefined || (arr(a) && a.every(each));
+// The tile entity types and the fields that each type adds.
+const TE_TYPES = {
+  chest: (t) => t.slots.length === 27,
+  furnace: (t) => t.slots.length === 3 && [t.burn, t.burnMax, t.cook].every((v) => num(v) && v >= 0),
+};
+const SLICE_CHECKS = {
+  edits: (a) => arr(a) && a.every((e) => arr(e) && int(e[0]) && arr(e[1]) && e[1].length % 2 === 0
+    && e[1].every((v, j) => int(v) && (j % 2 === 0 ? v >= 0 && v < VOL : !!BLOCKS[v]))),
+  te: (a) => optList(a, (t) => obj(t) && Object.hasOwn(TE_TYPES, t.type) && int(t.x) && int(t.y) && int(t.z)
+    && arr(t.slots) && t.slots.every(stack) && TE_TYPES[t.type](t)),
+  homes: (a) => optList(a, (h) => obj(h) && typeof h.name === 'string' && num(h.x) && num(h.y) && num(h.z) && num(h.yaw)),
+  liquids: (a) => a === undefined || (arr(a) && a.length === 2 && a.every((q) => arr(q) && q.every(cell))),
+  leaves: (a) => optList(a, cell),
+  farm: (a) => optList(a, (c) => arr(c) && c.length === 5 && c.every(num)),
+  vehicles: (a) => optList(a, (v) => obj(v) && typeof v.kind === 'string' && Object.hasOwn(VEHICLE_KINDS, v.kind)
+    && num(v.x) && num(v.y) && num(v.z) && num(v.yaw)),
+  looted: (a) => optList(a, (k) => typeof k === 'string' && /^-?\d+,-?\d+,-?\d+$/.test(k)),
+};
 // One realm slice: the top-level overworld fields, or one entry of `realms`. The overworld needs
 // `edits`; a stored slice may omit any field.
-function validSlice(s, top) {
-  const num = (x) => typeof x === 'number' && Number.isFinite(x);
-  const int = Number.isInteger, arr = Array.isArray;
-  const stack = (t) => t === null || (!!t && int(t.id) && !!ITEMS[t.id] && int(t.count) && t.count > 0 && validEnch(t));
-  const optArr = (a) => a === undefined || arr(a);
-  if (!s || typeof s !== 'object' || arr(s)) return false;
+function sliceProblem(s, top) {
+  if (!obj(s)) return 'slice';
   if (!top && s.edits === undefined) s = { ...s, edits: [] };
-  return arr(s.edits) && s.edits.every((e) => arr(e) && int(e[0]) && arr(e[1]) && e[1].length % 2 === 0
-      && e[1].every((v, j) => int(v) && (j % 2 === 0 ? v >= 0 && v < VOL : !!BLOCKS[v])))
-    && optArr(s.te) && (s.te || []).every((t) => t && int(t.x) && int(t.y) && int(t.z) && arr(t.slots) && t.slots.every(stack))
-    && optArr(s.homes) && (s.homes || []).every((h) => h && typeof h.name === 'string' && num(h.x) && num(h.y) && num(h.z))
-    && optArr(s.liquids) && optArr(s.leaves)
-    && optArr(s.farm) && (s.farm || []).every((c) => arr(c) && c.length === 5 && c.every(num))
-    && optArr(s.vehicles) && (s.vehicles || []).every((v) => v && typeof v.kind === 'string' && Object.hasOwn(VEHICLE_KINDS, v.kind)
-      && num(v.x) && num(v.y) && num(v.z) && num(v.yaw))
-    && optArr(s.looted) && (s.looted || []).every((k) => typeof k === 'string' && /^-?\d+,-?\d+,-?\d+$/.test(k));
+  return SLICE_FIELDS.find((f) => !SLICE_CHECKS[f](s[f])) ?? null;
 }
-function validSave(d) {
-  const num = (x) => typeof x === 'number' && Number.isFinite(x);
-  const int = Number.isInteger, arr = Array.isArray;
-  const vec = (a) => arr(a) && a.length === 3 && a.every(num);
-  const stack = (s) => s === null || (!!s && int(s.id) && !!ITEMS[s.id] && int(s.count) && s.count > 0 && validEnch(s));
-  const optArr = (a) => a === undefined || arr(a);
-  const P = d && d.player, V = d && d.inv;
-  return !!d && d.v === 1 && d.ids === IDS_VERSION && int(d.seed) && (d.seed | 0) === d.seed && num(d.dayTime) && num(d.clock)
-    && !!P && vec(P.pos) && vec(P.spawn) && num(P.yaw) && num(P.pitch) && num(P.health)
-    && !!V && arr(V.slots) && V.slots.length <= 36 && V.slots.every(stack) && optArr(V.loose) && (V.loose || []).every((s) => s && stack(s))
-    && validSlice(d, true)
-    && optArr(d.armor) && (d.armor || []).length <= 4
-    && (d.armor || []).every((s, i) => s === null || (stack(s) && ITEMS[s.id].armor?.piece === i))
-    && (d.enchantSeed === undefined || int(d.enchantSeed))
-    && (d.weather === undefined || (!!d.weather && WEATHER_KINDS.includes(d.weather.kind) && num(d.weather.left) && d.weather.left >= 0))
-    && (d.realm === undefined || Object.hasOwn(REALMS, d.realm))
-    && (d.realms === undefined || (!!d.realms && typeof d.realms === 'object' && !arr(d.realms)
-      && Object.entries(d.realms).every(([k, sl]) => k !== 'overworld' && Object.hasOwn(REALMS, k) && validSlice(sl, false))))
-    && (d.portals === undefined || (!!d.portals && (d.portals.crystalBack === null || d.portals.crystalBack === undefined || vec(d.portals.crystalBack))))
-    && (d.boss === undefined || (!!d.boss && (d.boss.defeated === undefined || typeof d.boss.defeated === 'boolean')));
+const SAVE_CHECKS = {
+  v: (d) => d.v === 1,
+  ids: (d) => d.ids === IDS_VERSION,
+  seed: (d) => int(d.seed) && (d.seed | 0) === d.seed,
+  dayTime: (d) => num(d.dayTime),
+  clock: (d) => num(d.clock),
+  player: (d) => obj(d.player) && vec(d.player.pos) && vec(d.player.spawn) && num(d.player.yaw) && num(d.player.pitch)
+    && num(d.player.health) && d.player.health >= 0 && d.player.health <= MAX_HEALTH,
+  inv: (d) => obj(d.inv) && arr(d.inv.slots) && d.inv.slots.length <= 36 && d.inv.slots.every(stack)
+    && int(d.inv.sel) && d.inv.sel >= 0 && d.inv.sel <= 8 && optList(d.inv.loose, (s) => s !== null && stack(s)),
+  armor: (d) => optList(d.armor, (s, i) => s === null || (stack(s) && ITEMS[s.id].armor?.piece === i)) && (d.armor || []).length <= 4,
+  enchantSeed: (d) => d.enchantSeed === undefined || int(d.enchantSeed),
+  weather: (d) => d.weather === undefined || (obj(d.weather) && WEATHER_KINDS.includes(d.weather.kind) && num(d.weather.left) && d.weather.left >= 0),
+  realm: (d) => d.realm === undefined || Object.hasOwn(REALMS, d.realm),
+  realms: (d) => d.realms === undefined || (obj(d.realms) && Object.keys(d.realms).every((k) => k !== 'overworld' && Object.hasOwn(REALMS, k))),
+  portals: (d) => d.portals === undefined || (obj(d.portals) && (d.portals.crystalBack == null || vec(d.portals.crystalBack))),
+  boss: (d) => d.boss === undefined || (obj(d.boss) && (d.boss.defeated === undefined || typeof d.boss.defeated === 'boolean')),
+};
+function saveProblem(d) {
+  if (!obj(d)) return 'save';
+  const field = Object.keys(SAVE_CHECKS).find((k) => !SAVE_CHECKS[k](d));
+  if (field) return field;
+  const top = sliceProblem(d, true);
+  if (top) return top;
+  for (const [k, sl] of Object.entries(d.realms || {})) { const p = sliceProblem(sl, false); if (p) return `realms.${k}.${p}`; }
+  return null;
 }
+const validSlice = (s, top) => sliceProblem(s, top) === null;
+const validSave = (d) => saveProblem(d) === null;
 
 export { editsOf, mapsOf, SLICE_FIELDS, validSave, validSlice };
