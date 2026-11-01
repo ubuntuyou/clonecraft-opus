@@ -3,7 +3,7 @@
 The gate file for `SPEC_deepen.md`. Check a box only after you verify it yourself. **(owner)** marks a box that only Joe closes. Test names refer to the numbered acceptance tests in the spec (for example `M4-3`). "Step gate" means `node tools/depcheck.js && npm test && npx vite build` on the merged step branch.
 
 ## Spec
-- [ ] **(owner)** Joe approves `SPEC_deepen.md` and this gate before Step 1. Note by rsh, 2026-11-01: Joe said "Spec everything kept including bugs then fix" (09:24 CT), so the build starts. This box stays open for Joe's review of the spec text.
+- [x] **(owner)** Joe approves `SPEC_deepen.md` and this gate before Step 1. Approved by Joe, 2026-11-01 13:53 CT: "spec and diff approved".
 
 ## Bugs with no code
 - [x] K6: not reproduced, unpatched. Design B found no reachable cell where the lower door half places and the upper half fails. (rsh, 2026-11-01: a scan of the arrival and exit lock boxes found 0 such cells.)
@@ -277,7 +277,7 @@ Added by Joe, 2026-11-01 12:51 CT ("Fix N1").
 - [x] Docs: `DISCOVERY_save-format.md` (N1 line resolved); `save-format.js` comment; `CHANGELOG.md` (Fixed K12). Note: 4c93bfc.
 - [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: 8b5a2c7; check 264/264, index.html equals a fresh build.
 - [x] Merged to `main`; branch removed. Note: 65442f1.
-- [ ] **(owner)** Joe reviews the S10 diff.
+- [x] **(owner)** Joe reviews the S10 diff. Approved by Joe, 2026-11-01 13:53 CT: "spec and diff approved".
 
 ## Release
 - [ ] **(owner)** Joe approves the release tag and the version number.
