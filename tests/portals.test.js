@@ -162,7 +162,7 @@ test('portal-seal: a platform in water leaves no water next to the structure', (
 
 test('portal-seal: a platform in lava leaves no lava next to the structure', () => sealedIn(B.LAVA));
 
-// SPEC_deepen M3: the ring box of a frame (ringHas). T7.2 writes the M3-1..M3-3 cases.
+// SPEC_deepen M3: the ring box of a frame (ringHas). The M3-1..M3-3 cases follow the fakes.
 // The helpers below are the S7 contract fakes.
 import { ringHas } from '../src/portal-frame.js';
 import { WG } from '../src/gen-service.js';
@@ -171,3 +171,83 @@ import { WG } from '../src/gen-service.js';
 // in Node, so exitFrame() rebuilds EXIT_FRAME from its source values: x0 -1, the arena floor, z 0, 3 x 4.
 export const arrivalFrame = () => ({ ...WG.CRYSTAL_ARRIVAL });
 export const exitFrame = () => ({ axis: 'x', x0: -1, y0: WG.CRYSTAL_TOP + 1, z0: 0, w: 3, h: 4 });
+
+// Each frame below fixes the plane and the ring box. Axis 'x': plane z = z0, x x0-1..x0+w, y y0-1..y0+h.
+// Axis 'z': plane x = x0, z z0-1..z0+w, y y0-1..y0+h.
+const cellsIn = (xs, ys, zs) => xs.flatMap((x) => ys.flatMap((y) => zs.map((z) => [x, y, z])));
+
+test('M3-1 ringHas axis x is true at the 4 ring corners, the far edge, and every opening cell', () => {
+  const f = arrivalFrame();
+  const { x0, y0, z0, w, h } = f;
+  const corners = [[x0 - 1, y0 - 1], [x0 + w, y0 - 1], [x0 - 1, y0 + h], [x0 + w, y0 + h]];
+  for (const [x, y] of corners) assert.equal(ringHas(f, x, y, z0), true, `corner ${x},${y}`);
+  // far edge of the ring (x0 + w) and the near edge (x0 - 1), on every row
+  for (let y = y0 - 1; y <= y0 + h; y++) {
+    assert.equal(ringHas(f, x0 + w, y, z0), true, `far edge y ${y}`);
+    assert.equal(ringHas(f, x0 - 1, y, z0), true, `near edge y ${y}`);
+  }
+  // top and bottom rows of the ring
+  for (let x = x0 - 1; x <= x0 + w; x++) {
+    assert.equal(ringHas(f, x, y0 - 1, z0), true, `bottom row x ${x}`);
+    assert.equal(ringHas(f, x, y0 + h, z0), true, `top row x ${x}`);
+  }
+  for (const [x, y, z] of cellsIn([...Array(w).keys()].map((i) => x0 + i), [...Array(h).keys()].map((i) => y0 + i), [z0])) {
+    assert.equal(ringHas(f, x, y, z), true, `opening ${x},${y},${z}`);
+  }
+});
+
+test('M3-1 ringHas axis x is false just outside the ring and off the plane', () => {
+  const f = arrivalFrame();
+  const { x0, y0, z0, w, h } = f;
+  assert.equal(ringHas(f, x0 - 2, y0, z0), false, 'x0-2');
+  assert.equal(ringHas(f, x0 + w + 1, y0, z0), false, 'x0+w+1');
+  assert.equal(ringHas(f, x0, y0 - 2, z0), false, 'y0-2');
+  assert.equal(ringHas(f, x0, y0 + h + 1, z0), false, 'y0+h+1');
+  assert.equal(ringHas(f, x0, y0, z0 + 1), false, 'z0+1');
+  assert.equal(ringHas(f, x0, y0, z0 - 1), false, 'z0-1');
+  // corners and ring cells off the plane stay false
+  assert.equal(ringHas(f, x0 - 1, y0 - 1, z0 + 1), false, 'corner, z0+1');
+  assert.equal(ringHas(f, x0 + w, y0 + h, z0 - 1), false, 'far corner, z0-1');
+  // a diagonal cell beyond a corner
+  assert.equal(ringHas(f, x0 + w + 1, y0 + h + 1, z0), false, 'beyond the far corner');
+});
+
+test('M3-2 ringHas axis z is true at the 4 ring corners, the far edge, and every opening cell', () => {
+  const f = { axis: 'z', x0: 12, y0: 70, z0: 30, w: 3, h: 4 };
+  const { x0, y0, z0, w, h } = f;
+  const corners = [[z0 - 1, y0 - 1], [z0 + w, y0 - 1], [z0 - 1, y0 + h], [z0 + w, y0 + h]];
+  for (const [z, y] of corners) assert.equal(ringHas(f, x0, y, z), true, `corner z ${z}, y ${y}`);
+  for (let y = y0 - 1; y <= y0 + h; y++) {
+    assert.equal(ringHas(f, x0, y, z0 + w), true, `far edge y ${y}`);
+    assert.equal(ringHas(f, x0, y, z0 - 1), true, `near edge y ${y}`);
+  }
+  for (let z = z0 - 1; z <= z0 + w; z++) {
+    assert.equal(ringHas(f, x0, y0 - 1, z), true, `bottom row z ${z}`);
+    assert.equal(ringHas(f, x0, y0 + h, z), true, `top row z ${z}`);
+  }
+  for (const [x, y, z] of cellsIn([x0], [...Array(h).keys()].map((i) => y0 + i), [...Array(w).keys()].map((i) => z0 + i))) {
+    assert.equal(ringHas(f, x, y, z), true, `opening ${x},${y},${z}`);
+  }
+});
+
+test('M3-2 ringHas axis z is false just outside the ring and off the plane', () => {
+  const f = { axis: 'z', x0: 12, y0: 70, z0: 30, w: 3, h: 4 };
+  const { x0, y0, z0, w, h } = f;
+  assert.equal(ringHas(f, x0, y0, z0 - 2), false, 'z0-2');
+  assert.equal(ringHas(f, x0, y0, z0 + w + 1), false, 'z0+w+1');
+  assert.equal(ringHas(f, x0, y0 - 2, z0), false, 'y0-2');
+  assert.equal(ringHas(f, x0, y0 + h + 1, z0), false, 'y0+h+1');
+  assert.equal(ringHas(f, x0 + 1, y0, z0), false, 'x0+1');
+  assert.equal(ringHas(f, x0 - 1, y0, z0), false, 'x0-1');
+  assert.equal(ringHas(f, x0 + 1, y0 - 1, z0 - 1), false, 'corner, x0+1');
+  assert.equal(ringHas(f, x0 - 1, y0 + h, z0 + w), false, 'far corner, x0-1');
+  assert.equal(ringHas(f, x0, y0 + h + 1, z0 + w + 1), false, 'beyond the far corner');
+});
+
+test('M3-3 a frame shaped like EXIT_FRAME covers x -2..2, y 96..101, z 0 and nothing else nearby', () => {
+  const f = exitFrame();
+  for (let x = -3; x <= 3; x++) for (let y = 95; y <= 102; y++) for (let z = -1; z <= 1; z++) {
+    const inBox = x >= -2 && x <= 2 && y >= 96 && y <= 101 && z === 0;
+    assert.equal(ringHas(f, x, y, z), inBox, `cell ${x},${y},${z}`);
+  }
+});
