@@ -117,4 +117,58 @@ function readSave(text, seed) {
   return { save: d, reason: null };
 }
 
-export { editsOf, mapsOf, readSave, SLICE_FIELDS, validSave, validSlice };
+// ---- the boot policy (SPEC_deepen M4, K7) ---------------------------------------------------
+// openSave holds the whole boot fallback policy: the carried notice, the read, the backup of a
+// rejected save, and the apply throw. It is pure: the caller passes the stores, the clock, and
+// `apply`. `store` has the `storage` shape (get, set -> bool, remove). `session` has the
+// sessionStorage shape (getItem, setItem, removeItem); each call may throw.
+// It returns { save, notice, blocked, reload }; `notice` is { msg, keep } or null.
+const BOOT_NOTICE = 'clonecraft.bootNotice';
+
+// The notice that a reload carried, or null. It reads the session, then the store (K7: the store
+// carries the notice when the session write fails). It removes the key from both.
+function takeNotice(session, store) {
+  let found = null;
+  try { found = session.getItem(BOOT_NOTICE); } catch (e) { /* the session is unreadable */ }
+  try { session.removeItem(BOOT_NOTICE); } catch (e) { /* nothing to remove */ }
+  const stored = store.get(BOOT_NOTICE);
+  if (stored !== null) store.remove(BOOT_NOTICE);   // no write on a boot with no store notice
+  if (!found) found = stored;
+  try { return found ? JSON.parse(found) : null; } catch (e) { return null; }
+}
+
+// Copies the rejected text to `<key>.rejected.<now>`, then removes `key`. -> { msg, keep }
+function backup(store, key, text, reason, now) {
+  const copy = `${key}.rejected.${now}`;
+  if (store.set(copy, text)) {
+    store.remove(key);
+    return { msg: `The saved world could not load: ${reason}. A copy is in ${copy}. A new world starts.`, keep: false };
+  }
+  return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
+}
+
+// K7: after an apply throw, the notice goes to the session. When that write fails and the backup
+// succeeded, the notice goes to `store` instead and the page still reloads: SAVE_KEY is gone, so
+// the reload cannot loop. When the backup failed (`keep`), a failed session write gives no reload.
+function openSave({ store, session, key, seed, now, apply }) {
+  let notice = takeNotice(session, store), blocked = !!notice?.keep, reload = false;
+  const text = notice?.keep ? null : store.get(key);
+  const read = readSave(text, seed);
+  let save = read.save;
+  if (read.reason) { notice = backup(store, key, text, read.reason, now); if (notice.keep) blocked = true; }
+  if (save) {
+    try { apply(save); } catch (e) {
+      save = null;
+      blocked = true;                               // nothing may write the half-restored game
+      notice = backup(store, key, text, `it failed to load (${e.message})`, now);
+      const carried = JSON.stringify(notice);
+      try { session.setItem(BOOT_NOTICE, carried); reload = true; } catch (err) {
+        if (!notice.keep) { store.set(BOOT_NOTICE, carried); reload = true; }   // the notice may be lost; the world is clean
+      }
+    }
+  }
+  return { save, notice, blocked, reload };
+}
+
+// K10: validSlice is not exported (no reader outside this file).
+export { BOOT_NOTICE, editsOf, mapsOf, openSave, readSave, SLICE_FIELDS, validSave };

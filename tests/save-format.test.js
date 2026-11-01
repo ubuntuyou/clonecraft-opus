@@ -263,3 +263,181 @@ test('save-reader fail proof: a forwarded save text fails the rule', () => {
   assert.equal(errors.length, 1);
   assert.match(errors[0], /^save-reader: boot\.js line \d+ parses save text \(text2\)/);
 });
+
+// ---- M4, K7: the boot policy (openSave) ---------------------------------------------------------
+import * as saveFormat from '../src/save-format.js';
+import { BOOT_NOTICE, openSave } from '../src/save-format.js';
+// A fake `storage` (config.js shape) with an op log: each call pushes [op, key].
+// `failSet` makes every set return false (a full or blocked store); `init` seeds the entries.
+function fakeStore(init = {}, { failSet = false } = {}) {
+  const map = new Map(Object.entries(init)), ops = [];
+  return {
+    map, ops,
+    get(k) { ops.push(['get', k]); return map.has(k) ? map.get(k) : null; },
+    set(k, v) { ops.push(['set', k]); if (failSet) return false; map.set(k, String(v)); return true; },
+    remove(k) { ops.push(['remove', k]); map.delete(k); return true; },
+  };
+}
+// A fake sessionStorage with an op log. `throwGet` and `throwSet` make those calls throw, as a
+// blocked sessionStorage does; removeItem throws with `throwGet` too.
+function fakeSession(init = {}, { throwGet = false, throwSet = false } = {}) {
+  const map = new Map(Object.entries(init)), ops = [];
+  const blocked = () => { throw new Error('SecurityError: sessionStorage is blocked'); };
+  return {
+    map, ops,
+    getItem(k) { ops.push(['getItem', k]); if (throwGet) blocked(); return map.has(k) ? map.get(k) : null; },
+    setItem(k, v) { ops.push(['setItem', k]); if (throwSet) blocked(); map.set(k, String(v)); },
+    removeItem(k) { ops.push(['removeItem', k]); if (throwGet) blocked(); map.delete(k); },
+  };
+}
+// The openSave arguments for one boot: the live fixture's seed, a fixed clock, and an apply that
+// records its calls. Pass `apply` to make it throw.
+const BOOT_KEY = 'clonecraft.world.777001', BOOT_NOW = 1700000000000;
+function bootArgs({ store = fakeStore(), session = fakeSession(), apply } = {}) {
+  const applied = [];
+  return { applied, store, session, key: BOOT_KEY, seed: SEED, now: BOOT_NOW, apply: apply || ((d) => { applied.push(d); }) };
+}
+const liveText = () => readFileSync('tests/fixtures/save-live.json', 'utf8');
+const BACKUP_KEY = `${BOOT_KEY}.rejected.${BOOT_NOW}`;
+const writes = (store) => store.ops.filter(([op]) => op !== 'get');   // the set and remove calls
+const boom = () => { throw new Error('boom'); };
+const carried = (keep) => JSON.stringify({ msg: 'carried message', keep });
+
+test('M4-1 openSave with no save text returns empty fields and does not call apply', () => {
+  const a = bootArgs();
+  assert.deepEqual(openSave(a), { save: null, notice: null, blocked: false, reload: false });
+  assert.deepEqual(a.applied, []);
+});
+test('M4-2 openSave applies the live fixture once and returns it with no notice', () => {
+  const a = bootArgs({ store: fakeStore({ [BOOT_KEY]: liveText() }) });
+  const o = openSave(a);
+  assert.equal(a.applied.length, 1);
+  assert.deepEqual(a.applied[0], JSON.parse(liveText()));
+  assert.deepEqual(o.save, JSON.parse(liveText()));
+  assert.equal(o.notice, null);
+  assert.equal(o.blocked, false);
+  assert.equal(o.reload, false);
+});
+test('M4-3 openSave backs up a bad-JSON save, then removes the key, and names the backup key', () => {
+  const store = fakeStore({ [BOOT_KEY]: '{not json' });
+  const o = openSave(bootArgs({ store }));
+  assert.deepEqual(writes(store), [['set', BACKUP_KEY], ['remove', BOOT_KEY]]);
+  assert.equal(store.map.get(BACKUP_KEY), '{not json');
+  assert.equal(store.map.has(BOOT_KEY), false);
+  assert.deepEqual(o.notice, {
+    msg: `The saved world could not load: the save text is not valid JSON. A copy is in ${BACKUP_KEY}. A new world starts.`,
+    keep: false,
+  });
+  assert.equal(o.save, null);
+  assert.equal(o.blocked, false);
+  assert.equal(o.reload, false);
+});
+test('M4-4 openSave keeps a bad-JSON save, blocks saving, and says so when the backup fails', () => {
+  const store = fakeStore({ [BOOT_KEY]: '{not json' }, { failSet: true });
+  const o = openSave(bootArgs({ store }));
+  assert.deepEqual(writes(store).filter(([op]) => op === 'remove'), []);
+  assert.equal(store.map.get(BOOT_KEY), '{not json');
+  assert.deepEqual(o.notice, {
+    msg: 'The saved world could not load: the save text is not valid JSON. It was kept. Saving is off until the next visit.',
+    keep: true,
+  });
+  assert.equal(o.blocked, true);
+  assert.equal(o.save, null);
+  assert.equal(o.reload, false);
+});
+test('M4-5 openSave with a carried keep notice blocks saving, skips the save key, and clears the session key', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() }), session = fakeSession({ [BOOT_NOTICE]: carried(true) });
+  const a = bootArgs({ store, session });
+  const o = openSave(a);
+  assert.equal(store.ops.some(([op, k]) => op === 'get' && k === BOOT_KEY), false);
+  assert.equal(o.blocked, true);
+  assert.deepEqual(o.notice, { msg: 'carried message', keep: true });
+  assert.equal(session.map.has(BOOT_NOTICE), false);
+  assert.equal(o.save, null);
+  assert.deepEqual(a.applied, []);
+});
+test('M4-6 openSave reads a carried notice with bad JSON as no notice', () => {
+  const session = fakeSession({ [BOOT_NOTICE]: '{not json' });
+  const o = openSave(bootArgs({ session }));
+  assert.equal(o.notice, null);
+  assert.equal(o.blocked, false);
+});
+test('M4-7 openSave with a throwing session.getItem gives no notice and does not throw', () => {
+  const session = fakeSession({}, { throwGet: true });
+  let o;
+  assert.doesNotThrow(() => { o = openSave(bootArgs({ session })); });
+  assert.equal(o.notice, null);
+  assert.equal(o.blocked, false);
+});
+test('M4-8 openSave on an apply throw returns no save, blocks saving, reloads, and puts the notice in the session', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() }), session = fakeSession();
+  const o = openSave(bootArgs({ store, session, apply: boom }));
+  assert.equal(o.save, null);
+  assert.equal(o.blocked, true);
+  assert.equal(o.reload, true);
+  assert.deepEqual(o.notice, {
+    msg: `The saved world could not load: it failed to load (boom). A copy is in ${BACKUP_KEY}. A new world starts.`,
+    keep: false,
+  });
+  assert.deepEqual(JSON.parse(session.map.get(BOOT_NOTICE)), o.notice);
+  assert.equal(store.map.get(BACKUP_KEY), liveText());
+  assert.equal(store.map.has(BOOT_KEY), false);
+});
+test('M4-9 openSave backs up a save for another seed and gives the seed reason', () => {
+  const d = live();
+  d.seed = SEED + 1;
+  const text = JSON.stringify(d), store = fakeStore({ [BOOT_KEY]: text });
+  const a = bootArgs({ store });
+  const o = openSave(a);
+  assert.deepEqual(a.applied, []);
+  assert.equal(o.save, null);
+  assert.equal(o.notice.keep, false);
+  assert.equal(o.notice.msg, `The saved world could not load: the save is for seed ${SEED + 1}, not seed ${SEED}. A copy is in ${BACKUP_KEY}. A new world starts.`);
+  assert.equal(store.map.get(BACKUP_KEY), text);
+  assert.equal(store.map.has(BOOT_KEY), false);
+});
+test('M4-10 K7 openSave reloads and carries the notice in the store when apply throws and the session write fails', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() }), session = fakeSession({}, { throwSet: true });
+  const o = openSave(bootArgs({ store, session, apply: boom }));
+  assert.equal(o.reload, true);
+  assert.equal(o.blocked, true);
+  assert.equal(o.save, null);
+  assert.equal(o.notice.keep, false);
+  assert.ok(store.map.has(BOOT_NOTICE), 'the store holds the notice');
+  assert.deepEqual(JSON.parse(store.map.get(BOOT_NOTICE)), o.notice);
+  assert.equal(store.map.has(BOOT_KEY), false, 'the reload is loop-safe: the save key is gone');
+});
+test('M4-11 K7 openSave does not reload when apply throws, the session write fails, and the backup fails', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failSet: true }), session = fakeSession({}, { throwSet: true });
+  const o = openSave(bootArgs({ store, session, apply: boom }));
+  assert.equal(o.reload, false);
+  assert.equal(o.blocked, true);
+  assert.equal(o.notice.keep, true);
+  assert.match(o.notice.msg, /It was kept\. Saving is off until the next visit\.$/);
+  assert.equal(store.map.has(BOOT_KEY), true);
+});
+test('M4-12 K7 openSave returns a notice that only the store holds and removes it from both stores', () => {
+  const store = fakeStore({ [BOOT_NOTICE]: carried(false) }), session = fakeSession();
+  const o = openSave(bootArgs({ store, session }));
+  assert.deepEqual(o.notice, { msg: 'carried message', keep: false });
+  assert.equal(o.blocked, false);
+  assert.equal(store.map.has(BOOT_NOTICE), false);
+  assert.equal(session.map.has(BOOT_NOTICE), false);
+});
+test('M4-12b K7 round trip: the boot after a blocked-session apply throw shows the notice and loads a fresh world', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() });
+  const first = openSave(bootArgs({ store, session: fakeSession({}, { throwSet: true }), apply: boom }));
+  assert.equal(first.reload, true);
+  const a = bootArgs({ store, session: fakeSession() });   // the reload: a new tab session, the same store
+  const second = openSave(a);
+  assert.deepEqual(second.notice, first.notice);
+  assert.equal(second.save, null);
+  assert.equal(second.reload, false);
+  assert.equal(second.blocked, false);
+  assert.deepEqual(a.applied, []);
+  assert.equal(store.map.has(BOOT_NOTICE), false);
+});
+test('M4-13 K10 save-format.js does not export validSlice', () => {
+  assert.equal(typeof saveFormat.validSave, 'function', 'precondition: the namespace holds the real exports');
+  assert.equal('validSlice' in saveFormat, false);
+});

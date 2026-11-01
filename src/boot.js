@@ -1,8 +1,10 @@
 /* =====================================================================================
  * === 18. MAIN ANIMATION LOOP
  * -------------------------------------------------------------------------------------
- * Boot: read the save (readSave), or pick a dry spawn column from the world generator; stream
+ * Boot: open the save (openSave), or pick a dry spawn column from the world generator; stream
  * the chunks around the player, then enable Play. A rejected save goes to a backup key first. The menu shows the live world behind it with a slow panorama.
+ * Terms: a **notice** is the { msg, keep } text for a rejected save; boot.js shows it in the load line and a toast.
+ * The boot fallback policy lives in save-format.js (openSave). Rules: DISCOVERY_save-format.md.
  * Each frame: stream chunks, simulate (only while playing, in the inventory, or dead),
  * update the sky and HUD, render the world through `post` (bloom and light shafts), clear depth,
  * then render the held item.
@@ -16,7 +18,7 @@ import { game, player, world } from './engine.js';
 import { $, hud } from './hud.js';
 import { playBtn, setState } from './menus.js';
 import { persist } from './persist.js';
-import { readSave } from './save-format.js';
+import { openSave } from './save-format.js';
 
 function findSpawnColumn() {
   const good = (c) => c.biome !== BIOME.OCEAN && c.biome !== BIOME.RIVER && c.h > SEA + 1 && c.h < SEA + 28;
@@ -63,44 +65,23 @@ function openYaw(pos) {
   return bestYaw;
 }
 
-// ---- the boot reader and the fallback (SPEC_hardening H1) ----------------------------------
-// readSave checks the text of SAVE_KEY. A rejected save, or a save that throws in persist.apply,
-// is copied to a backup key (`<SAVE_KEY>.rejected.<epoch ms>`) and then removed. The world starts
-// fresh. After loading, the menu's load line shows the notice, and a toast repeats it when the
-// game starts (the HUD and its toast are hidden until then). The notice names the reason and the
-// backup key. When the backup write
-// fails, SAVE_KEY stays, saving is blocked (persist.blocked), and the toast says the save was kept.
-// An apply throw leaves the game half restored, so boot reloads the page. The notice for the toast
-// waits in sessionStorage (BOOT_NOTICE) over the reload. `keep` tells the next boot to skip SAVE_KEY.
-const BOOT_NOTICE = 'clonecraft.bootNotice', NOTICE_SECONDS = 12;
-function takeNotice() {
-  try { const t = sessionStorage.getItem(BOOT_NOTICE); sessionStorage.removeItem(BOOT_NOTICE); return t ? JSON.parse(t) : null; } catch (e) { return null; }
-}
-function rejectSave(text, reason) {
-  const key = `${SAVE_KEY}.rejected.${Date.now()}`;
-  if (storage.set(key, text)) {
-    storage.remove(SAVE_KEY);
-    return { msg: `The saved world could not load: ${reason}. A copy is in ${key}. A new world starts.`, keep: false };
-  }
-  persist.blocked = true;
-  return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
-}
-let notice = takeNotice();
-if (notice?.keep) persist.blocked = true;
-const saveText = notice?.keep ? null : storage.get(SAVE_KEY);
-const read = readSave(saveText, SEED);
-let save = read.save;
-if (read.reason) notice = rejectSave(saveText, read.reason);
-if (save) {
-  try { persist.apply(save); } catch (e) {
-    save = null;
-    persist.blocked = true;                       // nothing may write the half-restored game
-    notice = rejectSave(saveText, `it failed to load (${e.message})`);
-    let carried = false;
-    try { sessionStorage.setItem(BOOT_NOTICE, JSON.stringify(notice)); carried = true; } catch (err) { /* no reload: it could loop */ }
-    if (carried) location.reload();
-  }
-}
+// ---- the boot fallback (SPEC_deepen M4) -----------------------------------------------------
+// openSave (save-format.js) holds the policy: the carried notice, the read of SAVE_KEY, the backup of a
+// rejected save, and the apply throw. boot.js passes the stores, the clock, and persist.apply, then acts
+// on the result. The sessionStorage wrappers are lazy, so a throwing global stays inside openSave.
+// After loading, the menu's load line shows the notice, and a toast repeats it when the game starts
+// (the HUD and its toast are hidden until then).
+const NOTICE_SECONDS = 12;
+const session = {
+  getItem: (k) => sessionStorage.getItem(k),
+  setItem: (k, v) => sessionStorage.setItem(k, v),
+  removeItem: (k) => sessionStorage.removeItem(k),
+};
+const opened = openSave({ store: storage, session, key: SAVE_KEY, seed: SEED, now: Date.now(), apply: (d) => persist.apply(d) });
+let notice = opened.notice;
+const save = opened.save;
+if (opened.blocked) persist.blocked = true;
+if (opened.reload) location.reload();
 const restored = !!save;
 if (!restored) {
   const spawnCol = findSpawnColumn();
