@@ -95,8 +95,8 @@ Merged on main (4eaa7ba code, 40b6fef exit box from boss.EXIT, docs accc3b5), 20
 - [ ] The victory screen shows exactly once.
 
 ### H10: one travel ratio
-- [ ] Grep: `defaultTarget` holds no bare 8, 64, 33, or 110. No code reads `label`, and `label` is deleted.
-- [ ] One `defaultTarget('ember')` result is equal before and after the change.
+- [x] Grep: `defaultTarget` holds no bare 8, 64, 33, or 110. No code reads `label`, and `label` is deleted.
+- [x] One `defaultTarget('ember')` result is equal before and after the change. Four samples matched (agent, Node run of the real function body), e.g. overworld (100,70,-40) to ember [12.5,33,-5].
 
 ### Step 3 close
 - [ ] `npm run build`, then `npm run check` passes. `index.html` is committed once.
