@@ -17,18 +17,19 @@
  * The simulation stops during the load (state 'travel'). The game saves again on arrival.
  *
  * Save: the top-level slice fields hold the overworld. `realms.ember` and `realms.crystal` hold
- * the other slices. `realm` names the realm of player.pos. persist.js calls slice() and load().
+ * the other slices. `realm` names the realm of player.pos. persist.js calls data() and load().
+ * One SCOPED table drives slice, leave, and enter: a new scoped field adds one SCOPED entry.
  * ===================================================================================== */
-import { CONFIG, H, READY_RADIUS, REALMS, UNLOADED, VOID_Y } from './config.js';
-import { B, baseOf, IS_LEAF, LIQ_KIND, SOLID } from './blocks.js';
+import { H, READY_RADIUS, REALMS, UNLOADED, VOID_Y } from './config.js';
+import { B, IS_LEAF, LIQ_KIND, SOLID } from './blocks.js';
 import { canvas, game, player, scene, world } from './engine.js';
 import { resumeEl } from './player.js';
-import { doorTimers, editIndex, resetMining, torches } from './interact.js';
+import { editIndex, resetMining } from './interact.js';
 import { liquids } from './liquids.js';
 import { leafDecay } from './leaf-decay.js';
 import { farming } from './farming.js';
 import { drops } from './drops.js';
-import { looted, lootedSlice, teSlice, tileEntities } from './tile-entities.js';
+import { lootedSlice, teSlice } from './tile-entities.js';
 import { closeInventory } from './inventory-ui.js';
 import { mobs } from './mobs.js';
 import { vehicles } from './vehicles.js';
@@ -38,7 +39,7 @@ import { spawners } from './spawning.js';
 import { $, hud } from './hud.js';
 import { fadeIn, setState } from './menus.js';
 import { persist } from './persist.js';
-import { closeHomes, homes, homesSlice, setHomes } from './homes.js';
+import { closeHomes, homesSlice } from './homes.js';
 import { boss, weather } from './order.js';
 import { WG } from './gen-service.js';
 import { editsOf, mapsOf, SLICE_FIELDS } from './save-format.js';
@@ -75,13 +76,11 @@ const realm = {
   get def() { return REALMS[this.current]; },
 
   // The save slice of realm `name`, from the live modules or from its stash.
-  // TODO(T5.1): read the live fields from SCOPED[f].data() in SLICE_FIELDS order.
   slice(name) {
     if (name === this.current) {
-      return {
-        edits: editsOf(world.overridesByChunk), te: [...tileEntities.values()], homes,
-        liquids: liquids.save(), leaves: leafDecay.save(), farm: farming.save(), vehicles: vehicles.data(), looted: [...looted],
-      };
+      const out = { edits: editsOf(world.overridesByChunk) };
+      for (const f in SCOPED) out[f] = SCOPED[f].data();
+      return out;
     }
     const s = this.stash.get(name);
     if (!s) return null;
@@ -116,34 +115,24 @@ const realm = {
 
   // Detaches the live realm-scoped state into a stash and clears the modules. A dying Titan
   // shatters first, so its loot and exit portal join the stash.
-  // TODO(T5.1): clear each SCOPED entry, then each CLEARED entry.
   leave() {
     boss.finish();
     const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
     for (const d of s.drops) scene.remove(d.mesh);
-    tileEntities.clear(); looted.clear(); setHomes([]);
-    liquids.clear(); leafDecay.clear(); farming.clear(); vehicles.clear();
-    torches.clear(); doorTimers.clear(); clearTnt(); projectiles.clear(); spawners.clear();
-    resetMining();
+    for (const f in SCOPED) SCOPED[f].clear();
+    for (const m of CLEARED) m.clear();
     return s;
   },
-  // Makes a stash live: resets the world to its override maps and loads the other modules.
-  // TODO(T5.1): editIndex.load(world.overrides), then SCOPED[f].load(sl[f]) per field.
+  // Makes a stash live: resets the world to its override maps, derives the edit index from the
+  // overrides, and loads the other modules.
   enter(s) {
     const def = REALMS[this.current];
     world.reset(def.name, s.overrides, s.overridesByChunk, def.voidBelow, def.ambient);
     for (const m of mobs) m.remove();
     mobs.length = 0;
-    for (const [k, id] of world.overrides) {
-      if (baseOf(id) === B.TORCH) torches.add(k);
-      const v = id - B.DOOR;
-      if (baseOf(id) === B.DOOR && (v & 4) && !(v & 8)) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay);
-    }
+    editIndex.load(world.overrides);
     const sl = s.slice;
-    for (const t of sl.te || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t);
-    for (const k of sl.looted || []) looted.add(k);
-    setHomes(sl.homes || []);
-    liquids.load(sl.liquids); leafDecay.load(sl.leaves); farming.load(sl.farm); vehicles.load(sl.vehicles);
+    for (const f in SCOPED) SCOPED[f].load(sl[f]);
     for (const d of s.drops) { scene.add(d.mesh); drops.push(d); }
     this.voidT = 0;
   },
