@@ -121,7 +121,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 
 ### W1 close
 - [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: 5bacd88; depcheck pass, 167/167, fresh-build check pass.
-- [ ] **(owner)** Joe approves the W1 merge.
+- [x] **(owner)** Joe approves the W1 merge. Approved by Joe, 2026-11-01 14:14 CT: "approve the W1, W2, and W3 merges".
 
 ## Wave 2
 
@@ -193,7 +193,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 
 ### W2 close
 - [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: edf2906; depcheck pass, 210/210, fresh-build check pass.
-- [ ] **(owner)** Joe approves the W2 merge.
+- [x] **(owner)** Joe approves the W2 merge. Approved by Joe, 2026-11-01 14:14 CT: "approve the W1, W2, and W3 merges".
 
 ## Wave 3
 
@@ -262,7 +262,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 
 ### W3 close
 - [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: fb82c3e is the one `index.html` commit of W3; `npm run check` on `main` fb82c3e: depcheck pass, 261/261, "check: index.html equals a fresh build", exit 0. QA worktree dw3qa and branch `qa/deepen-w3a` removed (merge parents 7c3d7f6, c063c0d, a7802b3 on `main`).
-- [ ] **(owner)** Joe approves the W3 merge.
+- [x] **(owner)** Joe approves the W3 merge. Approved by Joe, 2026-11-01 14:14 CT: "approve the W1, W2, and W3 merges".
 
 ## Follow-up: S10, K12 (N1) — `step/deepen-10-keep-on-remove-fail`
 Added by Joe, 2026-11-01 12:51 CT ("Fix N1").
