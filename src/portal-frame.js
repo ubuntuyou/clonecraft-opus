@@ -57,8 +57,11 @@ function findFrame(get, x, y, z, ring = B.OBSIDIAN) {
 
 // True when (x, y, z) lies in the plane of frame f ({ axis, x0, y0, z0, w, h }), inside the
 // opening plus its 1-block ring (corners included). world.locked uses it for the crystal portals.
-// TODO M3 (T7.1)
-function ringHas(f, x, y, z) { return false; }
+function ringHas(f, x, y, z) {
+  const [u, d] = f.axis === 'x' ? [x - f.x0, z - f.z0] : [z - f.z0, x - f.x0];
+  const v = y - f.y0;
+  return d === 0 && u >= -1 && u <= f.w && v >= -1 && v <= f.h;
+}
 
 // Every opening cell of frame f, as [x, y, z].
 function frameCells(f) {
