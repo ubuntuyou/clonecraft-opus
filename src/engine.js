@@ -3,6 +3,8 @@
  * -------------------------------------------------------------------------------------
  * The renderer, scene, camera, and world live here because the player owns the view.
  * Game states: 'loading' -> 'menu' -> 'playing' <-> 'paused' | 'inventory' | 'homes' | 'dead'.
+ * 'travel' runs from 'playing' or 'dead' back to 'playing' while a realm loads. 'victory' runs from
+ * 'playing' when the Titan dies. Both freeze the simulation and leave pointer lock.
  * K toggles flight (setFlying). Flight stays on when the player touches the ground.
  * Only 'playing' holds pointer lock. The simulation runs in 'playing', 'inventory', 'homes',
  * and 'dead'; it freezes in 'paused' and before the first start.
