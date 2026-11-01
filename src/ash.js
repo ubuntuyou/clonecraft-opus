@@ -62,7 +62,7 @@ const ash = (() => {
   }
 
   function update(dt) {
-    const on = realm.current === 'ember' && !player.headInWater && !player.headInLava;
+    const on = realm.def.fx.ash && !player.headInWater && !player.headInLava;
     flakes.pts.visible = embers.pts.visible = on;
     if (!on) { seeded = false; return; }
     if (!seeded) { scatter(flakes); scatter(embers); seeded = true; }

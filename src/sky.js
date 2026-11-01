@@ -297,45 +297,48 @@ const sky = (() => {
     clouds.visible = !player.headInWater && !player.headInLava;
     const def = REALMS[realm.current];
     terrainUniforms.uAmbient.value.setRGB(0, 0, 0);
-    if (def.sky !== 'day') realmSky(def, far);
+    if (def.look) realmSky(def, far);
   }
 
   // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
-  const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
-  const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
-  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize(), CRYSTAL_STAR = C(0.86, 0.84, 1.0);
-  const EMBER_AMBIENT = C(1, 0.52, 0.32);   // the tint of the ember light floor
+  // It reads every value from def.look (REALMS in config.js). The three.js objects of each look
+  // are built once, at load.
+  const LOOKS = new Map(Object.values(REALMS).filter((d) => d.look).map(({ look: k }) => [k, {
+    top: C(...k.top), horizon: C(...k.horizon), light: C(...k.light),
+    tint: k.ambientTint && C(...k.ambientTint), dir: new THREE.Vector3(...k.lightDir).normalize(),
+    star: k.star && C(...k.star.color),
+  }]));
   // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
   const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
   function realmSky(def, far) {
-    const ember = def.sky === 'ember';
-    uniforms.uTop.value.copy(ember ? EMBER_TOP : CRYSTAL_TOP);
-    uniforms.uHorizon.value.copy(ember ? EMBER_HOR : CRYSTAL_HOR);
+    const look = def.look, o = LOOKS.get(look);
+    uniforms.uTop.value.copy(o.top);
+    uniforms.uHorizon.value.copy(o.horizon);
     uniforms.uGlowAmt.value = 0;
     sun.material.opacity = halo.material.opacity = moon.material.opacity = 0;
-    if (!ember) {   // the pale star: a small lavender disc and halo at the fixed light direction, and the aurora
-      sun.position.copy(CRYSTAL_SUN).multiplyScalar(700); sun.lookAt(camera.position);
-      halo.position.copy(CRYSTAL_SUN).multiplyScalar(690); halo.lookAt(camera.position);
-      sun.scale.setScalar(0.45); sun.material.opacity = 1; sun.material.color.copy(CRYSTAL_STAR).multiplyScalar(glowGain * glowGain);
-      halo.material.color.copy(CRYSTAL_STAR); halo.material.opacity = 0.4;
-      uniforms.uAurora.value = 0.5;
-      starMat.uniforms.uSize.value = 2.8 * renderer.getPixelRatio();
+    if (look.star) {   // the pale star: a small disc and halo at the fixed light direction
+      sun.position.copy(o.dir).multiplyScalar(700); sun.lookAt(camera.position);
+      halo.position.copy(o.dir).multiplyScalar(690); halo.lookAt(camera.position);
+      sun.scale.setScalar(look.star.scale); sun.material.opacity = 1; sun.material.color.copy(o.star).multiplyScalar(glowGain * glowGain);
+      halo.material.color.copy(o.star); halo.material.opacity = look.star.halo;
     }
-    starMat.uniforms.uOpacity.value = ember ? 0 : 1;
-    stars.visible = !ember;
+    uniforms.uAurora.value = look.aurora;
+    if (look.starSize != null) starMat.uniforms.uSize.value = look.starSize * renderer.getPixelRatio();
+    starMat.uniforms.uOpacity.value = look.starSize != null ? 1 : 0;
+    stars.visible = look.starSize != null;
     clouds.visible = false;
     fieldUniforms.uCloudCover.value = 0;               // no cloud shadows on the terrain
-    game.clearDaylight = game.daylight = ember ? 0.3 : 0.8;
+    game.clearDaylight = game.daylight = look.daylight;
     terrainUniforms.uDaylight.value = game.daylight;
-    terrainUniforms.uSkyLight.value.copy(ember ? EMBER_LIGHT : CRYSTAL_LIGHT);
-    terrainUniforms.uSunDir.value.copy(CRYSTAL_SUN);
-    terrainUniforms.uSunAmt.value = ember ? 0 : 0.6;
-    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(EMBER_AMBIENT).multiplyScalar(curveB(def.ambient));
+    terrainUniforms.uSkyLight.value.copy(o.light);
+    terrainUniforms.uSunDir.value.copy(o.dir);
+    terrainUniforms.uSunAmt.value = look.sunAmt;
+    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(o.tint).multiplyScalar(curveB(def.ambient));
     if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
     const fog = terrainUniforms.uFogColor.value;
     fog.setHex(def.fog.color);
     const f = Math.min(def.fog.far, far);
-    terrainUniforms.uFogNear.value = f * (ember ? 0.3 : 0.55); terrainUniforms.uFogFar.value = f;
+    terrainUniforms.uFogNear.value = f * look.fogNear; terrainUniforms.uFogFar.value = f;
     scene.fog.color.copy(fog);
     scene.fog.near = terrainUniforms.uFogNear.value; scene.fog.far = f;
     renderer.setClearColor(fog);

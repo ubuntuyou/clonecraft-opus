@@ -89,7 +89,7 @@ const fireflies = (() => {
 
   function update(dt) {
     const e = Math.sin(game.dayTime * Math.PI * 2);   // sun height: 0 at sunrise and sunset
-    level = realm.current === 'overworld' ? (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k) : 0;   // overworld only
+    level = realm.def.fx.fireflies ? (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k) : 0;   // the realm row's fx.fireflies
     const under = player.headInWater || player.headInLava;
     points.visible = level > 0.01 && !under;
     if (level <= 0.01) { for (let i = 0; i < N; i++) d[i * S + 10] = 0; shown = 0; return; }   // fresh spots next night
