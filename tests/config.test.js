@@ -41,7 +41,8 @@ test('rd-ready: the README range equals RD_MIN..RD_MAX', () => {
 });
 
 // SPEC_deepen K1: the light curves live in config.js. brightnessAt, sky.js, and the terrain shader share them.
-import { DRAW_ORDER, LIGHT_BLK, LIGHT_GLSL, LIGHT_SKY, lightCurve } from '../src/config.js';
+import { LIGHT_BLK, LIGHT_GLSL, LIGHT_SKY, lightCurve } from '../src/config.js';
+import { DRAW_ORDER } from '../src/config.js';
 import { readdirSync } from 'node:fs';
 
 // The shader text before K1 (terrain-material.js, `curve` and `curveB`), one function per line.
