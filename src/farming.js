@@ -29,6 +29,7 @@ const farming = (() => {
     if (!reg.has(k)) reg.set(k, [x, y, z, game.clock + firstDelay(id, x, y, z), 0]);
     return reg.get(k);
   }
+  // TODO M8 (T8.1): delete this copy; its three callers call world.batched.
   function batched(fn) {
     if (world.batch) return fn();
     world.beginBatch();

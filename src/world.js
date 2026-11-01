@@ -195,6 +195,7 @@ class World {
     return true;
   }
   // Batch mode (explosions): setBlock only collects touched chunks; endBatch remeshes each once.
+  // TODO M8 (T8.1): delete beginBatch and endBatch once every caller uses batched (decision 13).
   beginBatch() { this.batch = new Set(); }
   endBatch() {
     const set = this.batch; this.batch = null;
