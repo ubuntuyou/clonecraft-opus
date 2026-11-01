@@ -283,10 +283,36 @@ function emberMobType(r, inFortress) {
 // save checks (save-format.js) read it and must stay pure.
 // ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
 // { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
+// look (SPEC_deepen M7): null keeps the day sky; else sky.js realmSky replaces the day sky's
+// output with it. Colors are [r, g, b] in 0..1. top, horizon: the dome; light: the terrain sky
+// light; ambientTint: the tint of the ambient floor (null when ambient is 0); daylight, sunAmt:
+// the terrain light levels; lightDir: the fixed light direction (realmSky normalizes it);
+// fogNear: the fog near distance as a share of the fog far; starSize: the star point size (null:
+// the stars hide); star: null, or the pale star disc { color, scale, halo }; aurora: 0..1.
+// fx: the ambient effects of the realm (fireflies.js, ash.js).
 const REALMS = {
-  overworld: { name: 'overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
-  ember: { name: 'ember', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
-  crystal: { name: 'crystal', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
+  overworld: {
+    name: 'overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…',
+    look: null,
+    fx: { fireflies: true, ash: false },
+  },
+  ember: {
+    name: 'ember', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…',
+    look: {
+      top: [0.09, 0.012, 0.006], horizon: [0.24, 0.05, 0.02], light: [1, 0.62, 0.45], ambientTint: [1, 0.52, 0.32],
+      daylight: 0.3, sunAmt: 0, lightDir: [0.4, 0.75, 0.3], fogNear: 0.3, starSize: null, star: null, aurora: 0,
+    },
+    fx: { fireflies: false, ash: true },
+  },
+  crystal: {
+    name: 'crystal', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…',
+    look: {
+      top: [0.012, 0.0, 0.04], horizon: [0.2, 0.09, 0.34], light: [0.84, 0.76, 1.0], ambientTint: null,
+      daylight: 0.8, sunAmt: 0.6, lightDir: [0.4, 0.75, 0.3], fogNear: 0.55, starSize: 2.8,
+      star: { color: [0.86, 0.84, 1.0], scale: 0.45, halo: 0.4 }, aurora: 0.5,
+    },
+    fx: { fireflies: false, ash: false },
+  },
 };
 // The weather kinds (weather.js). The save checks read them too.
 const WEATHER_KINDS = ['clear', 'rain', 'storm'];
@@ -1067,7 +1093,7 @@ function buildPlan(get, tx, ty, tz) {
  * SAVE FORMAT — living header (src/save-format.js, SPEC_hardening H1–H3)
  * -------------------------------------------------------------------------------------
  * The shape of a save and the trust boundary for save text: boot reads SAVE_KEY through
- * readSave, and the file import checks with validSave. Terms: a **slice** is the
+ * openSave (the boot policy), and the file import checks with validSave. Terms: a **slice** is the
  * realm-scoped part of a save (SLICE_FIELDS); the **edits** are the save form of the block
  * overrides. The module is pure: Node tests import it. Rules: DISCOVERY_save-format.md.
  * ===================================================================================== */
@@ -1180,6 +1206,59 @@ function readSave(text, seed) {
   return { save: d, reason: null };
 }
 
+// ---- the boot policy (SPEC_deepen M4, K7) ---------------------------------------------------
+// openSave holds the whole boot fallback policy: the carried notice, the read, the backup of a
+// rejected save, and the apply throw. It is pure: the caller passes the stores, the clock, and
+// `apply`. `store` has the `storage` shape (get, set -> bool, remove). `session` has the
+// sessionStorage shape (getItem, setItem, removeItem); each call may throw.
+// It returns { save, notice, blocked, reload }; `notice` is { msg, keep } or null.
+const BOOT_NOTICE = 'clonecraft.bootNotice';
+
+// The notice that a reload carried, or null. It reads the session, then the store (K7: the store
+// carries the notice when the session write fails). It removes the key from both.
+function takeNotice(session, store) {
+  let found = null;
+  try { found = session.getItem(BOOT_NOTICE); } catch (e) { /* the session is unreadable */ }
+  try { session.removeItem(BOOT_NOTICE); } catch (e) { /* nothing to remove */ }
+  const stored = store.get(BOOT_NOTICE);
+  if (stored !== null) store.remove(BOOT_NOTICE);   // no write on a boot with no store notice
+  if (!found) found = stored;
+  try { return found ? JSON.parse(found) : null; } catch (e) { return null; }
+}
+
+// Copies the rejected text to `<key>.rejected.<now>`, then removes `key`. -> { msg, keep }
+function backup(store, key, text, reason, now) {
+  const copy = `${key}.rejected.${now}`;
+  if (store.set(copy, text)) {
+    store.remove(key);
+    return { msg: `The saved world could not load: ${reason}. A copy is in ${copy}. A new world starts.`, keep: false };
+  }
+  return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
+}
+
+// K7: after an apply throw, the notice goes to the session. When that write fails and the backup
+// succeeded, the notice goes to `store` instead and the page still reloads: SAVE_KEY is gone, so
+// the reload cannot loop. When the backup failed (`keep`), a failed session write gives no reload.
+function openSave({ store, session, key, seed, now, apply }) {
+  let notice = takeNotice(session, store), blocked = !!notice?.keep, reload = false;
+  const text = notice?.keep ? null : store.get(key);
+  const read = readSave(text, seed);
+  let save = read.save;
+  if (read.reason) { notice = backup(store, key, text, read.reason, now); if (notice.keep) blocked = true; }
+  if (save) {
+    try { apply(save); } catch (e) {
+      save = null;
+      blocked = true;                               // nothing may write the half-restored game
+      notice = backup(store, key, text, `it failed to load (${e.message})`, now);
+      const carried = JSON.stringify(notice);
+      try { session.setItem(BOOT_NOTICE, carried); reload = true; } catch (err) {
+        if (!notice.keep) { store.set(BOOT_NOTICE, carried); reload = true; }   // the notice may be lost; the world is clean
+      }
+    }
+  }
+  return { save, notice, blocked, reload };
+}
+
 /* =====================================================================================
  * === 3. PROCEDURAL TEXTURE ATLAS GENERATION
  * -------------------------------------------------------------------------------------
@@ -1207,9 +1286,11 @@ const TINT_ALPHA = 191;
 // TILE maps a tile name to its index; TILE_PIX keeps the pixels for item icons and particles.
 // atlasTexture wraps the canvas for the terrain shader. The crack stages and the item icons
 // come from the same painters. Each tile seeds its RNG from its name, so a tile looks the same
-// in every world.
+// in every world. The atlas holds ATLAS_TILES (256) tiles. A full atlas or a `tex` name with no
+// tile throws at load (SPEC_deepen K3, K4). Rules: DISCOVERY_engine.md.
 
 const ATLAS_SIZE = 256;
+const ATLAS_TILES = (ATLAS_SIZE / 16) ** 2;   // 16x16-pixel tiles; paintTile allows no more
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = atlasCanvas.height = ATLAS_SIZE;
 const actx = atlasCanvas.getContext('2d');
@@ -1254,6 +1335,7 @@ function tileVoronoi(rng, n) {
 }
 
 function paintTile(name, painter) {
+  if (tileCount >= ATLAS_TILES) throw new Error(`atlas: tile '${name}' does not fit; the atlas holds ${ATLAS_TILES} tiles`);
   const index = tileCount++;
   TILE$1[name] = index;
   const data = new Uint8ClampedArray(16 * 16 * 4);
@@ -1994,11 +2076,18 @@ atlasTexture.colorSpace = THREE.NoColorSpace;
 // Tile index for each block face: faceTiles[id*6 + face], face order +X,-X,+Y,-Y,+Z,-Z.
 // A facing block (furnace, chest) puts its front on one face; the table shows it on +Z and -Z.
 const FACE_TILE = new Int16Array(256 * 6).fill(-1);
+// The tile index that def.tex[key] names (key: side, top, bottom, or front).
+// An unknown tile name throws, so a misspelled `tex` fails at load and not as a missing face.
+function tileOf(def, key) {
+  const n = def.tex[key], i = TILE$1[n];
+  if (i === undefined) throw new Error(`atlas: block ${def.name} tex.${key} names no tile: ${n}`);
+  return i;
+}
 for (const def of BLOCKS) {
   if (!def || !def.tex) continue;
   const t = def.tex;
-  const side = TILE$1[t.side], front = t.front ? TILE$1[t.front] : side;
-  const tiles = [side, side, TILE$1[t.top], TILE$1[t.bottom], front, front];
+  const side = tileOf(def, 'side'), front = t.front ? tileOf(def, 'front') : side;
+  const tiles = [side, side, tileOf(def, 'top'), tileOf(def, 'bottom'), front, front];
   if (def.facing >= 0) { tiles[4] = tiles[5] = side; tiles[DIR_FACE[def.facing]] = front; }
   FACE_TILE.set(tiles, def.id * 6);
 }
@@ -4239,6 +4328,36 @@ class World {
 }
 
 /* =====================================================================================
+ * FACE KIND — living header (src/face-kind.js, SPEC_deepen M5)
+ * -------------------------------------------------------------------------------------
+ * The one owner of the face-kind byte (the aTint alpha). Terms: a **face kind** (FACE_KIND)
+ * names how a face sways or glows; its **face byte** (FACE_BYTE) is the alpha that the mesher
+ * writes and the shaders decode with FACE_GLSL. No imports; pure. Rules: DISCOVERY_face-kind.md.
+ * ===================================================================================== */
+
+const FACE_KIND = Object.freeze({ STILL: 0, LEAF: 1, PLANT: 2, GLOW: 3, SOFT_GLOW: 4, CRYSTAL: 5, PORTAL_EMBER: 6, PORTAL_CRYSTAL: 7, WET: 8 });
+const FACE_BYTE = Uint8Array.of(255, 128, 0, 200, 214, 232, 160, 172, 246);   // by kind
+
+// The byte of one vertex. `top`: the vertex lies above the quad's lowest y (PLANT only).
+// `wet`: the face's neighbour cell is water (STILL only). -> 0..255
+function faceByte(kind, top, wet) {
+  if (kind === FACE_KIND.PLANT) return top ? 0 : 255;
+  if (kind === FACE_KIND.STILL && wet) return FACE_BYTE[FACE_KIND.WET];
+  return FACE_BYTE[kind];
+}
+
+// The JS mirror of the GLSL match: the kind whose byte lies within 0.5 of `byte`, or -1.
+function faceKindOf(byte) {
+  for (let k = 0; k < FACE_BYTE.length; k++) if (Math.abs(byte - FACE_BYTE[k]) <= 0.5) return k;
+  return -1;
+}
+
+// GLSL: one `const float FACE_<NAME> = <byte>.0;` per kind, and faceIs(a, k). `a` is the
+// normalized aTint alpha; faceIs gives 1.0 when its byte is k (within 0.5), else 0.0.
+const FACE_GLSL = Object.keys(FACE_KIND).map((name) => `const float FACE_${name} = ${FACE_BYTE[FACE_KIND[name]]}.0;\n`).join('')
+  + 'float faceIs(float a, float k) { return step(abs(a * 255.0 - k), 0.5); }\n';
+
+/* =====================================================================================
  * === 8. MESH GENERATION
  * -------------------------------------------------------------------------------------
  * buildChunkMesh copies the chunk and a 1-cell border from its 8 neighbours into padded
@@ -4294,15 +4413,11 @@ for (const F of FACES) {
 const UV_CORNERS = [[0, 1], [1, 1], [1, 0], [0, 0]];   // BL, BR, TR, TL -> (u, v) with v down
 
 const _vx = new Int32Array(12), _vuv = new Int32Array(8), _vl = new Uint8Array(16), _vc = new Uint8Array(4);
-// Wind sway and glow, stored in the aTint alpha: 255 = still, 128 = leaves (half sway),
-// 0 = full sway, 200 = glow (torch: bright texels are emissive), 214 = soft glow (lava, lit
-// furnace: bright texels ignore light but barely bloom), 232 = crystal (every texel glows and
-// keeps its facet shade), 160 = portal pane (the water pass draws the swirl). Plants sway only at
-// their top vertices, so their base stays in the ground.
-const SWAY_NONE = 0, SWAY_LEAF = 1, SWAY_PLANT = 2, SWAY_GLOW = 3, SWAY_SOFTGLOW = 4, SWAY_CRYSTAL = 5, SWAY_PORTAL = 6, SWAY_PORTAL_CRY = 7;
-const SWAY_ALPHA = [255, 128, 0, 200, 214, 232, 160, 172];
-const WET_ALPHA = 246;   // a still face whose neighbour cell is water: the shader draws caustics on it
-let swayMode = SWAY_NONE;
+// Wind sway and glow ride in the aTint alpha. face-kind.js owns the byte of each kind.
+// Plants sway only at their top vertices, so their base stays in the ground.
+const { STILL: K_STILL, LEAF: K_LEAF, PLANT: K_PLANT, GLOW: K_GLOW, SOFT_GLOW: K_SOFT_GLOW, CRYSTAL: K_CRYSTAL,
+  PORTAL_EMBER: K_PORTAL_EMBER, PORTAL_CRYSTAL: K_PORTAL_CRYSTAL } = FACE_KIND;
+let swayMode = K_STILL;   // the FACE_KIND of the quads being emitted
 let wetFace = false;   // emitCubeFace sets it per face
 let flatCry = 0;   // crystal light (0..15) of emitFlat quads; buildChunkMesh sets it per cell
 // Writes one quad from the scratch arrays; `flip` rotates the vertex order to flip the diagonal.
@@ -4316,7 +4431,7 @@ function pushQuad(buf, tint, flip) {
     buf.uv[v * 2] = _vuv[s * 2]; buf.uv[v * 2 + 1] = _vuv[s * 2 + 1];
     buf.light[v * 4] = _vl[s * 4]; buf.light[v * 4 + 1] = _vl[s * 4 + 1]; buf.light[v * 4 + 2] = _vl[s * 4 + 2]; buf.light[v * 4 + 3] = _vl[s * 4 + 3];
     buf.tint[v * 4] = tint[0]; buf.tint[v * 4 + 1] = tint[1]; buf.tint[v * 4 + 2] = tint[2];
-    buf.tint[v * 4 + 3] = swayMode === SWAY_PLANT ? (_vx[s * 3 + 1] > yMin ? 0 : 255) : swayMode === SWAY_NONE && wetFace ? WET_ALPHA : SWAY_ALPHA[swayMode];
+    buf.tint[v * 4 + 3] = faceByte(swayMode, _vx[s * 3 + 1] > yMin, wetFace);
     buf.cry[v] = _vc[s];
   }
 }
@@ -4607,14 +4722,14 @@ function buildChunkMesh(world, chunk) {
         _tint[0] = T[k]; _tint[1] = T[k + 1]; _tint[2] = T[k + 2];
       }
       const tint = tintable ? _tint : WHITE;
-      swayMode = IS_LEAF[id] ? SWAY_LEAF : GLOWS[id] ? SWAY_SOFTGLOW : SWAY_NONE;
+      swayMode = IS_LEAF[id] ? K_LEAF : GLOWS[id] ? K_SOFT_GLOW : K_STILL;
       const glass = id === B.GLASS;
       for (let f = 0; f < 6; f++) {
         const nb = PB[p + FACES[f].off];
         if (OPAQUE[nb] || (glass && nb === B.GLASS)) continue;
         emitCubeFace(ob, x, y, z, p, f, FACE_TILE[id * 6 + f], tint, 16, true);
       }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.WATER) {
       // Liquid. Each top corner averages the heights of the 4 cells that share it (Minecraft
       // rule): same kind above any of them -> full height; near-full cells weigh 10x.
@@ -4634,13 +4749,13 @@ function buildChunkMesh(world, chunk) {
         LIQ_H[cx + cz * 2] = top ? 16 : Math.max(1, Math.round(sum / (wsum || 1)));
       }
       const lava = kind === 2, buf = lava ? ob : wb, tile = lava ? TILE$1.lava : TILE$1.water;
-      if (lava) swayMode = SWAY_SOFTGLOW;
+      if (lava) swayMode = K_SOFT_GLOW;
       for (let f = 0; f < 6; f++) {
         const nb = PB[p + FACES[f].off];
         if (LIQ_KIND[nb] === kind || OPAQUE[nb]) continue;
         emitCubeFace(buf, x, y, z, p, f, tile, WHITE, full ? 16 : -1, false);
       }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.DOOR) {
       boxFit(ob, x, y, z, doorBox(id), FACE_TILE[id * 6], PS[p], PL[p]);
     } else if (shape === SHAPE.STAIRS) {
@@ -4655,7 +4770,7 @@ function buildChunkMesh(world, chunk) {
     } else if (shape === SHAPE.CROP) {   // 4 planes in a # pattern, sunk 1/16 into the farmland
       const tile = FACE_TILE[id * 6], r = tileRect(tile, 0, 0, 16, 16);
       const X = x * 16, Y = y * 16 - 1, Z = z * 16;
-      swayMode = SWAY_PLANT;
+      swayMode = K_PLANT;
       for (const o of [4, 12]) {
         const q = [
           [X, Y, Z + o, X + 16, Y, Z + o, X + 16, Y + 16, Z + o, X, Y + 16, Z + o],
@@ -4665,7 +4780,7 @@ function buildChunkMesh(world, chunk) {
         ];
         for (const c of q) { for (let i = 0; i < 12; i++) _corners[i] = c[i]; emitFlat(ob, _corners, r, PS[p], PL[p], 0.9, WHITE); }
       }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.CROSS) {
       const tile = FACE_TILE[id * 6], r = tileRect(tile, 0, 0, 16, 16);
       const tint = id === B.TALL_GRASS ? (() => { const k = ((z + 1) * PAD + (x + 1)) * 3; _tint[0] = TINT_G[k]; _tint[1] = TINT_G[k + 1]; _tint[2] = TINT_G[k + 2]; return _tint; })() : WHITE;
@@ -4676,16 +4791,16 @@ function buildChunkMesh(world, chunk) {
         [X + a, Y, Z + b, X + b, Y, Z + a, X + b, Y + top, Z + a, X + a, Y + top, Z + b],
         [X + b, Y, Z + a, X + a, Y, Z + b, X + a, Y + top, Z + b, X + b, Y + top, Z + a],
       ];
-      swayMode = SWAY_PLANT;
+      swayMode = K_PLANT;
       for (const q of quads) { for (let i = 0; i < 12; i++) _corners[i] = q[i]; emitFlat(ob, _corners, r, PS[p], PL[p], 0.9, tint); }
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.TORCH) {
       const t = TILE$1.torch;
-      swayMode = SWAY_GLOW;
+      swayMode = K_GLOW;
       const f = BLOCKS[id].facing;
       if (f >= 0) wallTorch(ob, x, y, z, f, PS[p]);
       else box(ob, x, y, z, 7, 0, 7, 9, 10, 9, t, PS[p], 15, tileRect(t, 7, 6, 9, 16), tileRect(t, 7, 6, 9, 8), true);
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.LADDER) {   // two rails and four rungs as boxes against the wall
       const f = BLOCKS[id].facing, [dx] = DIR4[f], back = DIR4[f][0] + DIR4[f][1] > 0, t = TILE$1.ladder;
       // local u (out from the wall), w (along the wall), h (up), in 1/16 units
@@ -4706,13 +4821,13 @@ function buildChunkMesh(world, chunk) {
       const c = along ? [X, Y, Z + 8, X + 16, Y, Z + 8, X + 16, Y + 16, Z + 8, X, Y + 16, Z + 8]
         : [X + 8, Y, Z + 16, X + 8, Y, Z, X + 8, Y + 16, Z, X + 8, Y + 16, Z + 16];
       for (let i = 0; i < 12; i++) _corners[i] = c[i];
-      swayMode = id === B.PORTAL_CRYSTAL ? SWAY_PORTAL_CRY : SWAY_PORTAL;
+      swayMode = id === B.PORTAL_CRYSTAL ? K_PORTAL_CRYSTAL : K_PORTAL_EMBER;
       emitFlat(wb, _corners, tileRect(FACE_TILE[id * 6], 0, 0, 16, 16), PS[p], PL[p], 0.8, WHITE);
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.CRYSTAL) {
-      swayMode = SWAY_CRYSTAL; flatCry = 15;
+      swayMode = K_CRYSTAL; flatCry = 15;
       crystalCluster(ob, x, y, z, id, PS[p], PL[p]);
-      swayMode = SWAY_NONE;
+      swayMode = K_STILL;
     } else if (shape === SHAPE.CACTUS) {
       const side = TILE$1.cactus_side, top = TILE$1.cactus_top;
       const sk = PS[p], bl = PL[p];
@@ -4966,26 +5081,27 @@ const TERRAIN_VS = /* glsl */`
   CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
   CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
+  ${FACE_GLSL}
   void main() {
-    vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66) + 2.0 * step(0.665, aTint.a) * step(aTint.a, 0.69);   // pane: 1 ember (160), 2 crystal (172)
+    vPortal = faceIs(aTint.a, FACE_PORTAL_EMBER) + 2.0 * faceIs(aTint.a, FACE_PORTAL_CRYSTAL);   // pane: 1 ember, 2 crystal
     vUv = aUv / 4096.0; vLight = aLight; vTint = aTint.rgb; vCry = aCry;
-    vCrystal = step(0.88, aTint.a) * step(aTint.a, 0.94);                                // crystal faces glow
-    vGlow = step(0.7, aTint.a) * step(aTint.a, 0.85) * (aTint.a > 0.82 ? 0.5 : 1.0);   // 1 glow, 0.5 soft glow
-    vWet = step(0.955, aTint.a) * step(aTint.a, 0.975);                                   // WET_ALPHA 246: caustics
+    vCrystal = faceIs(aTint.a, FACE_CRYSTAL);                                             // crystal faces glow
+    vGlow = faceIs(aTint.a, FACE_GLOW) + 0.5 * faceIs(aTint.a, FACE_SOFT_GLOW);           // 1 glow, 0.5 soft glow
+    vWet = faceIs(aTint.a, FACE_WET);                                                     // caustics
     vec3 p = position;
     vec4 wp = modelMatrix * vec4(p, 1.0);
     #ifdef WATER
       if (aLight.w > 0.99) p.y += (sin(wp.x * 1.3 + uTime * 1.7) + sin(wp.z * 1.1 + uTime * 1.3)) * 0.35 - 0.7;
     #else
       // wind sway (position is in 1/16 block units): leaves up to 1/32 block, plant tops 1/10
-      float sw = aTint.a < 0.6 ? 1.0 - aTint.a : 0.0;
-      if (sw > 0.01) {
+      float leaf = faceIs(aTint.a, FACE_LEAF), plant = faceIs(aTint.a, FACE_PLANT);
+      if (leaf + plant > 0.5) {
         float ph = uTime * 1.6 + wp.x * 0.35 + wp.z * 0.25;
         float gust = 0.65 + 0.35 * sin(uTime * 0.37 + wp.x * 0.05);
-        float amt = (sw > 0.75 ? 1.6 : 0.5) * gust;
+        float amt = (plant > 0.5 ? 1.6 : 0.5) * gust;
         p.x += sin(ph) * amt;
         p.z += sin(ph * 0.8 + 1.7) * amt * 0.7;
-        p.y += sin(ph * 1.3 + wp.z) * amt * 0.25 * step(sw, 0.75);
+        p.y += sin(ph * 1.3 + wp.z) * amt * 0.25 * leaf;
       }
     #endif
     vWorld = (modelMatrix * vec4(p, 1.0)).xyz;
@@ -10975,11 +11091,11 @@ const boss = {
  * `weather` follows the sky. It fades k (wet) and storm over 6 s. The sky greys the dome and
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
- * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
- * a dark red dome, no sun, moon, stars, or clouds, close red fog, and a red-orange light floor
- * (uAmbient) at block light `def.ambient`. The day sky sets uAmbient to black. crystal: a violet dome with
- * full, larger stars, 3 slow aurora bands, a small pale star disc at the fixed light direction, and
- * no clouds. The day clock keeps running.
+ * Realm skies (SPEC_realms, SPEC_deepen M7): the day sky runs first, then realmSky replaces its output
+ * with the row's `look` (REALMS in config.js). ember: a dark red dome, no sun, moon, stars, or clouds,
+ * close red fog, and a light floor (uAmbient) at block light `def.ambient`, tinted by `look.ambientTint`.
+ * The day sky sets uAmbient to black. crystal: a violet dome with full, larger stars, 3 slow aurora
+ * bands, a small pale star disc at the fixed light direction, and no clouds. The day clock keeps running.
  * ===================================================================================== */
 
 const sky = (() => {
@@ -11253,45 +11369,48 @@ const sky = (() => {
     clouds$1.visible = !player.headInWater && !player.headInLava;
     const def = REALMS[realm.current];
     terrainUniforms.uAmbient.value.setRGB(0, 0, 0);
-    if (def.sky !== 'day') realmSky(def, far);
+    if (def.look) realmSky(def, far);
   }
 
   // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
-  const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
-  const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
-  const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize(), CRYSTAL_STAR = C(0.86, 0.84, 1.0);
-  const EMBER_AMBIENT = C(1, 0.52, 0.32);   // the tint of the ember light floor
+  // It reads every value from def.look (REALMS in config.js). The three.js objects of each look
+  // are built once, at load.
+  const LOOKS = new Map(Object.values(REALMS).filter((d) => d.look).map(({ look: k }) => [k, {
+    top: C(...k.top), horizon: C(...k.horizon), light: C(...k.light),
+    tint: k.ambientTint && C(...k.ambientTint), dir: new THREE.Vector3(...k.lightDir).normalize(),
+    star: k.star && C(...k.star.color),
+  }]));
   // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
   const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
   function realmSky(def, far) {
-    const ember = def.sky === 'ember';
-    uniforms.uTop.value.copy(ember ? EMBER_TOP : CRYSTAL_TOP);
-    uniforms.uHorizon.value.copy(ember ? EMBER_HOR : CRYSTAL_HOR);
+    const look = def.look, o = LOOKS.get(look);
+    uniforms.uTop.value.copy(o.top);
+    uniforms.uHorizon.value.copy(o.horizon);
     uniforms.uGlowAmt.value = 0;
     sun.material.opacity = halo.material.opacity = moon.material.opacity = 0;
-    if (!ember) {   // the pale star: a small lavender disc and halo at the fixed light direction, and the aurora
-      sun.position.copy(CRYSTAL_SUN).multiplyScalar(700); sun.lookAt(camera.position);
-      halo.position.copy(CRYSTAL_SUN).multiplyScalar(690); halo.lookAt(camera.position);
-      sun.scale.setScalar(0.45); sun.material.opacity = 1; sun.material.color.copy(CRYSTAL_STAR).multiplyScalar(glowGain * glowGain);
-      halo.material.color.copy(CRYSTAL_STAR); halo.material.opacity = 0.4;
-      uniforms.uAurora.value = 0.5;
-      starMat.uniforms.uSize.value = 2.8 * renderer.getPixelRatio();
+    if (look.star) {   // the pale star: a small disc and halo at the fixed light direction
+      sun.position.copy(o.dir).multiplyScalar(700); sun.lookAt(camera.position);
+      halo.position.copy(o.dir).multiplyScalar(690); halo.lookAt(camera.position);
+      sun.scale.setScalar(look.star.scale); sun.material.opacity = 1; sun.material.color.copy(o.star).multiplyScalar(glowGain * glowGain);
+      halo.material.color.copy(o.star); halo.material.opacity = look.star.halo;
     }
-    starMat.uniforms.uOpacity.value = ember ? 0 : 1;
-    stars.visible = !ember;
+    uniforms.uAurora.value = look.aurora;
+    if (look.starSize != null) starMat.uniforms.uSize.value = look.starSize * renderer.getPixelRatio();
+    starMat.uniforms.uOpacity.value = look.starSize != null ? 1 : 0;
+    stars.visible = look.starSize != null;
     clouds$1.visible = false;
     cloudUniforms.uCloudCover.value = 0;               // no cloud shadows on the terrain
-    game.clearDaylight = game.daylight = ember ? 0.3 : 0.8;
+    game.clearDaylight = game.daylight = look.daylight;
     terrainUniforms.uDaylight.value = game.daylight;
-    terrainUniforms.uSkyLight.value.copy(ember ? EMBER_LIGHT : CRYSTAL_LIGHT);
-    terrainUniforms.uSunDir.value.copy(CRYSTAL_SUN);
-    terrainUniforms.uSunAmt.value = ember ? 0 : 0.6;
-    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(EMBER_AMBIENT).multiplyScalar(curveB(def.ambient));
+    terrainUniforms.uSkyLight.value.copy(o.light);
+    terrainUniforms.uSunDir.value.copy(o.dir);
+    terrainUniforms.uSunAmt.value = look.sunAmt;
+    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(o.tint).multiplyScalar(curveB(def.ambient));
     if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
     const fog = terrainUniforms.uFogColor.value;
     fog.setHex(def.fog.color);
     const f = Math.min(def.fog.far, far);
-    terrainUniforms.uFogNear.value = f * (ember ? 0.3 : 0.55); terrainUniforms.uFogFar.value = f;
+    terrainUniforms.uFogNear.value = f * look.fogNear; terrainUniforms.uFogFar.value = f;
     scene.fog.color.copy(fog);
     scene.fog.near = terrainUniforms.uFogNear.value; scene.fog.far = f;
     renderer.setClearColor(fog);
@@ -11621,7 +11740,7 @@ const fireflies = (() => {
 
   function update(dt) {
     const e = Math.sin(game.dayTime * Math.PI * 2);   // sun height: 0 at sunrise and sunset
-    level = realm.current === 'overworld' ? (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k) : 0;   // overworld only
+    level = realm.def.fx.fireflies ? (1 - THREE.MathUtils.smoothstep(e, -0.1, 0.06)) * (1 - weather.k) : 0;   // the realm row's fx.fireflies
     const under = player.headInWater || player.headInLava;
     points.visible = level > 0.01 && !under;
     if (level <= 0.01) { for (let i = 0; i < N; i++) d[i * S + 10] = 0; shown = 0; return; }   // fresh spots next night
@@ -11735,7 +11854,7 @@ const ash = (() => {
   }
 
   function update(dt) {
-    const on = realm.current === 'ember' && !player.headInWater && !player.headInLava;
+    const on = realm.def.fx.ash && !player.headInWater && !player.headInLava;
     flakes.pts.visible = embers.pts.visible = on;
     if (!on) { seeded = false; return; }
     if (!seeded) { scatter(flakes); scatter(embers); seeded = true; }
@@ -11768,8 +11887,10 @@ const ash = (() => {
 /* =====================================================================================
  * === 18. MAIN ANIMATION LOOP
  * -------------------------------------------------------------------------------------
- * Boot: read the save (readSave), or pick a dry spawn column from the world generator; stream
+ * Boot: open the save (openSave), or pick a dry spawn column from the world generator; stream
  * the chunks around the player, then enable Play. A rejected save goes to a backup key first. The menu shows the live world behind it with a slow panorama.
+ * Terms: a **notice** is the { msg, keep } text for a rejected save; boot.js shows it in the load line and a toast.
+ * The boot fallback policy lives in save-format.js (openSave). Rules: DISCOVERY_save-format.md.
  * Each frame: stream chunks, simulate (only while playing, in the inventory, or dead),
  * update the sky and HUD, render the world through `post` (bloom and light shafts), clear depth,
  * then render the held item.
@@ -11820,44 +11941,23 @@ function openYaw(pos) {
   return bestYaw;
 }
 
-// ---- the boot reader and the fallback (SPEC_hardening H1) ----------------------------------
-// readSave checks the text of SAVE_KEY. A rejected save, or a save that throws in persist.apply,
-// is copied to a backup key (`<SAVE_KEY>.rejected.<epoch ms>`) and then removed. The world starts
-// fresh. After loading, the menu's load line shows the notice, and a toast repeats it when the
-// game starts (the HUD and its toast are hidden until then). The notice names the reason and the
-// backup key. When the backup write
-// fails, SAVE_KEY stays, saving is blocked (persist.blocked), and the toast says the save was kept.
-// An apply throw leaves the game half restored, so boot reloads the page. The notice for the toast
-// waits in sessionStorage (BOOT_NOTICE) over the reload. `keep` tells the next boot to skip SAVE_KEY.
-const BOOT_NOTICE = 'clonecraft.bootNotice', NOTICE_SECONDS = 12;
-function takeNotice() {
-  try { const t = sessionStorage.getItem(BOOT_NOTICE); sessionStorage.removeItem(BOOT_NOTICE); return t ? JSON.parse(t) : null; } catch (e) { return null; }
-}
-function rejectSave(text, reason) {
-  const key = `${SAVE_KEY}.rejected.${Date.now()}`;
-  if (storage.set(key, text)) {
-    storage.remove(SAVE_KEY);
-    return { msg: `The saved world could not load: ${reason}. A copy is in ${key}. A new world starts.`, keep: false };
-  }
-  persist.blocked = true;
-  return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
-}
-let notice = takeNotice();
-if (notice?.keep) persist.blocked = true;
-const saveText = notice?.keep ? null : storage.get(SAVE_KEY);
-const read = readSave(saveText, SEED);
-let save = read.save;
-if (read.reason) notice = rejectSave(saveText, read.reason);
-if (save) {
-  try { persist.apply(save); } catch (e) {
-    save = null;
-    persist.blocked = true;                       // nothing may write the half-restored game
-    notice = rejectSave(saveText, `it failed to load (${e.message})`);
-    let carried = false;
-    try { sessionStorage.setItem(BOOT_NOTICE, JSON.stringify(notice)); carried = true; } catch (err) { /* no reload: it could loop */ }
-    if (carried) location.reload();
-  }
-}
+// ---- the boot fallback (SPEC_deepen M4) -----------------------------------------------------
+// openSave (save-format.js) holds the policy: the carried notice, the read of SAVE_KEY, the backup of a
+// rejected save, and the apply throw. boot.js passes the stores, the clock, and persist.apply, then acts
+// on the result. The sessionStorage wrappers are lazy, so a throwing global stays inside openSave.
+// After loading, the menu's load line shows the notice, and a toast repeats it when the game starts
+// (the HUD and its toast are hidden until then).
+const NOTICE_SECONDS = 12;
+const session = {
+  getItem: (k) => sessionStorage.getItem(k),
+  setItem: (k, v) => sessionStorage.setItem(k, v),
+  removeItem: (k) => sessionStorage.removeItem(k),
+};
+const opened = openSave({ store: storage, session, key: SAVE_KEY, seed: SEED, now: Date.now(), apply: (d) => persist.apply(d) });
+let notice = opened.notice;
+const save = opened.save;
+if (opened.blocked) persist.blocked = true;
+if (opened.reload) location.reload();
 const restored = !!save;
 if (!restored) {
   const spawnCol = findSpawnColumn();
@@ -11925,7 +12025,7 @@ const shadows = (() => {
   rt.depthTexture.compareFunction = THREE.LessEqualCompare;   // P2: sampler2DShadow, hardware-filtered compares
   rt.depthTexture.minFilter = rt.depthTexture.magFilter = THREE.LinearFilter;
   const cam = new THREE.OrthographicCamera(-HALF, HALF, HALF, -HALF, 0.5, DEPTH);
-  const VS = (uv) => `${uv ? 'attribute vec2 aUv; attribute vec4 aTint; varying vec2 vUv; varying float vLeaf;' : ''} void main() { ${uv ? 'vUv = aUv / 4096.0; vLeaf = step(0.45, aTint.a) * step(aTint.a, 0.55);' : ''} gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const VS = (uv) => `${uv ? 'attribute vec2 aUv; attribute vec4 aTint; varying vec2 vUv; varying float vLeaf;' : ''} ${uv ? FACE_GLSL : ''} void main() { ${uv ? 'vUv = aUv / 4096.0; vLeaf = faceIs(aTint.a, FACE_LEAF);' : ''} gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
   // Leaf faces (sway alpha 128) drop half of their 4x4-texel cells, so light dapples through a canopy.
   const cutMat = new THREE.ShaderMaterial({ uniforms: { map: { value: atlasTexture } }, side: THREE.DoubleSide, vertexShader: VS(true),
     fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying float vLeaf;
@@ -12312,7 +12412,7 @@ const post = (() => {
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 51 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 52 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -12324,8 +12424,8 @@ const post = (() => {
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
- *    crafting, and save-format never reach this file. Node tests import them.
+ *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, face-kind, clouds,
+ *    terrain-material, crafting, and save-format never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
@@ -12342,7 +12442,7 @@ const post = (() => {
  *      overrides, unloading; sky, block, and crystal light, BFS flood fill, incremental
  *      updates; a LIGHT_STOP cell such as a stair takes light but never passes it on)
  *   8. Mesh generation: mesher (hidden-face culling, smooth light + AO, sloped liquids, doors,
- *      crystals, stairs, wet faces for caustics: WET_ALPHA; rails: railMesh() rotates one
+ *      crystals, stairs, wet faces for caustics: FACE_KIND.WET; rails: railMesh() rotates one
  *      flat, slope, or curve quad); clouds (the shared cloud density: one baked noise
  *      texture, GLSL cloudDensity(), the wind, coverage from the weather); terrain-material
  *      (TERRAIN_FS: water waves and glitter, shadows, held light, cloud shadows)
