@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
 ### Changed
 
 - The precipitation rule (SPEC_deepen M9): the new pure module `precip.js` holds it. `zoneOf`, `precipKind`, `snowFloor`, and `rainFloor` take the zone, the top block, and `melt` as arguments, so Node tests now cover the rule with no world. `weather.js` wraps them; `weather.precip`, `zone`, `melt`, `top`, and `wetAt` stay on the handle. Rain and snow fall where they did before.

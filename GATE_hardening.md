@@ -109,4 +109,4 @@ Merged on main (code cb40199, docs ec1686f), 2026-10-31. Case A seed 780001 (tra
 - [x] **(owner)** Joe approves the Step 3 merge. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
 ## Release
-- [ ] **(owner)** Joe approves the release tag and the version number.
+- [x] **(owner)** Joe approves the release tag and the version number. Approved by Joe, 2026-11-01 15:20 CT: version 0.2.0 ("yes, 0.2.0"). The tag waits on the open seed 1234 boxes.

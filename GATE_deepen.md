@@ -280,4 +280,4 @@ Added by Joe, 2026-11-01 12:51 CT ("Fix N1").
 - [x] **(owner)** Joe reviews the S10 diff. Approved by Joe, 2026-11-01 13:53 CT: "spec and diff approved".
 
 ## Release
-- [ ] **(owner)** Joe approves the release tag and the version number.
+- [x] **(owner)** Joe approves the release tag and the version number. Approved by Joe, 2026-11-01 15:20 CT: version 0.2.0 ("yes, 0.2.0"). The tag waits on the open seed 1234 boxes.
