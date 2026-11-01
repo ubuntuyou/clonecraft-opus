@@ -7,7 +7,7 @@ The gate file for `SPEC_deepen.md`. Check a box only after you verify it yoursel
 
 ## Bugs with no code
 - [x] K6: not reproduced, unpatched. Design B found no reachable cell where the lower door half places and the upper half fails. (rsh, 2026-11-01: a scan of the arrival and exit lock boxes found 0 such cells.)
-- [ ] K11: no code. The invariant is in `DISCOVERY_engine.md` (S7 close).
+- [x] K11: no code. The invariant is in `DISCOVERY_engine.md` (S7 close). Note: 6b41233, the bullet after the `realm.leave()` bullet; it names the arrival save in `realm.updateTravel`, not `realms.js:167`.
 
 ## Every step (repeat in each step's Integrate box)
 The step gate passes. The 109 existing tests pass, and `git diff main -- tests` shows added lines only in existing files. `git diff main -- tests/fixtures` is empty. `save-live.json` passes `readSave`. The sweep baseline is unchanged. For an M step, the string-literal diff review shows no user-visible text change. No expectation was edited to pass. Reindex: N/A (no specialist-rag domain for this repo).
@@ -198,28 +198,28 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 ## Wave 3
 
 ### S7: boss lock (M3, K5, K11) — `step/deepen-7-boss-lock`
-- [ ] Contract commit (W3 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T7.1 opus, T7.2 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: the "Every step" checks pass.
-- [ ] K5 repro (QA, wave base): the chest key and the torch key stay, and no drop appears. If it does not reproduce, record it here and skip the K5 fix boxes.
-- [ ] Unit: M3-1
-- [ ] Unit: M3-2
-- [ ] Unit: M3-3
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: `<=` → `<` on `x0 + w` in `ringHas` → M3-1 fails.
-- [ ] Mutation: `world.locked` without the realm check → QA shows an overworld edit at (0, 97, 0) fails.
-- [ ] Mutation: `boss.load` without `!!` → M3-5 deep-equal fails after `load({})`.
-- [ ] Mutation: swap the build and the flag in `shatter` → M3-5 QA shows no exit panes.
-- [ ] Mutation: drop `TORCH` from `ENTITY_BASE` → the K5 torch assert fails.
-- [ ] Structure: `inArrival` and `inExit` are gone; `realm.boss` is a getter; `boss.EXIT` keeps `z`; only `boss.js` writes `defeated`; the 4 `boss.js`/`portals.js` batch sites use `world.batched`.
-- [ ] QA: M3-4
-- [ ] QA: M3-5
-- [ ] QA: K5 fix: the chest key is gone, chest and item drop within 3 blocks, `torches` lacks the key.
-- [ ] QA: 0 game console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md` D49/D52/D53 (the lock lives in `boss`); `DISCOVERY_engine.md` (`:122`, `:142`, and the K11 invariant); headers of `boss.js` and `portals.js`; `CHANGELOG.md` (Changed M3; Fixed K5).
+- [x] Contract commit (W3 contract agent, opus); rsh reviewed it. Note: S7 b0a20f0; rsh reviewed it by diff stat and key hunks (`/tmp/deepen-clonecraft/wave-notes.md` W3).
+- [x] Wave dispatched: T7.1 opus, T7.2 sonnet. Note: T7.1 b471876 (portals) and 5288b88 (boss); T7.2 c4653f7.
+- [x] Owns check by `git diff --stat`. Note: `boss.js`, `portal-frame.js`, `portals.js`, `realms.js`, `tests/portals.test.js` only (`/tmp/deepen-clonecraft/w3-integrate.md` S7 2).
+- [x] Integrate: the "Every step" checks pass. Note: S7 tip c063c0d: depcheck pass, 215/215, build ok; fixtures diff empty; live fixture passes `readSave`; sweep baseline unchanged; no user-visible text change (`/tmp/deepen-clonecraft/w3-integrate.md` S7 3, 7). On `main` ae314a7: depcheck pass, 215/215.
+- [x] K5 repro (QA, wave base): the chest key and the torch key stay, and no drop appears. If it does not reproduce, record it here and skip the K5 fix boxes. Note: REPRODUCED on 7c3d7f6, seeds 790101 and 790102: both cells became pane 182; `tileEntities.has('0,97,0')` and `torches.has('1,97,0')` stayed true; no ruby drop (`/tmp/deepen-clonecraft/w3-k5-repro.md`).
+- [x] Unit: M3-1 Note: green on `main` ae314a7.
+- [x] Unit: M3-2 Note: green on `main` ae314a7.
+- [x] Unit: M3-3 Note: green on `main` ae314a7.
+- [x] Ported cases: none deleted. Note: `git diff 7c3d7f6 ae314a7 -- tests` is `tests/portals.test.js` +90/-0.
+- [x] Mutation: `<=` → `<` on `x0 + w` in `ringHas` → M3-1 fails. Note: caught by M3-1, M3-2, M3-3 (`/tmp/deepen-clonecraft/w3-integrate.md` S7 6); rsh re-ran it on `main` ae314a7: the same 3 fail, 212 pass.
+- [x] Mutation: `world.locked` without the realm check → QA shows an overworld edit at (0, 97, 0) fails. Note: caught. DEVIATION: QA used the overworld cell (0, 97, 36), not (0, 97, 0). (0, 97, 36) is in the arrival ring, which `ringHas` locks with no flag; (0, 97, 0) locks under the mutant only after `boss.defeated` is set true. Control: `setBlock` true; mutant: `locked` true, `setBlock` false ((`/tmp/deepen-clonecraft/w3-qa-r1.md` E1; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
+- [x] Mutation: `boss.load` without `!!` → M3-5 deep-equal fails after `load({})`. Note: DEVIATION: a Node analogue, not the M3-5 QA run. `/tmp/deepen-clonecraft/s7-boss/load.mjs src/boss.js` runs the real `data()` and `load(d)` lines through JSON. rsh ran it on `main` ae314a7: pass; with the mutant it fails "load({}) then data()" (`{}` against `{ defeated: false }`); `npm test` stays 215/215 under the mutant (`/tmp/deepen-clonecraft/w3-integrate.md` S7 6).
+- [x] Mutation: swap the build and the flag in `shatter` → M3-5 QA shows no exit panes. Note: caught: 0 panes against 12 in the control ((`/tmp/deepen-clonecraft/w3-qa-r1.md` E2; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
+- [x] Mutation: drop `TORCH` from `ENTITY_BASE` → the K5 torch assert fails. Note: caught with a floor torch: `torches.has('1,97,0')` stays true and no torch drops ((`/tmp/deepen-clonecraft/w3-qa-r1.md` E3; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
+- [x] Structure: `inArrival` and `inExit` are gone; `realm.boss` is a getter; `boss.EXIT` keeps `z`; only `boss.js` writes `defeated`; the 4 `boss.js`/`portals.js` batch sites use `world.batched`. Note: grep on `main` ae314a7: 0 `inArrival`/`inExit`; `realms.js:72` `get boss()`; `boss.js:65` `EXIT` has `z`; `defeated` writers `boss.js:301` (shatter) and `:340` (load) only; `world.batched` at `boss.js:312`, `portals.js:90,112,163`, and no `beginBatch`/`endBatch`/`world.batch` there.
+- [x] QA: M3-4 Note: flag false: a break at (0, 97, 0) succeeds; flag true: `setBlock` returns false; the arrival ring stays locked in both ((`/tmp/deepen-clonecraft/w3-qa-r1.md` B; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
+- [x] QA: M3-5 Note: shatter kill and a real kill: `persist.data().boss` deep-equals `{ defeated: true }`; a reload keeps it, no Titan spawns, `realm.boss` reads `{ defeated: true }` ((`/tmp/deepen-clonecraft/w3-qa-r1.md` C; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
+- [x] QA: K5 fix: the chest key is gone, chest and item drop within 3 blocks, `torches` lacks the key. Note: both keys gone; ruby, chest, and torch drop at (0.5, 97.5, 0.5), (0.5, 97.3, 0.5), (1.5, 97.3, 0.5) ((`/tmp/deepen-clonecraft/w3-qa-r1.md` D; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
+- [x] QA: 0 game console errors; cleanup done. Note: (`/tmp/deepen-clonecraft/w3-qa-r1.md` A and Cleanup; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3).
+- [x] Docs: `ARCHITECTURE.md` D49/D52/D53 (the lock lives in `boss`); `DISCOVERY_engine.md` (`:122`, `:142`, and the K11 invariant); headers of `boss.js` and `portals.js`; `CHANGELOG.md` (Changed M3; Fixed K5). Note: 6b41233 (also the "block edits to portals" Seams row); the headers came with T7.1 (`portals.js` names `boss.locks`, `boss.js` names `boss.defeated`).
 - [ ] **(owner)** Joe reviews the S7 diff.
-- [ ] Merged to `main` before S8; worktrees and branches removed.
+- [x] Merged to `main` before S8; worktrees and branches removed. Note: ae314a7; worktrees d7, d7a, d7b and their branches removed (each merged into `main` first).
 
 ### S8: batched sites (M8) — `step/deepen-8-batched`
 - [ ] Contract commit (W3 contract agent, opus); rsh reviewed it.
