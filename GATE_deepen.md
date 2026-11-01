@@ -261,7 +261,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Merged to `main`; worktrees and branches removed. Note: 3f227c7; worktrees d9, d9a, d9b and their branches removed (each merged into `main` first).
 
 ### W3 close
-- [ ] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once.
+- [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: fb82c3e is the one `index.html` commit of W3; `npm run check` on `main` fb82c3e: depcheck pass, 261/261, "check: index.html equals a fresh build", exit 0. QA worktree dw3qa and branch `qa/deepen-w3a` removed (merge parents 7c3d7f6, c063c0d, a7802b3 on `main`).
 - [ ] **(owner)** Joe approves the W3 merge.
 
 ## Release
