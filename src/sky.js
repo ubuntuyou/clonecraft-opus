@@ -301,6 +301,7 @@ const sky = (() => {
   }
 
   // A realm sky: replaces the dome, the bodies, the terrain light, and the fog of the day sky.
+  // TODO M7, K2 (T4.1): read def.look (REALMS in config.js) and drop the EMBER_ and CRYSTAL_ constants.
   const EMBER_TOP = C(0.09, 0.012, 0.006), EMBER_HOR = C(0.24, 0.05, 0.02), EMBER_LIGHT = C(1, 0.62, 0.45);
   const CRYSTAL_TOP = C(0.012, 0.0, 0.04), CRYSTAL_HOR = C(0.2, 0.09, 0.34), CRYSTAL_LIGHT = C(0.84, 0.76, 1.0);
   const CRYSTAL_SUN = new THREE.Vector3(0.4, 0.75, 0.3).normalize(), CRYSTAL_STAR = C(0.86, 0.84, 1.0);

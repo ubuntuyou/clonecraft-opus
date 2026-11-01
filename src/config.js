@@ -33,10 +33,36 @@ function emberMobType(r, inFortress) {
 // save checks (save-format.js) read it and must stay pure.
 // ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
 // { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
+// look (SPEC_deepen M7): null keeps the day sky; else sky.js realmSky replaces the day sky's
+// output with it. Colors are [r, g, b] in 0..1. top, horizon: the dome; light: the terrain sky
+// light; ambientTint: the tint of the ambient floor (null when ambient is 0); daylight, sunAmt:
+// the terrain light levels; lightDir: the fixed light direction (realmSky normalizes it);
+// fogNear: the fog near distance as a share of the fog far; starSize: the star point size (null:
+// the stars hide); star: null, or the pale star disc { color, scale, halo }; aurora: 0..1.
+// fx: the ambient effects of the realm (fireflies.js, ash.js).
 const REALMS = {
-  overworld: { name: 'overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
-  ember: { name: 'ember', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
-  crystal: { name: 'crystal', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
+  overworld: {
+    name: 'overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…',
+    look: null,
+    fx: { fireflies: true, ash: false },
+  },
+  ember: {
+    name: 'ember', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…',
+    look: {
+      top: [0.09, 0.012, 0.006], horizon: [0.24, 0.05, 0.02], light: [1, 0.62, 0.45], ambientTint: [1, 0.52, 0.32],
+      daylight: 0.3, sunAmt: 0, lightDir: [0.4, 0.75, 0.3], fogNear: 0.3, starSize: null, star: null, aurora: 0,
+    },
+    fx: { fireflies: false, ash: true },
+  },
+  crystal: {
+    name: 'crystal', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…',
+    look: {
+      top: [0.012, 0.0, 0.04], horizon: [0.2, 0.09, 0.34], light: [0.84, 0.76, 1.0], ambientTint: null,
+      daylight: 0.8, sunAmt: 0.6, lightDir: [0.4, 0.75, 0.3], fogNear: 0.55, starSize: 2.8,
+      star: { color: [0.86, 0.84, 1.0], scale: 0.45, halo: 0.4 }, aurora: 0.5,
+    },
+    fx: { fireflies: false, ash: false },
+  },
 };
 // The weather kinds (weather.js). The save checks read them too.
 const WEATHER_KINDS = ['clear', 'rain', 'storm'];
