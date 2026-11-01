@@ -237,28 +237,28 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Merged to `main`; worktrees and branches removed. Note: b38f904; worktrees d8, d8a, d8b and their branches removed (each merged into `main` first).
 
 ### S9: precipitation and draw order (M9, M10) — `step/deepen-9-precip-order`
-- [ ] Contract commit (W3 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T9.1 sonnet, T9.2 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: merged after S8; the "Every step" checks pass.
-- [ ] Unit: M9-1
-- [ ] Unit: M9-2
-- [ ] Unit: M9-3
-- [ ] Unit: M9-4
-- [ ] Unit: M9-5
-- [ ] Unit: M10-1
-- [ ] Unit: M10-2
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: `>=` → `>` in the height rule → M9-2 fails.
-- [ ] Mutation: drop `SNOWY_MOUNTAINS` from zone 2 → M9-1 fails.
-- [ ] Mutation: drop the `max` in `snowFloor` → M9-4 fails.
-- [ ] Mutation: `EFFECTS: 1` → M10-1 fails.
+- [x] Contract commit (W3 contract agent, opus); rsh reviewed it. Note: S9 f80a696; rsh reviewed it by diff stat and key hunks (`/tmp/deepen-clonecraft/wave-notes.md` W3).
+- [x] Wave dispatched: T9.1 sonnet, T9.2 sonnet. Note: T9.1 035c463; T9.2 668c476.
+- [x] Owns check by `git diff --stat`. Note: `git diff --stat 4986500 3f227c7`: `ash.js`, `config.js`, `fireflies.js`, `mesher.js`, `order.js`, `particles.js`, `precip.js` (new), `sky.js`, `targeting.js`, `weather.js`, `tools/depcheck.js`, `tests/config.test.js` (+38/-0), `tests/precip.test.js` (new, +135) only.
+- [x] Integrate: merged after S8; the "Every step" checks pass. Note: 3f227c7 follows the S8 merge b38f904; no conflict. Step tip a7802b3: depcheck pass, 255/255, build ok (`/tmp/deepen-clonecraft/w3-integrate.md` S9 3). On `main` 3f227c7: depcheck pass, 261/261 (216 + 45 new), `npx vite build` ok; tests +38/-0 and +135/-0; fixtures diff empty; live fixture and sweep pass in `npm test`; string-literal diff is imports and `precip.js` comments only.
+- [x] Unit: M9-1 Note: green on `main` 3f227c7.
+- [x] Unit: M9-2 Note: green on `main` 3f227c7.
+- [x] Unit: M9-3 Note: green on `main` 3f227c7.
+- [x] Unit: M9-4 Note: green on `main` 3f227c7.
+- [x] Unit: M9-5 Note: green on `main` 3f227c7.
+- [x] Unit: M10-1 Note: green on `main` 3f227c7.
+- [x] Unit: M10-2 Note: green on `main` 3f227c7.
+- [x] Ported cases: none deleted. Note: `git diff 4986500 3f227c7 -- tests` has 0 removed lines.
+- [x] Mutation: `>=` → `>` in the height rule → M9-2 fails. Note: rsh ran it on `main` 3f227c7: M9-2 (t = 158 snows; another melt) and M9-5 (boundary) fail, 258 pass.
+- [x] Mutation: drop `SNOWY_MOUNTAINS` from zone 2 → M9-1 fails. Note: rsh ran it on `main` 3f227c7: M9-1 `zoneOf(BIOME.SNOWY_MOUNTAINS) is 2` fails, 260 pass.
+- [x] Mutation: drop the `max` in `snowFloor` → M9-4 fails. Note: rsh ran it on `main` 3f227c7: M9-4 `snowFloor(1, 100)` and the boundary case fail, 259 pass.
+- [x] Mutation: `EFFECTS: 1` → M10-1 fails. Note: rsh ran it on `main` 3f227c7: M10-1 (the order holds) and M10-2 (pin) fail, 259 pass.
 - [ ] Structure: every `renderOrder =` in `src/` reads `DRAW_ORDER`; `precip` is in `order.js` and `PURE`; header count 53; `weather.precip`, `zone`, `melt`, `top`, `wetAt` still on the handle.
-- [ ] QA: rain and snow by kind across y 159, in snowy plains, and in a desert; rain over water draws in front of it.
-- [ ] QA: 0 game console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md` (weather paragraph; draw order); `DISCOVERY_engine.md:54-59`; headers of `weather.js`, `precip.js`, `order.js`; `CHANGELOG.md` (Changed M9, M10).
+- [x] QA: rain and snow by kind across y 159, in snowy plains, and in a desert; rain over water draws in front of it. Note: plains t 157 rain 1820, t 158 rain 0; snowy plains rain 0, snow 770; desert rain 0, snow 0; equal to the base; rain renderOrder 3 over water, streaks over the lake (`/tmp/deepen-clonecraft/w3-qa-r1.md` F; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3).
+- [x] QA: 0 game console errors; cleanup done. Note: (`/tmp/deepen-clonecraft/w3-qa-r1.md` A and Cleanup; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3).
+- [x] Docs: `ARCHITECTURE.md` (weather paragraph; draw order); `DISCOVERY_engine.md:54-59`; headers of `weather.js`, `precip.js`, `order.js`; `CHANGELOG.md` (Changed M9, M10). Note: e96dfb5 (D29, D8, the weather Seams row; `DISCOVERY_engine.md:55-57`). No `DISCOVERY_precip.md`: four short pure functions; one `DISCOVERY_engine.md` bullet holds the gotchas.
 - [ ] **(owner)** Joe reviews the S9 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: 3f227c7; worktrees d9, d9a, d9b and their branches removed (each merged into `main` first).
 
 ### W3 close
 - [ ] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once.
