@@ -19,7 +19,7 @@
  * bands, a small pale star disc at the fixed light direction, and no clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { clamp, CONFIG, CS, glowGain, lerp, mulberry32, REALMS } from './config.js';
+import { clamp, CONFIG, CS, glowGain, lerp, LIGHT_BLK, lightCurve, mulberry32, REALMS } from './config.js';
 import { CLOUD_GLSL, CLOUD_Y, clouds as cloudField, cloudUniforms as fieldUniforms } from './clouds.js';
 import { terrainUniforms } from './terrain-material.js';
 import { camera, game, player, renderer, scene } from './engine.js';
@@ -308,8 +308,6 @@ const sky = (() => {
     tint: k.ambientTint && C(...k.ambientTint), dir: new THREE.Vector3(...k.lightDir).normalize(),
     star: k.star && C(...k.star.color),
   }]));
-  // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
-  const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
   function realmSky(def, far) {
     const look = def.look, o = LOOKS.get(look);
     uniforms.uTop.value.copy(o.top);
@@ -333,7 +331,7 @@ const sky = (() => {
     terrainUniforms.uSkyLight.value.copy(o.light);
     terrainUniforms.uSunDir.value.copy(o.dir);
     terrainUniforms.uSunAmt.value = look.sunAmt;
-    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(o.tint).multiplyScalar(curveB(def.ambient));
+    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(o.tint).multiplyScalar(lightCurve(def.ambient, LIGHT_BLK));
     if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
     const fog = terrainUniforms.uFogColor.value;
     fog.setHex(def.fog.color);
