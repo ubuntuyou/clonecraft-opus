@@ -222,19 +222,19 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Merged to `main` before S8; worktrees and branches removed. Note: ae314a7; worktrees d7, d7a, d7b and their branches removed (each merged into `main` first).
 
 ### S8: batched sites (M8) — `step/deepen-8-batched`
-- [ ] Contract commit (W3 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T8.1 sonnet, T8.2 sonnet.
-- [ ] Owns check by `git diff --stat`.
+- [x] Contract commit (W3 contract agent, opus); rsh reviewed it. Note: S8 c0cadde; rsh reviewed it by diff stat and key hunks (`/tmp/deepen-clonecraft/wave-notes.md` W3).
+- [x] Wave dispatched: T8.1 sonnet, T8.2 sonnet. Note: T8.1 149aeca; T8.2 a1e7ef7.
+- [x] Owns check by `git diff --stat`. Note: `git diff --stat 418a911 b38f904`: `explosions.js`, `farming.js`, `grass.js`, `interact.js`, `leaf-decay.js`, `liquids.js`, `world.js` (-6, the pair), `tests/world.test.js` (+20/-0) only.
 - [ ] T8.2 reported M8-1 red on its branch for the `boss.js` and `portals.js` sites only.
-- [ ] Integrate: `main` (with S7) merged first; the "Every step" checks pass.
-- [ ] Unit: M8-1 green after the merge.
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: put one `world.beginBatch()` back in `grass.js` → M8-1 fails.
+- [x] Integrate: `main` (with S7) merged first; the "Every step" checks pass. Note: bf00ece merged `main` 379658c into the step branch; tip 5142a58: depcheck pass, 216/216, build ok; fixtures diff empty; live fixture and sweep pass in `npm test`; tests +20/-0; string-literal diff empty (`/tmp/deepen-clonecraft/w3-integrate.md` S8 second half 1-3). On `main` b38f904: depcheck pass, 216/216, `npx vite build` ok.
+- [x] Unit: M8-1 green after the merge. Note: green on `main` b38f904.
+- [x] Ported cases: none deleted. Note: `git diff 418a911 b38f904 -- tests` is `tests/world.test.js` +20/-0.
+- [x] Mutation: put one `world.beginBatch()` back in `grass.js` → M8-1 fails. Note: caught by M8-1 only ("old batch API still read in 1 places: grass.js:77"); rsh re-ran it on `main` b38f904: 215 pass, 1 fail.
 - [ ] Structure: grep (excluding `.claude/`) shows no `beginBatch`, `endBatch`, or `world.batch` read outside `world.js`; farming's local `batched` is gone.
-- [ ] QA: a TNT blast, a door toggle, and a portal light each remesh once, with no hole; 0 console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md:24`; `DISCOVERY_engine.md:10`; `world.js` header; `CHANGELOG.md` (Changed M8).
+- [x] QA: a TNT blast, a door toggle, and a portal light each remesh once, with no hole; 0 console errors; cleanup done. Note: max 1 build per chunk for tnt, doorOpen, doorClose, and portalLight on seeds 794002 and 794003; 0 stale chunks after a fresh build; mesh hashes equal to the base (`/tmp/deepen-clonecraft/w3-qa-r2.md` A, B, Cleanup; QA build = S8 tip 5142a58, merged in b38f904).
+- [x] Docs: `ARCHITECTURE.md:24`; `DISCOVERY_engine.md:10`; `world.js` header; `CHANGELOG.md` (Changed M8). Note: a7ef82e (also `ARCHITECTURE.md:364`, the SPEC M8 `grass.js` sentence, and the CHANGELOG M3 "pure function" fix).
 - [ ] **(owner)** Joe reviews the S8 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: b38f904; worktrees d8, d8a, d8b and their branches removed (each merged into `main` first).
 
 ### S9: precipitation and draw order (M9, M10) — `step/deepen-9-precip-order`
 - [ ] Contract commit (W3 contract agent, opus); rsh reviewed it.
