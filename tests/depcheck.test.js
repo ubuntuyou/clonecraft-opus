@@ -12,7 +12,14 @@ function planted(edit) {
   try {
     cpSync('src', dir, { recursive: true });
     // LF first: a CRLF checkout (core.autocrlf) must not stop a "\n" pattern from matching.
-    edit((name, fn) => { const p = join(dir, `${name}.js`); writeFileSync(p, fn(readFileSync(p, 'utf8').replace(/\r\n/g, '\n'))); });
+    // A plant that does not change the text proves nothing, so each plant asserts that it changed the file.
+    edit((name, fn) => {
+      const p = join(dir, `${name}.js`);
+      const before = readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+      const after = fn(before);
+      assert.notEqual(after, before, `the plant did not change ${name}.js`);
+      writeFileSync(p, after);
+    });
     return depcheck(dir);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
@@ -29,6 +36,8 @@ test('upward: an earlier name comes from order.js', () => fires(planted((e) => e
 test('upward: a later name is used at load time', () => fires(planted((e) => e('world', (t) => t + '\nbuildChunkMesh;\n')), 'upward'));
 test('readonly: a module writes an imported name', () => fires(planted((e) => e('main', (t) => t + '\nfunction f() { world = null; }\n')), 'readonly'));
 test('free: a name that is neither defined nor imported', () => fires(planted((e) => e('hud', (t) => t + '\nfunction f() { return notDefinedAnywhere; }\n')), 'free'));
+// SPEC_hardening H9: an IIFE runs at load time, so a later name used inside one is an error.
+test('upward: a later name is used inside an IIFE at load time', () => fires(planted((e) => e('liquids', (t) => t + '\nconst probe = (() => particles.update)();\n')), 'upward'));
 test('worker: worldgen.js imports something', () => fires(planted((e) => e('worldgen', (t) => "import { CS } from './config.js';\n" + t)), 'worker'));
 test('pure: a pure module reaches order.js', () => fires(planted((e) => e('crafting', (t) => "import { mobs } from './order.js';\n" + t)), 'pure'));
 
