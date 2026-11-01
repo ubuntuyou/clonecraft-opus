@@ -263,3 +263,36 @@ test('save-reader fail proof: a forwarded save text fails the rule', () => {
   assert.equal(errors.length, 1);
   assert.match(errors[0], /^save-reader: boot\.js line \d+ parses save text \(text2\)/);
 });
+
+// ---- M4, K7: the boot policy (openSave) ---------------------------------------------------------
+import { BOOT_NOTICE, openSave } from '../src/save-format.js';
+// A fake `storage` (config.js shape) with an op log: each call pushes [op, key].
+// `failSet` makes every set return false (a full or blocked store); `init` seeds the entries.
+function fakeStore(init = {}, { failSet = false } = {}) {
+  const map = new Map(Object.entries(init)), ops = [];
+  return {
+    map, ops,
+    get(k) { ops.push(['get', k]); return map.has(k) ? map.get(k) : null; },
+    set(k, v) { ops.push(['set', k]); if (failSet) return false; map.set(k, String(v)); return true; },
+    remove(k) { ops.push(['remove', k]); map.delete(k); return true; },
+  };
+}
+// A fake sessionStorage with an op log. `throwGet` and `throwSet` make those calls throw, as a
+// blocked sessionStorage does; removeItem throws with `throwGet` too.
+function fakeSession(init = {}, { throwGet = false, throwSet = false } = {}) {
+  const map = new Map(Object.entries(init)), ops = [];
+  const blocked = () => { throw new Error('SecurityError: sessionStorage is blocked'); };
+  return {
+    map, ops,
+    getItem(k) { ops.push(['getItem', k]); if (throwGet) blocked(); return map.has(k) ? map.get(k) : null; },
+    setItem(k, v) { ops.push(['setItem', k]); if (throwSet) blocked(); map.set(k, String(v)); },
+    removeItem(k) { ops.push(['removeItem', k]); if (throwGet) blocked(); map.delete(k); },
+  };
+}
+// The openSave arguments for one boot: the live fixture's seed, a fixed clock, and an apply that
+// records its calls. Pass `apply` to make it throw.
+const BOOT_KEY = 'clonecraft.world.777001', BOOT_NOW = 1700000000000;
+function bootArgs({ store = fakeStore(), session = fakeSession(), apply } = {}) {
+  const applied = [];
+  return { applied, store, session, key: BOOT_KEY, seed: SEED, now: BOOT_NOW, apply: apply || ((d) => { applied.push(d); }) };
+}

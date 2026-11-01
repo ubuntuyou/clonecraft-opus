@@ -117,4 +117,48 @@ function readSave(text, seed) {
   return { save: d, reason: null };
 }
 
-export { editsOf, mapsOf, readSave, SLICE_FIELDS, validSave, validSlice };
+// ---- the boot policy (SPEC_deepen M4, K7) ---------------------------------------------------
+// openSave holds the whole boot fallback policy: the carried notice, the read, the backup of a
+// rejected save, and the apply throw. It is pure: the caller passes the stores, the clock, and
+// `apply`. `store` has the `storage` shape (get, set -> bool, remove). `session` has the
+// sessionStorage shape (getItem, setItem, removeItem); each call may throw.
+// It returns { save, notice, blocked, reload }; `notice` is { msg, keep } or null.
+const BOOT_NOTICE = 'clonecraft.bootNotice';
+
+// The notice that a reload carried, or null. It removes the key.
+// TODO K7 (T1.1): read the session, then the store; remove the key from both.
+function takeNotice(session, store) {
+  try { const t = session.getItem(BOOT_NOTICE); session.removeItem(BOOT_NOTICE); return t ? JSON.parse(t) : null; } catch (e) { return null; }
+}
+
+// Copies the rejected text to `<key>.rejected.<now>`, then removes `key`. -> { msg, keep }
+function backup(store, key, text, reason, now) {
+  const copy = `${key}.rejected.${now}`;
+  if (store.set(copy, text)) {
+    store.remove(key);
+    return { msg: `The saved world could not load: ${reason}. A copy is in ${copy}. A new world starts.`, keep: false };
+  }
+  return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
+}
+
+// TODO M4, K7 (T1.1): the body below is today's boot.js policy, moved. K7 adds the store carrier
+// when the session write fails and the backup succeeded.
+function openSave({ store, session, key, seed, now, apply }) {
+  let notice = takeNotice(session, store), blocked = !!notice?.keep, reload = false;
+  const text = notice?.keep ? null : store.get(key);
+  const read = readSave(text, seed);
+  let save = read.save;
+  if (read.reason) { notice = backup(store, key, text, read.reason, now); if (notice.keep) blocked = true; }
+  if (save) {
+    try { apply(save); } catch (e) {
+      save = null;
+      blocked = true;                               // nothing may write the half-restored game
+      notice = backup(store, key, text, `it failed to load (${e.message})`, now);
+      try { session.setItem(BOOT_NOTICE, JSON.stringify(notice)); reload = true; } catch (err) { /* no reload: it could loop */ }
+    }
+  }
+  return { save, notice, blocked, reload };
+}
+
+// K10: validSlice is not exported (no reader outside this file).
+export { BOOT_NOTICE, editsOf, mapsOf, openSave, readSave, SLICE_FIELDS, validSave };
