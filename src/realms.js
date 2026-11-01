@@ -39,7 +39,7 @@ import { $, hud } from './hud.js';
 import { fadeIn, setState } from './menus.js';
 import { persist } from './persist.js';
 import { closeHomes, homes, setHomes } from './homes.js';
-import { weather } from './order.js';
+import { boss, weather } from './order.js';
 import { WG } from './gen-service.js';
 import { editsOf, mapsOf, SLICE_FIELDS } from './save-format.js';
 
@@ -93,8 +93,10 @@ const realm = {
     this.enter(stashOf(slices[this.current]));
   },
 
-  // Detaches the live realm-scoped state into a stash and clears the modules.
+  // Detaches the live realm-scoped state into a stash and clears the modules. A dying Titan
+  // shatters first, so its loot and exit portal join the stash.
   leave() {
+    boss.finish();
     const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
     for (const d of s.drops) scene.remove(d.mesh);
     tileEntities.clear(); looted.clear(); setHomes([]);
