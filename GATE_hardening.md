@@ -87,8 +87,9 @@ Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, 
 ## Step 3: boss kill and travel ratio (H5, H10)
 
 ### H5: kill survives a travel
-- [ ] Playwright: 0 HP, then death and respawn within 3 s, then a reload. The save holds `defeated: true`, and the exit portal and the loot exist in the Crystal Realm.
-- [ ] Playwright: 0 HP, then walking into the arrival portal within 3 s gives the same result.
+- [ ] Playwright: 0 HP, then death and respawn within 3 s. Before the reload, the crystal stash holds the loot drops.
+- [ ] Playwright: after that reload, the save holds `defeated: true`, the exit portal stands in the Crystal Realm, and no Titan spawns. Correction by rsh, 2026-10-31: dropped items are never saved (`persist.js` header, D47), so the loot cannot survive a reload for any kill. The loot check moved before the reload.
+- [ ] Playwright: 0 HP, then walking into the arrival portal within 3 s gives the same results (stash loot before the reload; `defeated` and the exit portal after it).
 - [ ] The victory screen shows exactly once.
 
 ### H10: one travel ratio
