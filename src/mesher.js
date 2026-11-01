@@ -11,7 +11,7 @@
  * chunkMeshes(scene) is World's mesh adapter (build, dispose, show). The scene is a parameter.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { ckey, CS, H, mulberry32, UNLOADED } from './config.js';
+import { ckey, CS, DRAW_ORDER, H, mulberry32, UNLOADED } from './config.js';
 import {
   B, BLOCKS, CRYSTAL_GROW, DIR4, GLOWS, IS_LEAF, LEAF_COLOR, LIQ_KIND, LIQ_LEVEL, OPAQUE, RAIL_ENDS, railUp,
   SHAPE, SHAPE_OF, SOLID, STAIR_BOXES, stairKey, stairV,
@@ -506,8 +506,8 @@ function buildChunkMesh(world, scene, chunk) {
     }
     if (ob.n + wb.n !== before) { if (y < minYSeen) minYSeen = y; if (y > maxYSeen) maxYSeen = y; }
   }
-  chunk.opaqueMesh = setChunkGeometry(world, scene, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, 0);
-  chunk.waterMesh = setChunkGeometry(world, scene, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, 1);
+  chunk.opaqueMesh = setChunkGeometry(world, scene, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, DRAW_ORDER.TERRAIN);
+  chunk.waterMesh = setChunkGeometry(world, scene, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, DRAW_ORDER.WATER);
   world.stats.meshMs = performance.now() - t0;
 }
 

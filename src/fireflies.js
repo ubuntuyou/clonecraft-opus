@@ -7,7 +7,7 @@
 // RADIUS blocks around the camera. The pool is one THREE.Points with additive blending. The save
 // holds no firefly state.
 import { THREE } from './three.js';
-import { CS, UNLOADED } from './config.js';
+import { CS, DRAW_ORDER, UNLOADED } from './config.js';
 import { B, IS_LAVA, IS_LEAF, IS_WATER, SOLID } from './blocks.js';
 import { BIOME } from './biomes.js';
 import { camera, game, player, scene, world } from './engine.js';
@@ -33,7 +33,7 @@ const fireflies = (() => {
   const mat = new THREE.PointsMaterial({ size: 0.35, map: new THREE.CanvasTexture(cv), vertexColors: true,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false; points.renderOrder = 3; points.visible = false; scene.add(points);   // after the water (1)
+  points.frustumCulled = false; points.renderOrder = DRAW_ORDER.EFFECTS; points.visible = false; scene.add(points);   // after the water (1)
   for (let i = 0; i < N; i++) d[i * S + 9] = d[i * S + 10] = 0;   // age = life = 0: spawn on the first frame
 
   let t = 0, level = 0, shown = 0;

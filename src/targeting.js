@@ -1,5 +1,5 @@
 import { THREE } from './three.js';
-import { REACH } from './config.js';
+import { DRAW_ORDER, REACH } from './config.js';
 import { B, BLOCKS, breakTime, IS_STAIR, pickaxeFor, STAIR_BOXES, stairKey } from './blocks.js';
 import { ATLAS_SIZE, atlasTexture, TILE } from './atlas.js';
 import { camera, game, input, player, scene, world } from './engine.js';
@@ -59,7 +59,7 @@ const crackMesh = new THREE.Mesh(crackGeo, new THREE.MeshBasicMaterial({
   map: atlasTexture, transparent: true, depthWrite: false, fog: false,
   polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
 crackMesh.visible = false;
-crackMesh.renderOrder = 2;
+crackMesh.renderOrder = DRAW_ORDER.CRACK;
 scene.add(crackMesh);
 let crackStage = -1;
 function setCrackStage(s) {
