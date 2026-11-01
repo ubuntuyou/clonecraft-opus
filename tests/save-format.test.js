@@ -3,12 +3,13 @@
 import './host-stub.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import * as acorn from 'acorn';
 import { B } from '../src/blocks.js';
-import { editsOf, mapsOf, SLICE_FIELDS, validSave } from '../src/save-format.js';
+import { editsOf, mapsOf, readSave, SLICE_FIELDS, validSave } from '../src/save-format.js';
 
 // A fresh copy of the live fixture. Each test owns its copy.
 const live = () => JSON.parse(readFileSync('tests/fixtures/save-live.json', 'utf8'));
@@ -151,4 +152,114 @@ test('validSave accepts a chest from lootChest, which has no burn fields', () =>
   const d = live(), loot = d.te.find((t) => t.type === 'chest' && t.slots.filter(Boolean).length > 1 && t.burn === undefined);
   assert.ok(loot, 'precondition: the fixture holds a looted chest');
   assert.equal(validSave(d), true);
+});
+
+// ---- H1: readSave ---------------------------------------------------------------------------
+const SEED = 777001;   // the seed of the live fixture
+test('readSave returns the checked save of the live fixture text', () => {
+  const text = readFileSync('tests/fixtures/save-live.json', 'utf8');
+  assert.equal(JSON.parse(text).seed, SEED);
+  const { save, reason } = readSave(text, SEED);
+  assert.equal(reason, null);
+  assert.deepEqual(save, JSON.parse(text));
+});
+test('readSave returns no save and no reason when there is no save text', () => {
+  assert.deepEqual(readSave(null, SEED), { save: null, reason: null });
+});
+test('readSave gives a reason for empty JSON', () => {
+  const { save, reason } = readSave('{}', SEED);
+  assert.equal(save, null);
+  assert.match(reason, /"v" is missing or not valid/);
+});
+test('readSave gives a reason for a wrong seed', () => {
+  const d = live();
+  d.seed = SEED + 1;
+  assert.equal(validSave(d), true);
+  const { save, reason } = readSave(JSON.stringify(d), SEED);
+  assert.equal(save, null);
+  assert.equal(reason, `the save is for seed ${SEED + 1}, not seed ${SEED}`);
+});
+test('readSave gives a reason for a truncated text', () => {
+  const text = readFileSync('tests/fixtures/save-live.json', 'utf8'), cut = text.slice(0, Math.floor(text.length / 2));
+  assert.ok(cut.length > 0 && cut.length < text.length);
+  const { save, reason } = readSave(cut, SEED);
+  assert.equal(save, null);
+  assert.equal(reason, 'the save text is not valid JSON');
+});
+test('readSave gives a reason for a save with no player', () => {
+  const d = live();
+  delete d.player;
+  const { save, reason } = readSave(JSON.stringify(d), SEED);
+  assert.equal(save, null);
+  assert.match(reason, /"player" is missing or not valid/);
+});
+test('readSave runs migrateIds before the checks', () => {
+  const d = JSON.parse(readFileSync('tests/fixtures/save-before-ids2.json', 'utf8'));
+  assert.equal(d.ids, undefined);
+  const { save, reason } = readSave(JSON.stringify(d), d.seed);
+  assert.equal(reason, null);
+  assert.equal(save.ids, 2);
+});
+
+// ---- H1: the save-reader rule -----------------------------------------------------------------
+// Only src/save-format.js calls JSON.parse on save text. Save text is an expression that names
+// SAVE_KEY or 'clonecraft.world.', or a variable whose value comes from one (forwarded forms).
+// The names that an expression reads. A property name (a.b, { b: 1 }) is not a read of b.
+function reads(node, out = new Set()) {
+  if (!node || typeof node.type !== 'string') return out;
+  if (node.type === 'Identifier') { out.add(node.name); return out; }
+  for (const [k, v] of Object.entries(node)) {
+    if ((node.type === 'MemberExpression' && k === 'property' && !node.computed) || (node.type === 'Property' && k === 'key' && !node.computed)) continue;
+    if (Array.isArray(v)) v.forEach((x) => reads(x, out)); else if (v && typeof v === 'object') reads(v, out);
+  }
+  return out;
+}
+function saveReaderErrors(dir) {
+  const errors = [], SAVE_TEXT = /SAVE_KEY|clonecraft\.world\./;
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.js') && n !== 'save-format.js')) {
+    const src = readFileSync(join(dir, f), 'utf8');
+    const ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+    const assigns = [], parses = [];
+    (function walk(n) {
+      if (!n || typeof n.type !== 'string') return;
+      if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init) assigns.push([n.id.name, n.init]);
+      if (n.type === 'AssignmentExpression' && n.left.type === 'Identifier') assigns.push([n.left.name, n.right]);
+      if (n.type === 'CallExpression' && n.callee.type === 'MemberExpression' && n.callee.object.name === 'JSON' && n.callee.property.name === 'parse') parses.push(n);
+      for (const v of Object.values(n)) if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') walk(v);
+    })(ast);
+    // A save-text expression names SAVE_KEY or 'clonecraft.world.', or reads a tainted variable.
+    const tainted = new Set();
+    const isSaveText = (node) => SAVE_TEXT.test(src.slice(node.start, node.end)) || [...reads(node)].some((x) => tainted.has(x));
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const [name, init] of assigns) if (!tainted.has(name) && isSaveText(init)) { tainted.add(name); grew = true; }
+    }
+    for (const n of parses) {
+      if (!n.arguments.some(isSaveText)) continue;
+      const arg = n.arguments.map((a) => src.slice(a.start, a.end)).join(', ');
+      errors.push(`save-reader: ${f} line ${n.loc.start.line} parses save text (${arg}). Use readSave from save-format.js.`);
+    }
+  }
+  return errors;
+}
+function plantedSaveReader(file, edit) {
+  const dir = mkdtempSync(join(tmpdir(), 'save-reader-'));
+  try {
+    cpSync('src', dir, { recursive: true });
+    const p = join(dir, file), text = readFileSync(p, 'utf8').replace(/\r\n/g, '\n'), out = edit(text);
+    assert.notEqual(out, text, `the plant did not change ${file}`);
+    writeFileSync(p, out);
+    return saveReaderErrors(dir);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+test('save-reader: only save-format.js parses save text in the real src/', () => assert.deepEqual(saveReaderErrors('src'), []));
+test('save-reader fail proof: JSON.parse(storage.get(SAVE_KEY)) in config.js fails the rule', () => {
+  const errors = plantedSaveReader('config.js', (t) => t + '\nconst planted = JSON.parse(storage.get(SAVE_KEY));\n');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^save-reader: config\.js line \d+ parses save text/);
+});
+test('save-reader fail proof: a forwarded save text fails the rule', () => {
+  const errors = plantedSaveReader('boot.js', (t) => t + '\nconst raw = storage.get(SAVE_KEY);\nconst text2 = raw;\nconst planted = JSON.parse(text2);\n');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^save-reader: boot\.js line \d+ parses save text \(text2\)/);
 });

@@ -49,11 +49,13 @@ function hashString(s) {
   return h | 0;
 }
 // World choice: `?seed=N` opens that world, `?new` makes a random one, no parameter reopens the
-// last world. Each seed has its own save under `clonecraft.world.<seed>` (section 16 writes it).
+// last world. Each seed has its own save under `clonecraft.world.<seed>` (section 16 writes it;
+// boot.js reads it through readSave in save-format.js).
 const urlParams = new URLSearchParams(location.search);
 const storage = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+  remove(k) { try { localStorage.removeItem(k); return true; } catch (e) { return false; } },
 };
 const SEED = (() => {
   if (urlParams.has('new')) {
@@ -68,7 +70,6 @@ const SEED = (() => {
 })();
 storage.set('clonecraft.lastSeed', String(SEED));
 const SAVE_KEY = `clonecraft.world.${SEED}`;
-const SAVE = (() => { try { const d = JSON.parse(storage.get(SAVE_KEY) || 'null'); return d && d.v === 1 && d.seed === SEED ? d : null; } catch (e) { return null; } })();
 
 const CONFIG = {
   renderDistance: 8, fov: 75, sensitivity: 1, volume: 0.6,
@@ -120,6 +121,6 @@ function setGlowGain(v) { glowGain = v; }
 export {
   BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
   LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HEALTH, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
-  PLAYER_W, randInt, randRange, REACH, REALMS, SAVE, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
+  PLAYER_W, randInt, randRange, REACH, REALMS, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
   storage, UNLOADED, VOID_Y, VOL, WALK_SPEED, WEATHER_KINDS,
 };

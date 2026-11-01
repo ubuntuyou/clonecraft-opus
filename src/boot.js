@@ -1,21 +1,22 @@
 /* =====================================================================================
  * === 18. MAIN ANIMATION LOOP
  * -------------------------------------------------------------------------------------
- * Boot: pick a dry spawn column from the world generator, stream the chunks around it,
- * then enable Play. The menu shows the live world behind it with a slow panorama.
+ * Boot: read the save (readSave), or pick a dry spawn column from the world generator; stream
+ * the chunks around the player, then enable Play. A rejected save goes to a backup key first. The menu shows the live world behind it with a slow panorama.
  * Each frame: stream chunks, simulate (only while playing, in the inventory, or dead),
  * update the sky and HUD, render the world through `post` (bloom and light shafts), clear depth,
  * then render the held item.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { EYE, SAVE, SEA, UNLOADED } from './config.js';
+import { EYE, SAVE_KEY, SEA, SEED, storage, UNLOADED } from './config.js';
 import { B, IS_LEAF, LIQ_KIND, OPAQUE } from './blocks.js';
 import { BIOME } from './biomes.js';
 import { WG } from './gen-service.js';
-import { player, world } from './engine.js';
-import { $ } from './hud.js';
+import { game, player, world } from './engine.js';
+import { $, hud } from './hud.js';
 import { playBtn, setState } from './menus.js';
 import { persist } from './persist.js';
+import { readSave } from './save-format.js';
 
 function findSpawnColumn() {
   const good = (c) => c.biome !== BIOME.OCEAN && c.biome !== BIOME.RIVER && c.h > SEA + 1 && c.h < SEA + 28;
@@ -62,8 +63,46 @@ function openYaw(pos) {
   return bestYaw;
 }
 
-if (SAVE) persist.apply(SAVE);
-else {
+// ---- the boot reader and the fallback (SPEC_hardening H1) ----------------------------------
+// readSave checks the text of SAVE_KEY. A rejected save, or a save that throws in persist.apply,
+// is copied to a backup key (`<SAVE_KEY>.rejected.<epoch ms>`) and then removed. The world starts
+// fresh. After loading, the menu's load line shows the notice, and a toast repeats it when the
+// game starts (the HUD and its toast are hidden until then). The notice names the reason and the
+// backup key. When the backup write
+// fails, SAVE_KEY stays, saving is blocked (persist.blocked), and the toast says the save was kept.
+// An apply throw leaves the game half restored, so boot reloads the page. The notice for the toast
+// waits in sessionStorage (BOOT_NOTICE) over the reload. `keep` tells the next boot to skip SAVE_KEY.
+const BOOT_NOTICE = 'clonecraft.bootNotice', NOTICE_SECONDS = 12;
+function takeNotice() {
+  try { const t = sessionStorage.getItem(BOOT_NOTICE); sessionStorage.removeItem(BOOT_NOTICE); return t ? JSON.parse(t) : null; } catch (e) { return null; }
+}
+function rejectSave(text, reason) {
+  const key = `${SAVE_KEY}.rejected.${Date.now()}`;
+  if (storage.set(key, text)) {
+    storage.remove(SAVE_KEY);
+    return { msg: `The saved world could not load: ${reason}. A copy is in ${key}. A new world starts.`, keep: false };
+  }
+  persist.blocked = true;
+  return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
+}
+let notice = takeNotice();
+if (notice?.keep) persist.blocked = true;
+const saveText = notice?.keep ? null : storage.get(SAVE_KEY);
+const read = readSave(saveText, SEED);
+let save = read.save;
+if (read.reason) notice = rejectSave(saveText, read.reason);
+if (save) {
+  try { persist.apply(save); } catch (e) {
+    save = null;
+    persist.blocked = true;                       // nothing may write the half-restored game
+    notice = rejectSave(saveText, `it failed to load (${e.message})`);
+    let carried = false;
+    try { sessionStorage.setItem(BOOT_NOTICE, JSON.stringify(notice)); carried = true; } catch (err) { /* no reload: it could loop */ }
+    if (carried) location.reload();
+  }
+}
+const restored = !!save;
+if (!restored) {
   const spawnCol = findSpawnColumn();
   player.pos.set(spawnCol.x + 0.5, WG.column(spawnCol.x, spawnCol.z).h + 1, spawnCol.z + 0.5);
   player.spawn.copy(player.pos);
@@ -76,17 +115,27 @@ const camDir = new THREE.Vector3();
 let last = performance.now();
 
 function onLoaded() {
-  if (!SAVE) {                       // a restored player keeps the saved position and view
+  if (!restored) {                   // a restored player keeps the saved position and view
     player.pos.copy(settleSpawn(Math.floor(player.pos.x), Math.floor(player.pos.z)));
     player.spawn.copy(player.pos);
     player.yaw = openYaw(player.pos);
   }
   setState('menu');
-  playBtn.disabled = false; playBtn.textContent = SAVE ? 'Continue' : 'Play';
+  playBtn.disabled = false; playBtn.textContent = restored ? 'Continue' : 'Play';
   $('loadbar').style.display = 'none';
   const at = `${Math.floor(player.pos.x)}, ${Math.floor(player.pos.y)}, ${Math.floor(player.pos.z)}`;
-  loadText.textContent = SAVE ? `Welcome back · ${at}` : `Spawn: ${at}`;
+  loadText.textContent = restored ? `Welcome back · ${at}` : `Spawn: ${at}`;
+  if (notice) { notice.line = loadText.textContent; loadText.textContent = notice.msg; }
 }
+
+// The notice toast, once, when Play or the overlay click starts the game (menus.js runs first).
+function toastNotice() {
+  if (!notice || !game.started) return;
+  hud.toast(notice.msg); hud.toastT = NOTICE_SECONDS;
+  if (notice.line) loadText.textContent = notice.line;   // the pause screen shows the usual line again
+  notice = null;
+}
+for (const el of [playBtn, $('overlay')]) el.addEventListener('click', toastNotice);
 
 function setLast(v) { last = v; }
 

@@ -1,12 +1,13 @@
 /* =====================================================================================
  * SAVE FORMAT — living header (src/save-format.js, SPEC_hardening H1–H3)
  * -------------------------------------------------------------------------------------
- * The shape of a save and the trust boundary for save text. Terms: a **slice** is the
+ * The shape of a save and the trust boundary for save text: boot reads SAVE_KEY through
+ * readSave, and the file import checks with validSave. Terms: a **slice** is the
  * realm-scoped part of a save (SLICE_FIELDS); the **edits** are the save form of the block
  * overrides. The module is pure: Node tests import it. Rules: DISCOVERY_save-format.md.
  * ===================================================================================== */
 import { CS, H, MAX_HEALTH, REALMS, VOL, WEATHER_KINDS } from './config.js';
-import { B, BLOCKS, IDS_VERSION, ITEMS, validEnch, VEHICLE_KINDS } from './blocks.js';
+import { B, BLOCKS, IDS_VERSION, ITEMS, migrateIds, validEnch, VEHICLE_KINDS } from './blocks.js';
 
 // The realm-scoped save fields. The top-level fields hold the overworld slice; `realms` holds the others.
 const SLICE_FIELDS = ['edits', 'te', 'homes', 'liquids', 'leaves', 'farm', 'vehicles', 'looted'];
@@ -100,4 +101,20 @@ function saveProblem(d) {
 const validSlice = (s, top) => sliceProblem(s, top) === null;
 const validSave = (d) => saveProblem(d) === null;
 
-export { editsOf, mapsOf, SLICE_FIELDS, validSave, validSlice };
+// ---- the boot reader ---------------------------------------------------------------------
+// readSave(text, seed) reads the text of SAVE_KEY. It parses the text, runs migrateIds, then the
+// save checks, then compares the seed. It returns { save, reason }: `save` is the checked save, or
+// null when there is no text or the save is rejected; `reason` is null, or a short text that says
+// why the save is rejected. boot.js shows the reason in a toast.
+function readSave(text, seed) {
+  if (text === null || text === undefined) return { save: null, reason: null };
+  let d;
+  try { d = JSON.parse(text); } catch (e) { return { save: null, reason: 'the save text is not valid JSON' }; }
+  const problem = saveProblem(migrateIds(d));
+  if (problem === 'save') return { save: null, reason: 'the save is not an object' };
+  if (problem) return { save: null, reason: `the save field "${problem}" is missing or not valid` };
+  if (d.seed !== seed) return { save: null, reason: `the save is for seed ${d.seed}, not seed ${seed}` };
+  return { save: d, reason: null };
+}
+
+export { editsOf, mapsOf, readSave, SLICE_FIELDS, validSave, validSlice };
