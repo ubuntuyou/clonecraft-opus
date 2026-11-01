@@ -25,7 +25,8 @@
  * to the crystalBack portal when a crystal pane still stands there, else to the player's spawn.
  *
  * The arrival portal is generated terrain, not edits (ARCHITECTURE D52). world.locked refuses every
- * edit to its frame and opening, so it is always lit and the player can never be stranded.
+ * edit to its frame and opening, so it is always lit and the player can never be stranded. After
+ * the boss kill (realm.boss.defeated), world.locked also refuses every edit to the exit portal box.
  *
  * `cells` maps "x,y,z" to the pane id of every pane cell in the loaded realm (the overrides, plus
  * the arrival panes in the Crystal Realm), for the sparks and the hum. It rebuilds when
@@ -56,13 +57,17 @@ const A = WG.CRYSTAL_ARRIVAL;
 // The arrival portal: its stand point (the middle of the opening's floor) and its locked box.
 const ARRIVAL_STAND = [A.x0 + (A.w >> 1) + 0.5, A.y0, A.z0 + 0.5];
 const inArrival = (x, y, z) => z === A.z0 && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
+// The exit portal (boss.js EXIT) has the arrival portal's shape and floor, in the plane z = 0. boss.js
+// loads after this module, so this box repeats EXIT.z; keep the two in step. Its locked box is the frame ring.
+const EXIT_Z = 0;
+const inExit = (x, y, z) => z === EXIT_Z && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
 
 const portals = (() => {
   const cells = new Map();          // "x,y,z" -> pane id of every pane cell in the loaded realm
   let known = null;                 // the override map that `cells` mirrors
   let t = 0, armed = false, warned = false, removing = false, kind = PE;
   const get = (x, y, z) => world.getBlock(x, y, z);
-  world.locked = (x, y, z) => world.realm === 'crystal' && inArrival(x, y, z);
+  world.locked = (x, y, z) => world.realm === 'crystal' && (inArrival(x, y, z) || (realm.boss.defeated && inExit(x, y, z)));
 
   function sync() {
     if (known === world.overrides) return;
