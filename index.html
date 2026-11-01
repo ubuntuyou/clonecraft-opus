@@ -400,6 +400,16 @@ const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
 function setGlowGain(v) { glowGain = v; }
 
+// The light curves (SPEC_deepen K1): a light level 0..15 to a brightness 0..1. `base` is LIGHT_SKY
+// for sky light or LIGHT_BLK for block light (it falls off slower, so a torch reaches farther).
+// lightCurve(0) is 0 and lightCurve(15) is 1. The constants are rounded to 4 places, as in the
+// shader text. LIGHT_GLSL holds the same curves as the GLSL functions curve and curveB.
+const LIGHT_SKY = 0.83, LIGHT_BLK = 0.85;
+const lightLo = (base) => +(base ** 15).toFixed(4), lightSpan = (base) => +(1 - base ** 15).toFixed(4);
+const lightCurve = (level, base) => (base ** (15 - level) - lightLo(base)) / lightSpan(base);
+const glslCurve = (name, base) => `float ${name}(float l) { return (pow(${base}, (1.0 - l) * 15.0) - ${lightLo(base)}) / ${lightSpan(base)}; }`;
+const LIGHT_GLSL = `${glslCurve('curve', LIGHT_SKY)}\n${glslCurve('curveB', LIGHT_BLK)}`;
+
 /* =====================================================================================
  * === 2. BLOCK AND ITEM DEFINITIONS
  * ===================================================================================== */
@@ -3886,6 +3896,8 @@ class GenService {
  * then switches the realm and the override maps (SPEC_realms). An `onChunkUnloaded` hook
  * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air. `ambient`
  * is the realm's light floor: brightnessAt never reads below it (the shader uses uAmbient).
+ * Meshes: World takes a mesh adapter { build, dispose, show } and never touches three.js, so the
+ * module is pure (PURE in tools/depcheck.js). chunkMeshes(scene) in mesher.js is the game's adapter.
  * ===================================================================================== */
 
 class Chunk {
@@ -3936,8 +3948,10 @@ function refreshColumn(c, ci) {
 }
 
 class World {
-  constructor(scene) {
-    this.scene = scene;
+  // `meshes` is the mesh adapter { build(world, chunk), dispose(chunk), show(chunk, visible) }
+  // (SPEC_deepen M6; chunkMeshes in mesher.js). World never touches a three.js object.
+  constructor(meshes) {
+    this.meshes = meshes;
     this.chunks = new Map();
     this.overrides = new Map();          // "x,y,z" -> block id (every edit the player made)
     this.overridesByChunk = new Map();   // chunk key -> Map(local index -> block id)
@@ -3954,6 +3968,7 @@ class World {
     this.onEdit = null;                  // (x, y, z, oldId, newId) after every setBlock (liquids wake here)
     this.voidBelow = false;              // true in the Crystal Realm: a cell below y 0 is air, not bedrock
     this.ambient = 0;                    // the realm's light floor (0..15) for brightnessAt (9 in the Ember Realm)
+    this.extraLight = null;              // (x, y, z) -> 0..15, an extra block light for brightnessAt (held-light.js sets it)
   }
 
   // Realm switch (SPEC_realms): unloads every chunk (each calls onChunkUnloaded), drops the
@@ -4002,8 +4017,10 @@ class World {
   }
   // Brightness 0..1 of a cell (used to shade mobs, items, the held item).
   brightnessAt(x, y, z, daylight) {
-    const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), heldLight.levelAt(x, y, z), this.ambient);
-    return Math.max(0.04, Math.pow(0.83, 15 - s), Math.pow(0.85, 15 - b));   // block light falls off slower (shader curveB)
+    // The same normalized curves as the terrain shader (SPEC_deepen K1): sky light on curve, block light on curveB.
+    const extra = this.extraLight ? this.extraLight(x, y, z) : 0;
+    const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), extra, this.ambient);
+    return Math.max(0.04, lightCurve(s, LIGHT_SKY), lightCurve(b, LIGHT_BLK));
   }
   surfaceY(x, z) {                       // highest solid block, or -1 if unloaded
     const c = this.chunkAt(x, z);
@@ -4030,19 +4047,10 @@ class World {
   }
 
   unload(c) {
-    this.disposeMeshes(c);
+    this.meshes.dispose(c);
     this.chunks.delete(c.key);
     this._lc = null; this._lcx = 1e9;
     if (this.onChunkUnloaded) this.onChunkUnloaded(c);
-  }
-  disposeMeshes(c) {
-    for (const m of [c.opaqueMesh, c.waterMesh]) {
-      if (!m) continue;
-      this.scene.remove(m);
-      m.geometry.setIndex(null);          // the quad index buffer is shared; keep it alive
-      m.geometry.dispose();
-    }
-    c.opaqueMesh = c.waterMesh = null;
   }
 
   // ---------------------------------------------------------------- edits
@@ -4067,7 +4075,7 @@ class World {
     this.touch(c, lx, lz);
     this.relightAt(x, y, z);
     if (this.batch) for (const tc of this.touched) this.batch.add(tc);
-    else for (const tc of this.touched) if (tc.meshed) { buildChunkMesh(this, tc); tc.dirty = false; }
+    else for (const tc of this.touched) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
     if (this.onEdit) this.onEdit(x, y, z, old, id);
     return true;
   }
@@ -4075,7 +4083,16 @@ class World {
   beginBatch() { this.batch = new Set(); }
   endBatch() {
     const set = this.batch; this.batch = null;
-    if (set) for (const tc of set) if (tc.meshed) { buildChunkMesh(this, tc); tc.dirty = false; }
+    if (set) for (const tc of set) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
+  }
+  // Runs fn() with remeshing deferred; the outermost call remeshes each touched chunk once, even when fn throws.
+  batched(fn) {
+    if (this.batch) return fn();
+    this.batch = new Set();
+    try { return fn(); } finally {
+      const set = this.batch; this.batch = null;   // reset() inside fn nulls it: drop the set
+      if (set) for (const tc of set) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
+    }
   }
 
   touch(c, lx, lz) {
@@ -4289,8 +4306,7 @@ class World {
     const R2 = (RD + 0.5) * (RD + 0.5);
     for (const c of this.chunks.values()) {
       const dx = c.cx - pcx, dz = c.cz - pcz, inside = dx * dx + dz * dz <= R2;
-      if (c.opaqueMesh) c.opaqueMesh.visible = inside;
-      if (c.waterMesh) c.waterMesh.visible = inside;
+      this.meshes.show(c, inside);
       if (!inside || !c.lit || (c.meshed && !c.dirty)) continue;
       let ok = true;
       for (let oz = -1; oz <= 1 && ok; oz++) for (let ox = -1; ox <= 1; ox++) {
@@ -4303,7 +4319,7 @@ class World {
     if (cand.length) {
       cand.sort((a, b) => prio(a.cx, a.cz) - prio(b.cx, b.cz));
       for (const c of cand) {
-        buildChunkMesh(this, c);
+        this.meshes.build(this, c);
         c.meshed = true; c.dirty = false;
         this.stats.meshed++;
         if (performance.now() - t0 > budgetMs) break;
@@ -4366,6 +4382,7 @@ const FACE_GLSL = Object.keys(FACE_KIND).map((name) => `const float FACE_${name}
  * Smooth lighting: each vertex averages the light of the 4 cells around it in front of
  * the face; ambient occlusion comes from the 3 opaque neighbours of that vertex.
  * Two meshes per chunk: opaque/cutout and water (transparent). Portal panes go in the water mesh.
+ * chunkMeshes(scene) is World's mesh adapter (build, dispose, show). The scene is a parameter.
  * ===================================================================================== */
 
 const PAD = 18, PSY = PAD * PAD, PVOL = PSY * (H + 2);
@@ -4698,7 +4715,7 @@ function fillPadded(world, chunk) {
   }
 }
 
-function buildChunkMesh(world, chunk) {
+function buildChunkMesh(world, scene, chunk) {
   const t0 = performance.now();
   fillPadded(world, chunk);
   const ob = QB_OPAQUE, wb = QB_WATER;
@@ -4853,14 +4870,14 @@ function buildChunkMesh(world, chunk) {
     }
     if (ob.n + wb.n !== before) { if (y < minYSeen) minYSeen = y; if (y > maxYSeen) maxYSeen = y; }
   }
-  chunk.opaqueMesh = setChunkGeometry(world, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, 0);
-  chunk.waterMesh = setChunkGeometry(world, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, 1);
+  chunk.opaqueMesh = setChunkGeometry(world, scene, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, 0);
+  chunk.waterMesh = setChunkGeometry(world, scene, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, 1);
   world.stats.meshMs = performance.now() - t0;
 }
 
-function setChunkGeometry(world, chunk, mesh, buf, material, y0, y1, order) {
+function setChunkGeometry(world, scene, chunk, mesh, buf, material, y0, y1, order) {
   if (mesh) { mesh.geometry.setIndex(null); mesh.geometry.dispose(); }
-  if (buf.n === 0) { if (mesh) world.scene.remove(mesh); return null; }
+  if (buf.n === 0) { if (mesh) scene.remove(mesh); return null; }
   const n = buf.n;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(buf.pos.slice(0, n * 12), 3));
@@ -4880,9 +4897,30 @@ function setChunkGeometry(world, chunk, mesh, buf, material, y0, y1, order) {
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     mesh.renderOrder = order;
-    world.scene.add(mesh);
+    scene.add(mesh);
   } else mesh.geometry = g;
   return mesh;
+}
+
+// The mesh adapter of World (SPEC_deepen M6): build or replace a chunk's meshes in `scene`,
+// free and remove them, and show or hide them.
+function chunkMeshes(scene) {
+  return {
+    build(world, chunk) { buildChunkMesh(world, scene, chunk); },
+    dispose(chunk) {
+      for (const m of [chunk.opaqueMesh, chunk.waterMesh]) {
+        if (!m) continue;
+        scene.remove(m);
+        m.geometry.setIndex(null);          // the quad index buffer is shared; keep it alive
+        m.geometry.dispose();
+      }
+      chunk.opaqueMesh = chunk.waterMesh = null;
+    },
+    show(chunk, visible) {
+      if (chunk.opaqueMesh) chunk.opaqueMesh.visible = visible;
+      if (chunk.waterMesh) chunk.waterMesh.visible = visible;
+    },
+  };
 }
 
 // ---- clouds: the shared cloud density field (G5) ---------------------------------------------
@@ -5121,9 +5159,7 @@ const TERRAIN_FS = /* glsl */`
   #endif
   CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
   CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
-  float curve(float l) { return (pow(0.83, (1.0 - l) * 15.0) - 0.0611) / 0.9389; }
-  // block light (torches, lava) falls off slower than sky light, so a torch reaches farther
-  float curveB(float l) { return (pow(0.85, (1.0 - l) * 15.0) - 0.0874) / 0.9126; }
+  ${LIGHT_GLSL}
   // G3 (P2): 1 = sunlit, 0 = in shadow. Hardware-filtered depth compares: each read blends 4 texels.
   // Terrain takes 4 reads on a square turned by per-pixel noise (a soft ~0.3-block penumbra); water takes 1.
   // With Soft shadows off (uShadowSoft 0), terrain also takes 1 read: a hard edge.
@@ -5299,6 +5335,8 @@ const waterMaterial = new THREE.ShaderMaterial({
  * -------------------------------------------------------------------------------------
  * The renderer, scene, camera, and world live here because the player owns the view.
  * Game states: 'loading' -> 'menu' -> 'playing' <-> 'paused' | 'inventory' | 'homes' | 'dead'.
+ * 'travel' runs from 'playing' or 'dead' back to 'playing' while a realm loads. 'victory' runs from
+ * 'playing' when the Titan dies. Both freeze the simulation and leave pointer lock.
  * K toggles flight (setFlying). Flight stays on when the player touches the ground.
  * Only 'playing' holds pointer lock. The simulation runs in 'playing', 'inventory', 'homes',
  * and 'dead'; it freezes in 'paused' and before the first start.
@@ -5318,7 +5356,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x9cc4ff, 80, 120);
 const camera = new THREE.PerspectiveCamera(CONFIG.fov, innerWidth / innerHeight, 0.05, 1400);
 camera.rotation.order = 'YXZ';
-const world = new World(scene);
+const world = new World(chunkMeshes(scene));
 
 const game = {
   state: 'loading', started: false, debug: false,
@@ -6179,6 +6217,19 @@ function stairFor(t, id) {
 
 // ---- doors: right click toggles both halves; an open door closes after CONFIG.doorCloseDelay
 const doorTimers = new Map();   // "x,y,z" of the bottom half -> game.clock time to close
+// The edit index: `torches` and `doorTimers`, derived from the override map of a realm
+// (SPEC_deepen M1; realms.js CLEARED and enter). load() sets a timer only for an open bottom
+// door half, due at game.clock + CONFIG.doorCloseDelay. clear() empties both in place.
+const editIndex = {
+  load(overrides) {
+    for (const [k, id] of overrides) {
+      if (baseOf(id) === B.TORCH) torches.add(k);
+      const v = id - B.DOOR;
+      if (baseOf(id) === B.DOOR && (v & 4) && !(v & 8)) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay);
+    }
+  },
+  clear() { torches.clear(); doorTimers.clear(); },
+};
 function toggleDoor(x, y, z) {
   let id = world.getBlock(x, y, z);
   if (baseOf(id) !== B.DOOR) return false;
@@ -7516,6 +7567,19 @@ function updateFurnaces(dt) {
     if (changed && ui.te === te && game.state === 'inventory') inv.changed();
   }
 }
+
+// The realm-slice adapters of `te` and `looted` (SPEC_deepen M1; realms.js SCOPED). load() expects an
+// empty field and accepts undefined. clear() empties the container in place: the handles keep it.
+const teSlice = {
+  data() { return [...tileEntities.values()]; },
+  load(list) { for (const t of list || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t); },
+  clear() { tileEntities.clear(); },
+};
+const lootedSlice = {
+  data() { return [...looted]; },
+  load(list) { for (const k of list || []) looted.add(k); },
+  clear() { looted.clear(); },
+};
 
 // ---- inventory screen -----------------------------------------------------------------
 
@@ -10101,8 +10165,8 @@ freezeEl.addEventListener('change', () => {
 // ---- save and load ------------------------------------------------------------------
 // One save per seed in localStorage (SAVE_KEY). It holds the block edits (overridesByChunk),
 // the player, the inventory, furnaces and chests, homes, queued liquid cells, and the time.
-// Realms: the top-level slice fields hold the overworld. `realm` names the realm of the player,
-// `realms` holds the ember and crystal slices, and `portals` and `boss` hold their state.
+// Realms: realm.data() (realms.js) owns the realm part of the save: the overworld slice at the top
+// level, `realm`, `realms`, `portals`, and `boss`. persist.data spreads it and adds the rest.
 // `ids` names the id plan of the save (IDS_VERSION). migrateIds upgrades an older save at boot and at import.
 // The save checks live in save-format.js (validSave, readSave). A new save field needs a check there.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
@@ -10120,15 +10184,12 @@ const persist = {
     // During a travel load the player saves at the place before travel (realm.place).
     const out = p.vehicle && !p.dead ? vehicles.exitSpot(p.vehicle) : null;
     const pos = place.pos ? new THREE.Vector3().fromArray(place.pos) : p.dead ? p.spawn : out ? new THREE.Vector3(out.x, out.y, out.z) : p.pos;
-    const realms = {};
-    for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = realm.slice(name); if (sl) realms[name] = sl; }
     return {
       v: 1, ids: IDS_VERSION, seed: SEED, dayTime: game.dayTime, clock: game.clock,
       player: { pos: pos.toArray(), spawn: p.spawn.toArray(), yaw: p.yaw, pitch: p.pitch, health: p.dead ? p.maxHealth : p.health, flying: p.flying && !p.dead },
       inv: { slots: inv.slots, sel: inv.sel, loose: [...inv.craft, ...inv.altar, inv.cursor].filter(Boolean) },
       armor: inv.armor,
-      ...realm.slice('overworld'), enchantSeed, weather: weather.data(),
-      realm: place.name, realms, portals: { ...realm.portals }, boss: { ...realm.boss },
+      ...realm.data(), enchantSeed, weather: weather.data(),
     };
   },
   save() {
@@ -10286,6 +10347,13 @@ function renderHomes() {
 $('homeSetBtn').addEventListener('click', () => setHome());
 
 function setHomes(v) { homes = v; }
+// The realm-slice adapter of `homes` (SPEC_deepen M1; realms.js SCOPED). data() returns the live
+// array, and clear() assigns a new one, so a stash keeps the old array.
+const homesSlice = {
+  data() { return homes; },
+  load(list) { homes = list || []; },
+  clear() { homes = []; },
+};
 
 /* =====================================================================================
  * REALMS — living header (src/realms.js, SPEC_realms)
@@ -10306,10 +10374,24 @@ function setHomes(v) { homes = v; }
  * The simulation stops during the load (state 'travel'). The game saves again on arrival.
  *
  * Save: the top-level slice fields hold the overworld. `realms.ember` and `realms.crystal` hold
- * the other slices. `realm` names the realm of player.pos. persist.js calls slice() and load().
+ * the other slices. `realm` names the realm of player.pos. persist.js calls data() and load().
+ * One SCOPED table drives slice, leave, and enter: a new scoped field adds one SCOPED entry.
  * ===================================================================================== */
 
 const VOID_DAMAGE = 4, VOID_TICK = 0.5;
+
+// The realm-scoped modules (SPEC_deepen M1). SCOPED maps each saved slice field except `edits` to
+// its adapter { data, load, clear }, in SLICE_FIELDS order. An adapter's load(v) expects an empty
+// field and accepts undefined. CLEARED holds the state that a realm change clears but never saves.
+// Every member is a downward import, so both tables are load-time consts (D39).
+const wrap = (m) => ({ data: () => m.save(), load: (v) => m.load(v), clear: () => m.clear() });
+const SCOPED = {
+  te: teSlice, homes: homesSlice, liquids: wrap(liquids), leaves: wrap(leafDecay), farm: wrap(farming),
+  vehicles: { data: () => vehicles.data(), load: (v) => vehicles.load(v), clear: () => vehicles.clear() },
+  looted: lootedSlice,
+};
+const CLEARED = [editIndex, { clear: clearTnt }, projectiles, spawners, { clear: resetMining }];
+if (['edits', ...Object.keys(SCOPED)].join() !== SLICE_FIELDS.join()) throw new Error('realms: SCOPED keys must equal SLICE_FIELDS');
 
 // A stash: { overrides, overridesByChunk, slice: { te, homes, liquids, leaves, farm, vehicles, looted }, drops }.
 function stashOf(slice) {
@@ -10330,16 +10412,22 @@ const realm = {
   // The save slice of realm `name`, from the live modules or from its stash.
   slice(name) {
     if (name === this.current) {
-      return {
-        edits: editsOf(world.overridesByChunk), te: [...tileEntities.values()], homes,
-        liquids: liquids.save(), leaves: leafDecay.save(), farm: farming.save(), vehicles: vehicles.data(), looted: [...looted],
-      };
+      const out = { edits: editsOf(world.overridesByChunk) };
+      for (const f in SCOPED) out[f] = SCOPED[f].data();
+      return out;
     }
     const s = this.stash.get(name);
     if (!s) return null;
     const out = { edits: editsOf(s.overridesByChunk) };
     for (const f of SLICE_FIELDS) if (f !== 'edits') out[f] = s.slice[f] ?? [];
     return out;
+  },
+  // The realm part of the save (SPEC_deepen M2): the overworld slice at the top level, `realm`,
+  // the other non-null slices in `realms`, and copies of `portals` and `boss`. load(d) reads it.
+  data() {
+    const realms = {};
+    for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = this.slice(name); if (sl) realms[name] = sl; }
+    return { ...this.slice('overworld'), realm: this.place().name, realms, portals: { ...this.portals }, boss: { ...this.boss } };
   },
   // Where the save puts the player: the realm before travel during a load, the overworld when dead.
   place() {
@@ -10365,28 +10453,20 @@ const realm = {
     boss.finish();
     const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
     for (const d of s.drops) scene.remove(d.mesh);
-    tileEntities.clear(); looted.clear(); setHomes([]);
-    liquids.clear(); leafDecay.clear(); farming.clear(); vehicles.clear();
-    torches.clear(); doorTimers.clear(); clearTnt(); projectiles.clear(); spawners.clear();
-    resetMining();
+    for (const f in SCOPED) SCOPED[f].clear();
+    for (const m of CLEARED) m.clear();
     return s;
   },
-  // Makes a stash live: resets the world to its override maps and loads the other modules.
+  // Makes a stash live: resets the world to its override maps, derives the edit index from the
+  // overrides, and loads the other modules.
   enter(s) {
     const def = REALMS[this.current];
     world.reset(def.name, s.overrides, s.overridesByChunk, def.voidBelow, def.ambient);
     for (const m of mobs) m.remove();
     mobs.length = 0;
-    for (const [k, id] of world.overrides) {
-      if (baseOf(id) === B.TORCH) torches.add(k);
-      const v = id - B.DOOR;
-      if (baseOf(id) === B.DOOR && (v & 4) && !(v & 8)) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay);
-    }
+    editIndex.load(world.overrides);
     const sl = s.slice;
-    for (const t of sl.te || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t);
-    for (const k of sl.looted || []) looted.add(k);
-    setHomes(sl.homes || []);
-    liquids.load(sl.liquids); leafDecay.load(sl.leaves); farming.load(sl.farm); vehicles.load(sl.vehicles);
+    for (const f in SCOPED) SCOPED[f].load(sl[f]);
     for (const d of s.drops) { scene.add(d.mesh); drops.push(d); }
     this.voidT = 0;
   },
@@ -11379,8 +11459,6 @@ const sky = (() => {
     tint: k.ambientTint && C(...k.ambientTint), dir: new THREE.Vector3(...k.lightDir).normalize(),
     star: k.star && C(...k.star.color),
   }]));
-  // curveB in terrain-material.js: block light level 0..15 to brightness 0..1
-  const curveB = (l) => (Math.pow(0.85, 15 - l) - 0.0874) / 0.9126;
   function realmSky(def, far) {
     const look = def.look, o = LOOKS.get(look);
     uniforms.uTop.value.copy(o.top);
@@ -11404,7 +11482,7 @@ const sky = (() => {
     terrainUniforms.uSkyLight.value.copy(o.light);
     terrainUniforms.uSunDir.value.copy(o.dir);
     terrainUniforms.uSunAmt.value = look.sunAmt;
-    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(o.tint).multiplyScalar(curveB(def.ambient));
+    if (def.ambient > 0) terrainUniforms.uAmbient.value.copy(o.tint).multiplyScalar(lightCurve(def.ambient, LIGHT_BLK));
     if (player.headInLava || player.headInWater) return;   // the liquid fog of the day sky stays
     const fog = terrainUniforms.uFogColor.value;
     fog.setHex(def.fog.color);
@@ -12155,6 +12233,8 @@ const heldLight = (() => {
     get on() { return on; },
   };
 })();
+// World reads the held light through its extraLight slot (SPEC_deepen M6), so world.js imports no later module.
+world.extraLight = (x, y, z) => heldLight.levelAt(x, y, z);
 
 // ---- post-processing (section 18) -------------------------------------------------------
 // `post` renders the scene into an offscreen target, then adds bloom (a 5-level blur chain)
@@ -12423,8 +12503,8 @@ const post = (() => {
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, face-kind, clouds,
- *    terrain-material, crafting, and save-format never reach this file. Node tests import them.
+ *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, world, face-kind,
+ *    clouds, terrain-material, crafting, and save-format never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
