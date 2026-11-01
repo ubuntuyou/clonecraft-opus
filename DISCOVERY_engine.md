@@ -44,6 +44,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `viewModel.heldId` starts at −2. The value −1 means an empty hand. If it starts at −1, `set(-1)` returns early and no arm mesh is built.
 - `renderer.info.autoReset` is off. The frame loop calls `renderer.info.reset()` once, so the counters cover both render passes.
 - `THREE.ColorManagement` is disabled. Give colors in gamma space, and do not convert them to linear.
+- The atlas holds `ATLAS_TILES` (256) tiles. 109 are in use, so 147 are free (test K3/4-3). Tile 257 throws `does not fit` at load. A `tex` name with no tile throws `names no tile` and names the block.
 - `P.fill(fn)` in `paintTile` ignores the return value of `fn`. A painter must call `P.set(x, y, c)`. A painter that returns colors gives a transparent tile, and the shader discards every texel.
 - Particle point size is capped at `uScale * 0.35` pixels, and points closer than 1.6 blocks fade out. Without the cap, explosion smoke fills the screen.
 - `python3 -m http.server` lets Chromium cache the built `index.html`. After an edit, load the page with a new query value (`&v=N`).

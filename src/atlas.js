@@ -3,7 +3,8 @@
 // TILE maps a tile name to its index; TILE_PIX keeps the pixels for item icons and particles.
 // atlasTexture wraps the canvas for the terrain shader. The crack stages and the item icons
 // come from the same painters. Each tile seeds its RNG from its name, so a tile looks the same
-// in every world.
+// in every world. The atlas holds ATLAS_TILES (256) tiles. A full atlas or a `tex` name with no
+// tile throws at load (SPEC_deepen K3, K4). Rules: DISCOVERY_engine.md.
 import { THREE } from './three.js';
 import { clamp, hashString, lerp, mulberry32 } from './config.js';
 import {

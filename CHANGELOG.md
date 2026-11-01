@@ -19,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- The atlas now fails at load with a clear message when a block's `tex` names no tile (SPEC_deepen K3), or when a new tile does not fit the 256-tile atlas (K4). Before, the first drew tile 0 on the face, and the second painted the tile off the canvas. Neither happens in the current game.
 - A save that throws while it loads now gives a clean world when `sessionStorage` is blocked (SPEC_deepen K7). The notice waits in `localStorage` instead, and the page reloads once. Before, the page did not reload: the game stayed half restored, and saving was off.
 - A portal platform built in water no longer loses its panes (SPEC_hardening H4). The platform first turns every water or lava cell next to the portal into obsidian. Before, water flowed into the panes within a second, and the portal vanished.
 - `?rd=2` no longer hangs on the loading screen (SPEC_hardening H6). The render distance range is 3–16. The URL parameter, the saved setting, and the slider are held to that range.

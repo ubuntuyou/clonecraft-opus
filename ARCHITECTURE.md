@@ -337,6 +337,11 @@ The `aTint` alpha of a terrain vertex holds one byte: the face kind. The kind te
 The match is exact, within 0.5 of the byte, and it runs in the vertex shader. Before, each shader decoded hand-picked byte windows, so a new byte could fall inside another kind's window. Now a new kind needs only an unused byte. `faceKindOf` is the JS mirror of the match, so Node tests prove the decode on all 256 bytes. The module has no imports and is pure. `DISCOVERY_face-kind.md` holds the byte table.
 Rejected: a new `aKind` attribute (memory), a decode in the fragment shader (a plant quad interpolates its bytes), and `FACE_GLSL` writing varyings (each shader reads different kinds).
 
+### D56. The atlas checks its tiles at load
+
+The atlas is one 256×256 canvas of 16×16 tiles, so it holds `ATLAS_TILES` (256) tiles. `paintTile` throws when the atlas is full (SPEC_deepen K4). The `FACE_TILE` table throws when a block's `tex` names an unknown tile (K3). So a misspelled tile name or a tile past the limit fails at load with a clear message. Before, the first drew tile 0 on the face, and the second painted the tile off the canvas. Neither fires today: the atlas holds 109 tiles, and 147 are free.
+Rejected: a throwing `Proxy` on `TILE`, because `TILE` is on the hot path.
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
