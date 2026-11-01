@@ -1,6 +1,6 @@
 # DISCOVERY: engine
 
-Gotchas, pointers, and invariants for the game modules in `src/`. Read this file before you change the world, the renderer, or the game states. `src/order.js` maps the sections to the modules. `DISCOVERY_build.md` covers the build and the module rules.
+Gotchas, pointers, and invariants for the game modules in `src/`. Read this file before you change the world, the renderer, or the game states. `src/order.js` maps the sections to the modules. `DISCOVERY_build.md` covers the build and the module rules. `DISCOVERY_save-format.md` covers the save format and the boot reader.
 
 ## Invariants
 
@@ -64,7 +64,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - A test that forces `setState('playing')` in lava can hide a death. Lava deals 4 damage every 0.5 s. Check `player.dead`, and call `respawn()` before the next test.
 - The game saves per seed. A test reload with `?seed=N` restores the last test state. Remove `clonecraft.world.<seed>` from `localStorage` for a clean world. `pagehide` saves again, even after a manual clear.
 - `relightAt()` must seed an opaque emitter itself (lit furnace). The BFS never enters opaque cells, so without the seed the furnace stays dark.
-- Export and import: `validSave(d)` checks a file before import. It rejects unknown item ids (`ITEMS`), unknown block ids (`BLOCKS`), and cell indices outside `VOL`. A new save field that `persist.apply` reads without a default must also be checked there. An import sets `persist.blocked`, then navigates to `?seed=N`.
+- Export and import: `validSave(d)` checks a file before import. It rejects unknown item ids (`ITEMS`), unknown block ids (`BLOCKS`), and cell indices outside `VOL`. For the save rules (a new field, the fixture, the sweep baseline), read `DISCOVERY_save-format.md`. An import sets `persist.blocked`, then navigates to `?seed=N`.
 - Playwright MCP catches file choosers and `alert`/`confirm` as modal states, and a `browser_run_code_unsafe` script stops at them. Use `page.setInputFiles('#importFile', path)` and stub `window.alert` and `window.confirm` in the page. The MCP can read and write files only in the project folder and its own temp folder.
 - A test that edits the save in `localStorage` and then reloads loses the edit. The page saves again on `pagehide` and on `visibilitychange`. Test the load path with `persist.apply(data)` instead.
 - A stack is `{id, count, dur?, ench?}`. A test stack built with `n` instead of `count` breaks the inventory silently.

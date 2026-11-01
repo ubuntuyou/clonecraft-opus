@@ -19,10 +19,10 @@
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
- *   1. Constants and configuration: config
+ *   1. Constants and configuration: config (also the pure tables REALMS and WEATHER_KINDS)
  *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
  *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan);
- *      save-format (the save shape checks and the edits codec; pure)
+ *      save-format (the save checks, the edits codec, and the boot reader readSave; pure)
  *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
  *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
  *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
@@ -59,7 +59,7 @@
  *      spawning (`spawners` run the spawner features)
  *  15. Particles and audio: particles, audio
  *  16. HUD and UI: hud (the compass dial), menus, persist (save and load, export and
- *      import), homes, realms (the realm table, travel, the stash of the realms that are
+ *      import), homes, realms (travel, the stash of the realms that are
  *      not current, the void), portals (Ember portal
  *      ignition, removal, the travel timer, linking, and building), boss (the Jewel Titan:
  *      the pylons, the beams, the fight, the boss bar, the exit portal, the victory)

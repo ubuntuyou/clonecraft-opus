@@ -4,6 +4,7 @@
 // Realms: the top-level slice fields hold the overworld. `realm` names the realm of the player,
 // `realms` holds the ember and crystal slices, and `portals` and `boss` hold their state.
 // `ids` names the id plan of the save (IDS_VERSION). migrateIds upgrades an older save at boot and at import.
+// The save checks live in save-format.js (validSave, readSave). A new save field needs a check there.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
 // play, on pause, and when the page hides or closes. An import sets `blocked`, so the
 // page-hide save cannot overwrite the imported save before the reload.
@@ -73,7 +74,7 @@ $('newWorldBtn').addEventListener('click', (e) => {
 
 // ---- export and import: the current world as a JSON file ---------------------------------
 // Export downloads the save of the current world. Import checks a file (validSave), writes it
-// under its own seed, and reloads on that seed: SAVE is read only at boot, so a reload is the
+// under its own seed, and reloads on that seed: boot reads the save (readSave), so a reload is the
 // only way to apply it. migrateIds runs before validSave, so an export from before the id plan
 // imports and is stored with the new ids. An import that meets an existing save for its seed asks first.
 function localDate() {

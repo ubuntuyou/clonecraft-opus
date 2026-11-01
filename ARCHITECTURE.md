@@ -1,6 +1,6 @@
 # Architecture
 
-Clonecraft ships as one HTML file with one module script. The source is 44 ES modules in `src/`. `npm run build` writes them into the root `index.html` (D36). The code keeps its numbered sections 1–18 as banners in the modules. The living header in `src/order.js` maps the sections to the modules. This document records the decisions and the seams.
+Clonecraft ships as one HTML file with one module script. The source is 51 ES modules in `src/`, plus `order.js` and `main.js`. `npm run build` writes them into the root `index.html` (D36). The code keeps its numbered sections 1–18 as banners in the modules. The living header in `src/order.js` maps the sections to the modules. This document records the decisions and the seams.
 
 ## Decisions
 
@@ -92,7 +92,11 @@ A flow cell takes its level from its neighbours, falls first, then spreads sidew
 `persist` writes `clonecraft.world.<seed>`: the overrides, the player, the inventory, tile entities, homes, the liquid queue, and the time. Mobs and drops are not saved.
 The seed is chosen before the world starts: `?seed=N`, then `?new`, then `clonecraft.lastSeed`. A save is applied before the first chunk arrives, so overrides apply as chunks load.
 New World navigates to `?new`. The old world stays saved under its seed.
-Export and import move one save as a JSON file. The save is read only at boot, so an import does not apply data to the running world. It checks the file (`validSave`), writes it under its own seed, and reloads on `?seed=N`. The boot path then applies it like any other save. `persist.blocked` stops the page-hide save, so a same-seed import is not overwritten by the running world. `validSave` is the trust boundary: a save from a file must pass it, because a bad id would break the boot of that seed.
+Export and import move one save as a JSON file. The save is read only at boot, so an import does not apply data to the running world. It checks the file (`validSave`), writes it under its own seed, and reloads on `?seed=N`. The boot path then applies it like any other save. `persist.blocked` stops the page-hide save, so a same-seed import is not overwritten by the running world.
+`readSave` and `validSave` are the trust boundary. Both live in `src/save-format.js` (SPEC_hardening H1–H3). Boot reads the text of `SAVE_KEY` only through `readSave(text, seed)`: it parses the text, runs `migrateIds`, runs the save checks, and compares the seed. The import checks a file with `validSave`. A save must pass the boundary, because one bad field would break the boot of its seed.
+The save checks check each element that `persist.apply` reads: stacks, edits, tile entities by type, homes, the liquid and leaf queues, farm rows, vehicles, `inv.sel`, and the player health. A save-sweep test proves this on a live fixture (`DISCOVERY_save-format.md`).
+Boot never deletes a rejected save. A save that `readSave` rejects, or that throws in `persist.apply`, is copied to `clonecraft.world.<seed>.rejected.<epoch ms>` and then removed. The world starts fresh, and the player sees the reason and the backup key. An apply throw leaves the game half restored, so boot reloads the page once. When the backup write fails, the save stays and `persist.blocked` stops every save for that visit. There is no save repair: Joe can restore a backup key by hand.
+`save-format` is pure, so Node tests import it. Three tables that the checks read moved to pure modules for this: `REALMS` and `WEATHER_KINDS` to `config.js`, and `VEHICLE_KINDS` to `blocks.js`. The edits codec (`editsOf`, `mapsOf`) and `SLICE_FIELDS` moved from `realms.js` with them.
 
 ### D17. Furnaces and chests keep state in tile entities
 
@@ -337,7 +341,8 @@ The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the
 | block edits to portals | `targeting.js` calls `portals.onEdit(x, y, z, old, id)` after every edit. `interact.js` calls `portals.ignite(x, y, z)` for a Magma Core on obsidian or an Ember Heart on a Crystal Frame. `portals.update(dt)` runs once per frame (D49). `world.locked(x, y, z)` guards the arrival portal (D52). |
 | realms to the scoped modules | `realm.leave()` takes each scoped module's `save()` and clears it. `realm.enter(stash)` calls each `load(d)`. New realm-scoped state joins both. |
 | containers | `tileEntity(x, y, z)` returns or creates the furnace or chest state. `openInventory(mode, target)` opens its screen. |
-| save | `persist.save()` writes the save. `persist.apply(SAVE)` restores it at boot. |
+| save | `persist.save()` writes the save. Boot reads the text with `readSave(text, SEED)` and passes the checked save to `persist.apply(save)` (D16). |
+| save-format | `src/save-format.js` is pure. `readSave(text, seed)` returns `{ save, reason }`. `validSave(d)` and `validSlice(s, top)` check a save and one realm slice. `editsOf` and `mapsOf` convert the edits. `SLICE_FIELDS` names the realm-scoped fields. It hides the check of every save element (D16). |
 | light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |
 | player damage | `damagePlayer(amount, cause, from, kind)` is the only damage path for the player. `kind` selects armor (D24). |
 | projectiles | `projectiles.shoot(x, y, z, vx, vy, vz, dmg, shooter)` launches an arrow. `projectiles.fireball(x, y, z, dx, dy, dz, dmg, shooter)` launches a fireball along a unit direction (D51). `projectiles.shard(...)` takes the same arguments and launches a crystal shard (D53). `projectiles.update(dt)` runs once per frame. |

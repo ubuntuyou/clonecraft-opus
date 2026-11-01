@@ -7,12 +7,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- The boot reader (SPEC_hardening H1): boot reads the save through `readSave`, which runs the same checks as the import. A save that fails, or that throws while it loads, is copied to `clonecraft.world.<seed>.rejected.<epoch ms>` and removed. A new world starts, and the menu and a toast name the reason and the backup key. When the backup cannot be written, the save stays and saving is off for that visit.
+- The save checks (SPEC_hardening H2) now check each liquid and leaf queue cell, each chest (27 slots) and furnace (3 slots and its burn state), each home yaw, the hotbar slot, the player health, and the stack durability type. An import of a bad file shows the "not a Clonecraft world save" alert instead of blocking its seed.
+- The save module (SPEC_hardening H3): the save checks, the edits codec, and the boot reader live in the pure module `src/save-format.js`. `REALMS` and `WEATHER_KINDS` move to `config.js`, and `VEHICLE_KINDS` moves to `blocks.js`.
 - Item ids (SPEC_realms.md, Phase 0): armor ids move from 176..199 to 300..323, so the realm blocks can use the one-byte ids. New item-only ids start at 256.
   - A save now holds `ids: 2`. An older save or export loads and imports with every armor piece intact: worn, in the inventory, in a chest, or held on the cursor.
   - An import rejects a save with an unknown `ids` value.
 
 ### Added
 
+- Save tests (SPEC_hardening H1–H3): a live fixture written by the game, a save-sweep mutation test with a ratchet baseline, a save-reader rule (only `save-format.js` parses save text), and planted fail proofs for each rule.
 - Realm sounds (SPEC_realms.md, Phase 7): a steel clang when a knight strikes, a glassy ping per Titan shard, a rising whine through the slam warning, a boom when the slam lands, and a roar when the Titan wakes and at each phase change (deeper into phase 3). A pylon breaks with a crystal shatter, and the Titan's death plays a bigger one.
 - Enemy arrows: the player picks up a skeleton arrow stuck in a block, as with a player arrow.
 - Soft edges setting: a second Shadows checkbox. Off gives a hard shadow edge (1 read instead of 4). It is disabled while shadows are off. A save without it loads as on.
