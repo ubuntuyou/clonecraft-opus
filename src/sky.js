@@ -12,11 +12,11 @@
  * `weather` follows the sky. It fades k (wet) and storm over 6 s. The sky greys the dome and
  * clouds, fades the sun, moon, and stars, and closes the fog by k. game.daylight = clearDaylight
  * × weather.dim + the lightning flash. A drop never falls below the top block of its column.
- * Realm skies (SPEC_realms): the day sky runs first, then a realm sky replaces its output. ember:
- * a dark red dome, no sun, moon, stars, or clouds, close red fog, and a red-orange light floor
- * (uAmbient) at block light `def.ambient`. The day sky sets uAmbient to black. crystal: a violet dome with
- * full, larger stars, 3 slow aurora bands, a small pale star disc at the fixed light direction, and
- * no clouds. The day clock keeps running.
+ * Realm skies (SPEC_realms, SPEC_deepen M7): the day sky runs first, then realmSky replaces its output
+ * with the row's `look` (REALMS in config.js). ember: a dark red dome, no sun, moon, stars, or clouds,
+ * close red fog, and a light floor (uAmbient) at block light `def.ambient`, tinted by `look.ambientTint`.
+ * The day sky sets uAmbient to black. crystal: a violet dome with full, larger stars, 3 slow aurora
+ * bands, a small pale star disc at the fixed light direction, and no clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { clamp, CONFIG, CS, glowGain, lerp, mulberry32, REALMS } from './config.js';
