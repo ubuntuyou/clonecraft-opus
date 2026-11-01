@@ -269,14 +269,14 @@ import * as saveFormat from '../src/save-format.js';
 import { BOOT_NOTICE, openSave } from '../src/save-format.js';
 // A fake `storage` (config.js shape) with an op log: each call pushes [op, key].
 // `failSet` makes every set return false (a full or blocked store); `init` seeds the entries.
-// `failRemove` makes every remove return false and keep the entry.
+// `failRemove` names one key whose remove returns false and keeps the entry.
 function fakeStore(init = {}, { failSet = false, failRemove = false } = {}) {
   const map = new Map(Object.entries(init)), ops = [];
   return {
     map, ops,
     get(k) { ops.push(['get', k]); return map.has(k) ? map.get(k) : null; },
     set(k, v) { ops.push(['set', k]); if (failSet) return false; map.set(k, String(v)); return true; },
-    remove(k) { ops.push(['remove', k]); if (failRemove) return false; map.delete(k); return true; },
+    remove(k) { ops.push(['remove', k]); if (k === failRemove) return false; map.delete(k); return true; },
   };
 }
 // A fake sessionStorage with an op log. `throwGet` and `throwSet` make those calls throw, as a
@@ -439,7 +439,7 @@ test('M4-12b K7 round trip: the boot after a blocked-session apply throw shows t
   assert.equal(store.map.has(BOOT_NOTICE), false);
 });
 test('K12-1 openSave keeps a bad-JSON save when the key remove fails, and drops the copy', () => {
-  const store = fakeStore({ [BOOT_KEY]: '{not json' }, { failRemove: true });
+  const store = fakeStore({ [BOOT_KEY]: '{not json' }, { failRemove: BOOT_KEY });
   const o = openSave(bootArgs({ store }));
   assert.equal(o.notice.keep, true);
   assert.equal(o.blocked, true);
@@ -449,7 +449,7 @@ test('K12-1 openSave keeps a bad-JSON save when the key remove fails, and drops 
   assert.deepEqual(writes(store), [['set', BACKUP_KEY], ['remove', BOOT_KEY], ['remove', BACKUP_KEY]]);
 });
 test('K12-2 an apply throw with a failing key remove reloads once, and the next boot does not loop', () => {
-  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failRemove: true }), session = fakeSession();
+  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failRemove: BOOT_KEY }), session = fakeSession();
   const first = openSave(bootArgs({ store, session, apply: boom }));
   assert.equal(first.reload, true);
   assert.equal(JSON.parse(session.map.get(BOOT_NOTICE)).keep, true);
@@ -464,7 +464,7 @@ test('K12-2 an apply throw with a failing key remove reloads once, and the next 
   assert.equal(store.ops.some(([op, k]) => op === 'set' && k.includes('.rejected.')), false, 'no new copy');
 });
 test('K12-3 an apply throw with a failing key remove and a throwing session write does not reload', () => {
-  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failRemove: true }), session = fakeSession({}, { throwSet: true });
+  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failRemove: BOOT_KEY }), session = fakeSession({}, { throwSet: true });
   const o = openSave(bootArgs({ store, session, apply: boom }));
   assert.equal(o.reload, false);
   assert.equal(o.blocked, true);
