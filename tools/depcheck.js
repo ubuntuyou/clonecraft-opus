@@ -5,7 +5,8 @@
 //   main      main.js imports './order.js' first. No module imports main.js.
 //   downward  A module imports a name directly only from an earlier module.
 //   upward    A name from './order.js' belongs to a later module, and the importer uses it
-//             only inside a function. At load time it is not evaluated yet.
+//             only inside a function. An immediately-invoked function runs at load time, so it
+//             does not count as a function here.
 //   readonly  No module writes an imported name. Use the owner's setter.
 //   free      Every free name is a JavaScript or browser global.
 //   worker    worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
@@ -20,6 +21,21 @@ import globals from 'globals';
 // Modules that tests import in Node. They must never pull in the rest of the game.
 export const PURE = ['three', 'config', 'blocks', 'portal-frame', 'biomes', 'atlas', 'worldgen', 'gen-service', 'clouds', 'terrain-material', 'crafting', 'save-format'];
 const GLOBALS = new Set([...Object.keys(globals.builtin), ...Object.keys(globals.browser)]);
+
+// The function nodes that run at once: the callee of a CallExpression, as in `(() => x)()`.
+// acorn drops parentheses by default, so the callee is the function node itself.
+function iifeNodes(ast) {
+  const found = new Set();
+  const visit = (n) => {
+    if (n.type === 'CallExpression' && (n.callee.type === 'FunctionExpression' || n.callee.type === 'ArrowFunctionExpression')) found.add(n.callee);
+    for (const v of Object.values(n)) {
+      if (Array.isArray(v)) v.forEach((c) => c && typeof c.type === 'string' && visit(c));
+      else if (v && typeof v.type === 'string') visit(v);
+    }
+  };
+  visit(ast);
+  return found;
+}
 
 export function depcheck(dir = 'src') {
   const errors = [];
@@ -65,6 +81,7 @@ export function depcheck(dir = 'src') {
     }
     const scopes = escope.analyze(ast, { ecmaVersion: 2022, sourceType: 'module' });
     const mod = scopes.scopes.find((s) => s.type === 'module');
+    const iife = iifeNodes(ast);
     for (const v of mod.variables) {
       if (v.defs[0].type !== 'ImportBinding') continue;
       for (const r of v.references) {
@@ -72,7 +89,7 @@ export function depcheck(dir = 'src') {
         if (r.isWrite()) err('readonly', `${m}.js line ${line} writes imported ${v.name}`);
         if (fromOrder.has(v.name)) {
           let s = r.from;
-          while (s && s !== mod && s.type !== 'function') s = s.upper;
+          while (s && s !== mod && (s.type !== 'function' || iife.has(s.block))) s = s.upper;
           if (s === mod) err('upward', `${m}.js line ${line} uses ${v.name} at load time; it comes from a later module`);
         }
       }

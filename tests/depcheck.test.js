@@ -38,6 +38,12 @@ test('readonly: a module writes an imported name', () => fires(planted((e) => e(
 test('free: a name that is neither defined nor imported', () => fires(planted((e) => e('hud', (t) => t + '\nfunction f() { return notDefinedAnywhere; }\n')), 'free'));
 // SPEC_hardening H9: an IIFE runs at load time, so a later name used inside one is an error.
 test('upward: a later name is used inside an IIFE at load time', () => fires(planted((e) => e('liquids', (t) => t + '\nconst probe = (() => particles.update)();\n')), 'upward'));
+test('upward: a later name is used inside a function IIFE at load time', () => fires(planted((e) => e('liquids', (t) => t + '\nconst probe = (function () { return particles.update; })();\n')), 'upward'));
+// The control: a function that is not called at once still defers the name, so the rule does not fire.
+test('upward: a later name inside a plain function still defers', () => {
+  const errors = planted((e) => e('liquids', (t) => t + '\nfunction probe() { return particles.update; }\n'));
+  assert.ok(!errors.some((x) => x.startsWith('upward:')), `a plain function must not fire, got: ${errors.join(' | ')}`);
+});
 test('worker: worldgen.js imports something', () => fires(planted((e) => e('worldgen', (t) => "import { CS } from './config.js';\n" + t)), 'worker'));
 test('pure: a pure module reaches order.js', () => fires(planted((e) => e('crafting', (t) => "import { mobs } from './order.js';\n" + t)), 'pure'));
 
