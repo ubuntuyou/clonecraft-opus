@@ -76,5 +76,12 @@ function renderHomes() {
 $('homeSetBtn').addEventListener('click', () => setHome());
 
 function setHomes(v) { homes = v; }
+// The realm-slice adapter of `homes` (SPEC_deepen M1; realms.js SCOPED). data() returns the live
+// array, and clear() assigns a new one, so a stash keeps the old array.
+const homesSlice = {
+  data() { return homes; },
+  load(list) { homes = list || []; },
+  clear() { homes = []; },
+};
 
-export { closeHomes, goHome, homes, homesEl, homesKey, openHomes, setHome, setHomes };
+export { closeHomes, goHome, homes, homesEl, homesKey, homesSlice, openHomes, setHome, setHomes };

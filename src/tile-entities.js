@@ -129,4 +129,17 @@ function updateFurnaces(dt) {
   }
 }
 
-export { featureAt, LOOT, lootChest, looted, spillTileEntity, tileEntities, tileEntity, ui, updateFurnaces };
+// The realm-slice adapters of `te` and `looted` (SPEC_deepen M1; realms.js SCOPED). load() expects an
+// empty field and accepts undefined. clear() empties the container in place: the handles keep it.
+const teSlice = {
+  data() { return [...tileEntities.values()]; },
+  load(list) { for (const t of list || []) tileEntities.set(`${t.x},${t.y},${t.z}`, t); },
+  clear() { tileEntities.clear(); },
+};
+const lootedSlice = {
+  data() { return [...looted]; },
+  load(list) { for (const k of list || []) looted.add(k); },
+  clear() { looted.clear(); },
+};
+
+export { featureAt, LOOT, lootChest, looted, lootedSlice, spillTileEntity, teSlice, tileEntities, tileEntity, ui, updateFurnaces };

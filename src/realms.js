@@ -23,12 +23,12 @@ import { CONFIG, H, READY_RADIUS, REALMS, UNLOADED, VOID_Y } from './config.js';
 import { B, baseOf, IS_LEAF, LIQ_KIND, SOLID } from './blocks.js';
 import { canvas, game, player, scene, world } from './engine.js';
 import { resumeEl } from './player.js';
-import { doorTimers, resetMining, torches } from './interact.js';
+import { doorTimers, editIndex, resetMining, torches } from './interact.js';
 import { liquids } from './liquids.js';
 import { leafDecay } from './leaf-decay.js';
 import { farming } from './farming.js';
 import { drops } from './drops.js';
-import { looted, tileEntities } from './tile-entities.js';
+import { looted, lootedSlice, teSlice, tileEntities } from './tile-entities.js';
 import { closeInventory } from './inventory-ui.js';
 import { mobs } from './mobs.js';
 import { vehicles } from './vehicles.js';
@@ -38,12 +38,25 @@ import { spawners } from './spawning.js';
 import { $, hud } from './hud.js';
 import { fadeIn, setState } from './menus.js';
 import { persist } from './persist.js';
-import { closeHomes, homes, setHomes } from './homes.js';
+import { closeHomes, homes, homesSlice, setHomes } from './homes.js';
 import { boss, weather } from './order.js';
 import { WG } from './gen-service.js';
 import { editsOf, mapsOf, SLICE_FIELDS } from './save-format.js';
 
 const VOID_DAMAGE = 4, VOID_TICK = 0.5;
+
+// The realm-scoped modules (SPEC_deepen M1). SCOPED maps each saved slice field except `edits` to
+// its adapter { data, load, clear }, in SLICE_FIELDS order. An adapter's load(v) expects an empty
+// field and accepts undefined. CLEARED holds the state that a realm change clears but never saves.
+// Every member is a downward import, so both tables are load-time consts (D39).
+const wrap = (m) => ({ data: () => m.save(), load: (v) => m.load(v), clear: () => m.clear() });
+const SCOPED = {
+  te: teSlice, homes: homesSlice, liquids: wrap(liquids), leaves: wrap(leafDecay), farm: wrap(farming),
+  vehicles: { data: () => vehicles.data(), load: (v) => vehicles.load(v), clear: () => vehicles.clear() },
+  looted: lootedSlice,
+};
+const CLEARED = [editIndex, { clear: clearTnt }, projectiles, spawners, { clear: resetMining }];
+if (['edits', ...Object.keys(SCOPED)].join() !== SLICE_FIELDS.join()) throw new Error('realms: SCOPED keys must equal SLICE_FIELDS');
 
 // A stash: { overrides, overridesByChunk, slice: { te, homes, liquids, leaves, farm, vehicles, looted }, drops }.
 function stashOf(slice) {
@@ -62,6 +75,7 @@ const realm = {
   get def() { return REALMS[this.current]; },
 
   // The save slice of realm `name`, from the live modules or from its stash.
+  // TODO(T5.1): read the live fields from SCOPED[f].data() in SLICE_FIELDS order.
   slice(name) {
     if (name === this.current) {
       return {
@@ -74,6 +88,13 @@ const realm = {
     const out = { edits: editsOf(s.overridesByChunk) };
     for (const f of SLICE_FIELDS) if (f !== 'edits') out[f] = s.slice[f] ?? [];
     return out;
+  },
+  // The realm part of the save (SPEC_deepen M2): the overworld slice at the top level, `realm`,
+  // the other non-null slices in `realms`, and copies of `portals` and `boss`. load(d) reads it.
+  data() {
+    const realms = {};
+    for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = this.slice(name); if (sl) realms[name] = sl; }
+    return { ...this.slice('overworld'), realm: this.place().name, realms, portals: { ...this.portals }, boss: { ...this.boss } };
   },
   // Where the save puts the player: the realm before travel during a load, the overworld when dead.
   place() {
@@ -95,6 +116,7 @@ const realm = {
 
   // Detaches the live realm-scoped state into a stash and clears the modules. A dying Titan
   // shatters first, so its loot and exit portal join the stash.
+  // TODO(T5.1): clear each SCOPED entry, then each CLEARED entry.
   leave() {
     boss.finish();
     const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
@@ -106,6 +128,7 @@ const realm = {
     return s;
   },
   // Makes a stash live: resets the world to its override maps and loads the other modules.
+  // TODO(T5.1): editIndex.load(world.overrides), then SCOPED[f].load(sl[f]) per field.
   enter(s) {
     const def = REALMS[this.current];
     world.reset(def.name, s.overrides, s.overridesByChunk, def.voidBelow, def.ambient);
