@@ -27,8 +27,8 @@ A `LIGHT_STOP` cell (a stair) takes light from its neighbours but never passes i
 
 The mesher writes sky light, block light, ambient occlusion, and face shade into the `aLight` vertex attribute. The terrain shader scales sky light by `uDaylight` and tints it with `uSkyLight`.
 A change of time of day never remeshes. Block light falls off slower than sky light (0.85 against 0.83 per level), so torches light a wider area without brighter days. The shader also adds a small directional term. It takes the face normal from screen-space derivatives and compares it to `uSunDir`, so the vertex format holds no normals.
-The water pass uses the same normal for a horizon reflection and a sun glint. The `aTint` alpha carries a wind-sway weight and a torch glow flag, so neither needs a new attribute.
-Crystal light has its own attribute, `aCry`. The shader tints it turquoise and takes the maximum of it and the other light. A crystal face is emissive: the `aTint` alpha code 232 marks it.
+The water pass uses the same normal for a horizon reflection and a sun glint. The `aTint` alpha carries the face kind (D55), so sway and glow need no new attribute.
+Crystal light has its own attribute, `aCry`. The shader tints it turquoise and takes the maximum of it and the other light. A crystal face is emissive: the face kind `CRYSTAL` marks it (D55).
 
 ### D5. Gamma-space color
 
@@ -197,7 +197,7 @@ A point light would shine through walls. `heldLight` instead fills light of leve
 
 ### D32. Caustics ride on a mesher flag
 
-The mesher knows each face's neighbour cell. A still face whose neighbour is water gets sway alpha `WET_ALPHA` (246), so the shader knows the face is under water without a depth buffer or a new vertex attribute. The net is shifted toward the sun by the water depth, read from sky light, so it stays put as the sun moves. Caustics multiply the face's sky light instead of adding light, so a dark floor stays dark. Sky light drops 1 per water block, so a smoothstep on it fades caustics out between about 3 and 7 blocks deep. A gate on `uDaylight` turns them off by moonlight. Two reads of the one caustic texture drift in opposite directions, and each read is bent by its own field of 4 moving sines. The net then changes shape in place, which a single translated texture cannot do. The bend is arithmetic, so it adds no texture read. The caustic net and the water ripples are baked once into two 256² tiling textures (`bakeWaterPatterns`) and read with scrolling, because per-pixel trig on the sea floor and the surface cost too much on the M1 Air.
+The mesher knows each face's neighbour cell. A still face whose neighbour is water gets the face kind `WET` (`FACE_KIND.WET`, byte 246, D55), so the shader knows the face is under water without a depth buffer or a new vertex attribute. The net is shifted toward the sun by the water depth, read from sky light, so it stays put as the sun moves. Caustics multiply the face's sky light instead of adding light, so a dark floor stays dark. Sky light drops 1 per water block, so a smoothstep on it fades caustics out between about 3 and 7 blocks deep. A gate on `uDaylight` turns them off by moonlight. Two reads of the one caustic texture drift in opposite directions, and each read is bent by its own field of 4 moving sines. The net then changes shape in place, which a single translated texture cannot do. The bend is arithmetic, so it adds no texture read. The caustic net and the water ripples are baked once into two 256² tiling textures (`bakeWaterPatterns`) and read with scrolling, because per-pixel trig on the sea floor and the surface cost too much on the M1 Air.
 
 ### D33. The time of day belongs to the world; the freeze belongs to the player
 
@@ -331,6 +331,12 @@ The Ember Wisp and the Cinder Knight are ordinary `Mob` instances. Their differe
 A flyer hovers relative to the floor below it. Over a low floor, such as the lava sea beside a bridge, a floor-relative hover sinks the flyer below the deck and breaks its line of sight. So a chasing flyer also stays 1 + hover/2 blocks above the player's feet.
 A fireball is a `projectiles` entry with `kind: 'fireball'`. It flies straight with no gravity, hits only the player, and bursts on a solid or liquid cell. It breaks no block, so it makes no edit and no save state.
 
+### D55. `face-kind.js` owns the face byte
+
+The `aTint` alpha of a terrain vertex holds one byte: the face kind. The kind tells the shaders how a face sways, glows, or shows a pane (SPEC_deepen M5). `face-kind.js` owns the byte. `FACE_KIND` names the 9 kinds, and `FACE_BYTE` gives the byte of each. The mesher writes the byte with `faceByte(kind, top, wet)`. The terrain shader and the shadow pass include `FACE_GLSL` and test a kind with `faceIs(aTint.a, FACE_<NAME>)`.
+The match is exact, within 0.5 of the byte, and it runs in the vertex shader. Before, each shader decoded hand-picked byte windows, so a new byte could fall inside another kind's window. Now a new kind needs only an unused byte. `faceKindOf` is the JS mirror of the match, so Node tests prove the decode on all 256 bytes. The module has no imports and is pure. `DISCOVERY_face-kind.md` holds the byte table.
+Rejected: a new `aKind` attribute (memory), a decode in the fragment shader (a plant quad interpolates its bytes), and `FACE_GLSL` writing varyings (each shader reads different kinds).
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -350,6 +356,7 @@ The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the
 | containers | `tileEntity(x, y, z)` returns or creates the furnace or chest state. `openInventory(mode, target)` opens its screen. |
 | save | `persist.save()` writes the save. Boot calls `openSave({ store, session, key, seed, now, apply })` once. `openSave` reads the text with `readSave`, passes the checked save to `persist.apply`, and returns `{ save, notice, blocked, reload }` (D16). |
 | save-format | `src/save-format.js` is pure. `readSave(text, seed)` returns `{ save, reason }`. `validSave(d)` checks a save. `openSave(...)` holds the boot fallback policy: the carried notice, the backup of a rejected save, and the apply throw. `editsOf` and `mapsOf` convert the edits. `SLICE_FIELDS` names the realm-scoped fields. It hides the check of every save element and the boot policy (D16). |
+| face kind | The mesher writes the `aTint` alpha only through `faceByte(kind, top, wet)`. A shader reads it only through `FACE_GLSL` (`faceIs`, `FACE_<NAME>`). `face-kind.js` hides the byte of each kind (D55). |
 | light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |
 | player damage | `damagePlayer(amount, cause, from, kind)` is the only damage path for the player. `kind` selects armor (D24). |
 | projectiles | `projectiles.shoot(x, y, z, vx, vy, vz, dmg, shooter)` launches an arrow. `projectiles.fireball(x, y, z, dx, dy, dz, dmg, shooter)` launches a fireball along a unit direction (D51). `projectiles.shard(...)` takes the same arguments and launches a crystal shard (D53). `projectiles.update(dt)` runs once per frame. |

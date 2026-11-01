@@ -1,6 +1,6 @@
 # DISCOVERY: engine
 
-Gotchas, pointers, and invariants for the game modules in `src/`. Read this file before you change the world, the renderer, or the game states. `src/order.js` maps the sections to the modules. `DISCOVERY_build.md` covers the build and the module rules. `DISCOVERY_save-format.md` covers the save format and the boot reader.
+Gotchas, pointers, and invariants for the game modules in `src/`. Read this file before you change the world, the renderer, or the game states. `src/order.js` maps the sections to the modules. `DISCOVERY_build.md` covers the build and the module rules. `DISCOVERY_save-format.md` covers the save format and the boot reader. `DISCOVERY_face-kind.md` covers the face byte in the `aTint` alpha.
 
 ## Invariants
 
@@ -45,7 +45,6 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `renderer.info.autoReset` is off. The frame loop calls `renderer.info.reset()` once, so the counters cover both render passes.
 - `THREE.ColorManagement` is disabled. Give colors in gamma space, and do not convert them to linear.
 - `P.fill(fn)` in `paintTile` ignores the return value of `fn`. A painter must call `P.set(x, y, c)`. A painter that returns colors gives a transparent tile, and the shader discards every texel.
-- Wind sway and glow codes include 232 for crystal faces (emissive). The fragment shader tests the alpha range 0.88..0.94.
 - Particle point size is capped at `uScale * 0.35` pixels, and points closer than 1.6 blocks fade out. Without the cap, explosion smoke fills the screen.
 - `python3 -m http.server` lets Chromium cache the built `index.html`. After an edit, load the page with a new query value (`&v=N`).
 - `glowGain` is 2 only with `CONFIG.bloom` on and an HDR target. Anything multiplied by it must look the same at 1 as before bloom existed.
@@ -116,7 +115,6 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - The tool id formula `base + tier` collides at tier 8 (pickaxe 208 is `BONE_MEAL`). Emberite tools take ids 270..274 instead.
 - A flyer's hover is relative to the floor below it. Without the chase height rule (ARCHITECTURE D51), a wisp over the lava sea sinks below the bridge deck, loses line of sight, and stops firing.
 - Ember spawn pressure: the natural spawn uses the overworld rate (1 try per 0.35 s up to `MAX_HOSTILE`). The realm is dark almost everywhere, so the cap fills in about 6 s.
-- The mesher tells the shader the pane kind through the tint alpha (`SWAY_ALPHA`): 160 is the Ember pane, 172 is the crystal pane. The shader decodes it in narrow bands (`vPortal` 1 or 2). A new alpha code must not fall inside 153..176.
 - `PORTAL_CRYSTAL` is not replaceable, unlike `PORTAL_EMBER`. No placed block and no liquid enters a crystal pane. Only the loss of a frame block removes it.
 - `world.locked(x, y, z)` makes `setBlock` return false. Every edit path must check the return value before it spends an item or drops a block.
 - The exit portal lock: once `realm.boss.defeated` is true, `world.locked` refuses every edit to the exit portal box in the Crystal Realm. `portals.js` reads the box from `boss.EXIT` through `order.js`, because `boss.js` loads later. It reads `EXIT` only inside `inExit`, at call time. The box is the ring around the panes: z 0, x -2..2, y 96..101. `buildExitPortal` runs before the kill sets `defeated`, so the build is never locked.
@@ -155,7 +153,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - Shadows: `shadows` (`src/shadows.js`, before `post`). 2048² map, box ±64 blocks, depth 320, bias `0.1 / DEPTH`, normal offset 0.12 block. `sampler2DShadow`: 4 reads at 2.2 texels on a noise-turned square (terrain), 1 read (water). Fade over the outer 20 % of the box. Leaf faces drop half of their 4×4-texel cells in the pass (dappled light).
 - Held torch: `heldLight` (`src/held-light.js`, before `post`). `levelAt(x, y, z)` gives 0..15. `on` is true while the selected slot holds `B.TORCH`. The shader samples at the face centre plus half a block along the normal, flipped toward the camera.
 - Water patterns: `bakeWaterPatterns` (`src/terrain-material.js`) fills `uCaus` (caustic net) and `uRipple` (RG slope) once at startup; 256², repeat, mipmapped.
-- Caustics: faces with sway alpha `WET_ALPHA` (246). `pushQuad` (`src/mesher.js`) writes it when `wetFace` is set by `emitCubeFace`.
+- Caustics: faces with the face kind `WET` (246). `pushQuad` (`src/mesher.js`) writes it through `faceByte` when `wetFace` is set by `emitCubeFace`.
 - Caustics must scale `sky`, not add to `light`. An added term driven by `uSunAmt` (0.4 under the moon then, 0.5 now) glowed at night and ignored depth. Depth fade: `smoothstep(0.5, 0.95, vLight.x)`; night gate: `uDaylight` below 0.35.
 - Caustic projection: shift `cp` by depth (`15*(1-vLight.x)`), never by `vWorld.y`. Absolute y (about 125) times the moving sun direction slid the net up to about 7 blocks/s. A QA script that resets `game.dayTime` before each shot hides this.
 - Sky discs: `Object3D.lookAt` takes a world-space target. The sky group follows the camera, so the sun, moon, and halo must `lookAt(camera.position)`, not `(0, 0, 0)`.
@@ -168,7 +166,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - `buildTree` must not draw from `rng` for new features. The chunk rng is shared, so one extra draw moves every later tree and structure. Use `hash3` of a position.
 - Settings live in `localStorage` under `clonecraft.settings`. The booleans (`freezeTime`, `shadows`, `bloom`) have their own load loop. `renderScale` has its own line: it loads only when it is a number in 0.5..1, else it stays 1. The time-of-day slider is not a setting: it writes `game.dayTime`, and `setState` re-reads the time into it on `menu` and `paused`. The `rd` URL parameter overrides the render distance.
 - The render distance range is `RD_MIN` 3 to `RD_MAX` 16 (`config.js`). `clampRenderDistance` holds `?rd=N`, the saved setting, and the slider (the `norm` argument of `bindSetting` in `menus.js`) to that range. Loading and travel wait for `readyAround(..., READY_RADIUS)`. The mesh radius is `renderDistance + 0.5`, so `RD_MIN` must keep `(RD_MIN + 0.5) ** 2 >= READY_RADIUS ** 2`, or loading never ends. The rd-ready test checks this.
-- Wind sway and glow live in the `aTint` alpha: 255 is still, 128 is leaves, 0 is a plant top, 200 is a torch (glow), and 214 is a soft glow (lava, lit furnace; about 1.2 in HDR). `swayMode` in the mesher sets it. Reset `swayMode` to `SWAY_NONE` after each block that sets it. The vertex shader sways only alpha below 0.6.
+- Wind sway, glow, crystal, pane, and wet faces live in the `aTint` alpha as the face kind. `src/face-kind.js` owns the byte, and `DISCOVERY_face-kind.md` holds the table and the rules. Reset `swayMode` to `K_STILL` after each block that sets it. A soft glow (lava, lit furnace) is about 1.2 in HDR.
 - Flight: `setFlying()` is the only switch. `player.flying` skips gravity and water physics. The K key toggles it. A landing (`onGround`) does not end flight.
 - The walk bob and the footsteps share `walkPhase`. A footstep plays when `floor(walkPhase)` changes.
 - Before `game.started`, `updateCamera()` shows the menu panorama and ignores the player's yaw.
