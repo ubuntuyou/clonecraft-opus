@@ -4,44 +4,46 @@ The gate file for `SPEC_hardening.md`. Check a box only after you verify it your
 
 ## Step 1: the save module (H3, H2, H1)
 
+Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, so the notice shows in the menu load line, and a 12 s toast repeats it when the game starts. Baseline: 226 accepted mutants, each applied in Chromium with no throw.
+
 ### Before the step
-- [ ] Back up Joe's seed 1234 save text to the session scratchpad (not the repo).
-- [ ] Export `tests/fixtures/save-live.json` from a throwaway seed. Every slice field is populated in the overworld, the Ember slice, and the Crystal slice. `portals.crystalBack` and `boss` are set.
+- [ ] Back up Joe's seed 1234 save text to the session scratchpad (not the repo). — NOT POSSIBLE: Joe plays from `file://` in his own browser (23:06 CT). Substitute: Joe exports the world, and rsh runs `readSave` on it before Joe opens the new build.
+- [x] Export `tests/fixtures/save-live.json` from a throwaway seed. Every slice field is populated in the overworld, the Ember slice, and the Crystal slice. `portals.crystalBack` and `boss` are set.
 
 ### H3: the pure save-format module
-- [ ] `src/save-format.js` exists and is listed in `src/order.js` and in `PURE`.
-- [ ] `REALMS` and `WEATHER_KINDS` live in `config.js`. `VEHICLE_KINDS` lives in `blocks.js`. Every importer is updated.
-- [ ] The live fixture passes the moved `validSave` unchanged.
-- [ ] `editsOf(mapsOf(x))` round trip test passes.
-- [ ] Test: a `B.LEAVES` edit loads as `B.LEAVES_PLACED`.
-- [ ] Fail proof (pure): a scratch `import { mobs } from './order.js'` in `save-format.js` fails depcheck with `pure`. Reverted.
+- [x] `src/save-format.js` exists and is listed in `src/order.js` and in `PURE`.
+- [x] `REALMS` and `WEATHER_KINDS` live in `config.js`. `VEHICLE_KINDS` lives in `blocks.js`. Every importer is updated.
+- [x] The live fixture passes the moved `validSave` unchanged.
+- [x] `editsOf(mapsOf(x))` round trip test passes.
+- [x] Test: a `B.LEAVES` edit loads as `B.LEAVES_PLACED`.
+- [x] Fail proof (pure): a scratch `import { mobs } from './order.js'` in `save-format.js` fails depcheck with `pure`. Reverted.
 
 ### H2: element checks
-- [ ] The checks cover `liquids`, `leaves`, `te` (by type), `homes[].yaw`, `inv.sel`, and the `player.health` range.
-- [ ] The save-sweep test passes. `save-accepted-mutants.json` lists each accepted mutant with a reason.
-- [ ] Ratchet proof: a mutant listed in the baseline but now rejected fails the test. Reverted.
-- [ ] Fail proof (save-sweep): removing the `liquids` element check fails the sweep and names the path. Reverted.
-- [ ] Rejection tests: `liquids: [[null]]`, `leaves: [null]`, a furnace with no `burn`, a home with no `yaw`, and `inv.sel: 99`.
+- [x] The checks cover `liquids`, `leaves`, `te` (by type), `homes[].yaw`, `inv.sel`, and the `player.health` range.
+- [x] The save-sweep test passes. `save-accepted-mutants.json` lists each accepted mutant with a reason.
+- [x] Ratchet proof: a mutant listed in the baseline but now rejected fails the test. Reverted.
+- [x] Fail proof (save-sweep): removing the `liquids` element check fails the sweep and names the path. Reverted.
+- [x] Rejection tests: `liquids: [[null]]`, `leaves: [null]`, a furnace with no `burn`, a home with no `yaw`, and `inv.sel: 99`.
 
 ### H1: boot reader and fallback
-- [ ] `config.js` no longer parses the save. `boot.js` uses `readSave`.
-- [ ] Tests: `readSave` gives a reason for empty JSON, a wrong seed, truncated text, and no `player`.
-- [ ] Fail proof (save-reader): a scratch `JSON.parse(storage.get(SAVE_KEY))` in `config.js` fails the test and names `save-reader`. Reverted.
-- [ ] Playwright, throwaway seed: a corrupt save gives a fresh world, a toast with the reason and the key, and a backup key that holds the exact text.
-- [ ] Playwright, throwaway seed: an apply throw (a scratch-only patch, then reverted) gives the same result after one reload.
-- [ ] Playwright: a failed backup write keeps `SAVE_KEY` and sets `persist.blocked`.
-- [ ] Playwright: seed 1234 opens with Continue, at the same position, with the boss defeated.
+- [x] `config.js` no longer parses the save. `boot.js` uses `readSave`.
+- [x] Tests: `readSave` gives a reason for empty JSON, a wrong seed, truncated text, and no `player`.
+- [x] Fail proof (save-reader): a scratch `JSON.parse(storage.get(SAVE_KEY))` in `config.js` fails the test and names `save-reader`. Reverted.
+- [x] Playwright, throwaway seed: a corrupt save gives a fresh world, a toast with the reason and the key, and a backup key that holds the exact text.
+- [x] Playwright, throwaway seed: an apply throw (a scratch-only patch, then reverted) gives the same result after one reload.
+- [x] Playwright: a failed backup write keeps `SAVE_KEY` and sets `persist.blocked`.
+- [ ] Playwright: seed 1234 opens with Continue, at the same position, with the boss defeated. — SUBSTITUTED (agent, 2026-10-31): seed 777008 reloads with Continue at the same position, and seed 777001 reloads in the Crystal Realm with the boss defeated. The real seed 1234 check needs the export above.
 - [ ] **(owner)** Joe confirms that his seed 1234 world is intact.
 - [ ] **(owner)** Joe reviews the toast text and the backup key policy.
 
 ### Step 1 close
-- [ ] `npm run build`, then `npm run check` passes on the merged branch. `index.html` is committed once.
-- [ ] 0 game console errors in Chromium.
-- [ ] `ARCHITECTURE.md`: D16 names `readSave` and `validSave` as the trust boundary for boot and import. The new seam `save-format` is documented. The table moves are recorded.
-- [ ] `DISCOVERY_save-format.md` exists (fixture refresh, sweep baseline, the rule that every new save field needs a check and a fixture entry).
-- [ ] `DISCOVERY_engine.md` points to `DISCOVERY_save-format.md` for save rules.
-- [ ] `CHANGELOG.md` `[Unreleased]` lists H1–H3.
-- [ ] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
+- [x] `npm run build`, then `npm run check` passes on the merged branch. `index.html` is committed once.
+- [x] 0 game console errors in Chromium.
+- [x] `ARCHITECTURE.md`: D16 names `readSave` and `validSave` as the trust boundary for boot and import. The new seam `save-format` is documented. The table moves are recorded.
+- [x] `DISCOVERY_save-format.md` exists (fixture refresh, sweep baseline, the rule that every new save field needs a check and a fixture entry).
+- [x] `DISCOVERY_engine.md` points to `DISCOVERY_save-format.md` for save rules.
+- [x] `CHANGELOG.md` `[Unreleased]` lists H1–H3.
+- [x] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
 - [ ] **(owner)** Joe approves the Step 1 merge.
 
 ## Step 2: the wave (H4, H6, H7, H8, H9)
