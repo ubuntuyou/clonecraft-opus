@@ -131,8 +131,9 @@ function takeNotice(session, store) {
   let found = null;
   try { found = session.getItem(BOOT_NOTICE); } catch (e) { /* the session is unreadable */ }
   try { session.removeItem(BOOT_NOTICE); } catch (e) { /* nothing to remove */ }
-  if (!found) found = store.get(BOOT_NOTICE);
-  store.remove(BOOT_NOTICE);
+  const stored = store.get(BOOT_NOTICE);
+  if (stored !== null) store.remove(BOOT_NOTICE);   // no write on a boot with no store notice
+  if (!found) found = stored;
   try { return found ? JSON.parse(found) : null; } catch (e) { return null; }
 }
 
