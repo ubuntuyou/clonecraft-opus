@@ -22,6 +22,7 @@ Gotchas, pointers, and invariants for `src/save-format.js`: the save checks, the
 - After a new check, the sweep reports the entries that the check now rejects. Delete those entries.
 - `mapsOf` reads a `B.LEAVES` edit as `B.LEAVES_PLACED`. So `editsOf(mapsOf(x))` equals `x` only when `x` holds no `B.LEAVES` edit.
 - `validSave` does not compare the seed. `readSave` does. A valid save for another seed is rejected at boot but imports under its own seed.
+- `inv.loose` holds the stacks in the craft grid, the altar, and on the cursor. `persist.apply` adds each one to the 36 slots. The rest of a stack that does not fit waits in `persist.leftover` (SPEC_hardening H8). `persist.dropLeftover()` drops it at the player from `onLoaded`, after the chunks are meshed. No loose stack is lost on load.
 - `readSave` returns `{ save: null, reason: null }` only for `null` text. Any other text that fails gives a reason, and boot backs it up.
 - An apply throw reloads the page. The notice waits in `sessionStorage` under `clonecraft.bootNotice`. With `keep: true`, the next boot skips `SAVE_KEY` and sets `persist.blocked`.
 - The HUD, and so the toast, is hidden until the game starts. Boot shows the notice in the menu load line first, then as a toast when Play or the overlay click starts the game.

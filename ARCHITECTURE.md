@@ -45,6 +45,7 @@ A menu close returns to `playing`, not `paused`. Esc on the pause screen also re
 
 `world.update()` receives a time budget: 40 ms while loading and 7 ms while playing. Generation requests, lighting, and meshing stop when the budget runs out, and they continue on the next frame.
 The world sorts requests by distance and view direction.
+Loading and every travel wait for `readyAround(..., READY_RADIUS)`, with `READY_RADIUS` 3 chunks. The world meshes chunks out to `renderDistance + 0.5`. So the render distance must reach `READY_RADIUS`, or loading never ends (SPEC_hardening H6). The range is `RD_MIN` 3 to `RD_MAX` 16 in `config.js`. `clampRenderDistance` holds `?rd=N`, the saved setting, and the slider to that range. The rd-ready test checks `(RD_MIN + 0.5) ** 2 >= READY_RADIUS ** 2`.
 
 ### D8. Two render passes, with post-processing on the world pass
 
@@ -92,6 +93,7 @@ A flow cell takes its level from its neighbours, falls first, then spreads sidew
 `persist` writes `clonecraft.world.<seed>`: the overrides, the player, the inventory, tile entities, homes, the liquid queue, and the time. Mobs and drops are not saved.
 The seed is chosen before the world starts: `?seed=N`, then `?new`, then `clonecraft.lastSeed`. A save is applied before the first chunk arrives, so overrides apply as chunks load.
 New World navigates to `?new`. The old world stays saved under its seed.
+`?rd=N` sets the render distance for one visit. `clampRenderDistance` holds it to 3..16 (D7).
 Export and import move one save as a JSON file. The save is read only at boot, so an import does not apply data to the running world. It checks the file (`validSave`), writes it under its own seed, and reloads on `?seed=N`. The boot path then applies it like any other save. `persist.blocked` stops the page-hide save, so a same-seed import is not overwritten by the running world.
 `readSave` and `validSave` are the trust boundary. Both live in `src/save-format.js` (SPEC_hardening H1–H3). Boot reads the text of `SAVE_KEY` only through `readSave(text, seed)`: it parses the text, runs `migrateIds`, runs the save checks, and compares the seed. The import checks a file with `validSave`. A save must pass the boundary, because one bad field would break the boot of its seed.
 The save checks check each element that `persist.apply` reads: stacks, edits, tile entities by type, homes, the liquid and leaf queues, farm rows, vehicles, `inv.sel`, and the player health. A save-sweep test proves this on a live fixture (`DISCOVERY_save-format.md`).
@@ -224,6 +226,7 @@ The old 0–2 Effects slider tied shadows to bloom. Shadows cost the most (the d
 ### D39. One import rule
 
 A module imports an earlier module's names directly. It imports a later module's names (upward names) from `./order.js`, which re-exports them, and uses them only inside a function body. No module imports `main.js`. `tools/depcheck.js` enforces the rule and also rejects any free name that is not a JavaScript or browser global.
+An immediately-invoked function runs at load time, so depcheck treats its body as load time. A later-module name inside `(() => …)()` is an `upward` error. A plain function body still defers the read (SPEC_hardening H9).
 
 ### D40. Setters replace cross-module writes
 
@@ -283,6 +286,7 @@ The bedrock roof keeps sky light at 0 in the whole realm. The realm needs a ligh
 Generation never makes `PORTAL_EMBER`. So every portal cell is an override, and the link search scans the target realm's stashed override map. It needs no chunk of the target realm. A built portal is ordinary edits, so the save keeps it with no extra field.
 `portals.cells` mirrors the portal cells of the loaded realm for the sparks and the hum. It rebuilds when `world.overrides` changes identity, which happens at a realm switch and at a load.
 Removal runs from `world.onEdit`. An edit that changes a portal cell, or that removes obsidian next to one, floods the connected portal cells to air. Placing a block into the pane works because the pane is replaceable.
+A built portal with no dry site stands on a fallback platform. The plan first turns every liquid cell (water or lava) that touches the structure into obsidian. Without this seal, water flows into the replaceable pane, and the removal rule clears the portal (SPEC_hardening H4). The site search (`siteOk`) does not change.
 The pane is one double-sided quad in the water pass, so it blends with the transparent geometry and casts no shadow.
 Every 'travel' state disarms the portal: portal travel, respawn, and home travel. The player must step out of the pane before the timer runs again. So an arrival inside a portal never sends the player straight back.
 The same functions serve the crystal portal. `frameOk` and `findFrame` take the ring block as an argument: obsidian or Crystal Frame. D52 amends the edit-only rule for one portal.
@@ -291,6 +295,7 @@ The same functions serve the crystal portal. `frameOk` and `findFrame` take the 
 
 The arrival portal is part of the arena island. The crystal generator writes its Crystal Frame ring and its `PORTAL_CRYSTAL` opening (`WG.CRYSTAL_ARRIVAL`). So it exists in every world without an edit or a save field, and the link to it needs no search.
 `world.locked(x, y, z)` refuses every edit inside the arrival frame and its opening. `setBlock` returns false there, so mining, TNT, placement, and portal removal all fail. Targeting reports a break time of Infinity for a locked cell. So the player can never break the only way home.
+After the boss kill, `world.locked` also refuses every edit to the exit portal box: the Crystal Frame ring and its opening (SPEC_hardening H7). The lock reads `realm.boss.defeated`. `buildExitPortal` runs before the kill sets that flag, so the lock does not block the build. Before the kill the box is plain arena, and edits there work.
 `portals.cells` adds the arrival panes to the override panes when the Crystal Realm loads, for the sparks and the hum.
 The return link is one saved cell: `portals.crystalBack`, the foot of the last overworld crystal portal used. The return leads there when a crystal pane still stands within 3 blocks of that cell. Otherwise it leads to the player's spawn.
 
