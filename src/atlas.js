@@ -57,8 +57,8 @@ function tileVoronoi(rng, n) {
   return { cell, edge, rel, pts };
 }
 
-// TODO K4 (T3.1): throw `atlas: tile '<name>' does not fit; the atlas holds 256 tiles` when tileCount >= ATLAS_TILES.
 function paintTile(name, painter) {
+  if (tileCount >= ATLAS_TILES) throw new Error(`atlas: tile '${name}' does not fit; the atlas holds ${ATLAS_TILES} tiles`);
   const index = tileCount++;
   TILE[name] = index;
   const data = new Uint8ClampedArray(16 * 16 * 4);
@@ -800,8 +800,12 @@ atlasTexture.colorSpace = THREE.NoColorSpace;
 // A facing block (furnace, chest) puts its front on one face; the table shows it on +Z and -Z.
 const FACE_TILE = new Int16Array(256 * 6).fill(-1);
 // The tile index that def.tex[key] names (key: side, top, bottom, or front).
-// TODO K3 (T3.1): throw `atlas: block <name> tex.<key> names no tile: <n>` when TILE lacks the name.
-function tileOf(def, key) { return TILE[def.tex[key]]; }
+// An unknown tile name throws, so a misspelled `tex` fails at load and not as a missing face.
+function tileOf(def, key) {
+  const n = def.tex[key], i = TILE[n];
+  if (i === undefined) throw new Error(`atlas: block ${def.name} tex.${key} names no tile: ${n}`);
+  return i;
+}
 for (const def of BLOCKS) {
   if (!def || !def.tex) continue;
   const t = def.tex;
