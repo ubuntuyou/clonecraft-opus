@@ -10,6 +10,7 @@
 import { THREE } from './three.js';
 import { CONFIG, MAX_HEALTH, PLAYER_H, PLAYER_W, SEA } from './config.js';
 import { World } from './world.js';
+import { chunkMeshes } from './mesher.js';
 
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -25,7 +26,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x9cc4ff, 80, 120);
 const camera = new THREE.PerspectiveCamera(CONFIG.fov, innerWidth / innerHeight, 0.05, 1400);
 camera.rotation.order = 'YXZ';
-const world = new World(scene);
+const world = new World(chunkMeshes(scene));
 
 const game = {
   state: 'loading', started: false, debug: false,

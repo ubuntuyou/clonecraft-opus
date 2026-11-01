@@ -14,8 +14,8 @@
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, face-kind, clouds,
- *    terrain-material, crafting, and save-format never reach this file. Node tests import them.
+ *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, world, face-kind,
+ *    clouds, terrain-material, crafting, and save-format never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
@@ -97,7 +97,7 @@ import './worldgen.js';
 import './gen-service.js';
 import './world.js';
 import './face-kind.js';
-export { buildChunkMesh } from './mesher.js';
+import './mesher.js';
 import './clouds.js';
 export { terrainMaterial, waterMaterial } from './terrain-material.js';
 import './engine.js';
@@ -136,5 +136,5 @@ import './fireflies.js';
 import './ash.js';
 import './boot.js';
 import './shadows.js';
-export { heldLight } from './held-light.js';
+import './held-light.js';
 export { post } from './post.js';

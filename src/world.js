@@ -12,7 +12,6 @@
 import { ckey, CONFIG, CS, H, lidx, UNLOADED, VOL } from './config.js';
 import { ATTEN, B, EMIT, EMIT_CRY, LIGHT_STOP, OPAQUE, SKY_FREE, SOLID } from './blocks.js';
 import { GenService } from './gen-service.js';
-import { buildChunkMesh, heldLight } from './order.js';
 
 class Chunk {
   constructor(cx, cz, data) {
@@ -62,8 +61,10 @@ function refreshColumn(c, ci) {
 }
 
 class World {
-  constructor(scene) {
-    this.scene = scene;
+  // `meshes` is the mesh adapter { build(world, chunk), dispose(chunk), show(chunk, visible) }
+  // (SPEC_deepen M6; chunkMeshes in mesher.js). World never touches a three.js object.
+  constructor(meshes) {
+    this.meshes = meshes;
     this.chunks = new Map();
     this.overrides = new Map();          // "x,y,z" -> block id (every edit the player made)
     this.overridesByChunk = new Map();   // chunk key -> Map(local index -> block id)
@@ -80,6 +81,7 @@ class World {
     this.onEdit = null;                  // (x, y, z, oldId, newId) after every setBlock (liquids wake here)
     this.voidBelow = false;              // true in the Crystal Realm: a cell below y 0 is air, not bedrock
     this.ambient = 0;                    // the realm's light floor (0..15) for brightnessAt (9 in the Ember Realm)
+    this.extraLight = null;              // (x, y, z) -> 0..15, an extra block light for brightnessAt (held-light.js sets it)
   }
 
   // Realm switch (SPEC_realms): unloads every chunk (each calls onChunkUnloaded), drops the
@@ -128,7 +130,9 @@ class World {
   }
   // Brightness 0..1 of a cell (used to shade mobs, items, the held item).
   brightnessAt(x, y, z, daylight) {
-    const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), heldLight.levelAt(x, y, z), this.ambient);
+    // TODO(T6.1, K1): lightCurve(s, LIGHT_SKY) and lightCurve(b, LIGHT_BLK) with the 0.04 floor.
+    const extra = this.extraLight ? this.extraLight(x, y, z) : 0;
+    const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), extra, this.ambient);
     return Math.max(0.04, Math.pow(0.83, 15 - s), Math.pow(0.85, 15 - b));   // block light falls off slower (shader curveB)
   }
   surfaceY(x, z) {                       // highest solid block, or -1 if unloaded
@@ -156,19 +160,10 @@ class World {
   }
 
   unload(c) {
-    this.disposeMeshes(c);
+    this.meshes.dispose(c);
     this.chunks.delete(c.key);
     this._lc = null; this._lcx = 1e9;
     if (this.onChunkUnloaded) this.onChunkUnloaded(c);
-  }
-  disposeMeshes(c) {
-    for (const m of [c.opaqueMesh, c.waterMesh]) {
-      if (!m) continue;
-      this.scene.remove(m);
-      m.geometry.setIndex(null);          // the quad index buffer is shared; keep it alive
-      m.geometry.dispose();
-    }
-    c.opaqueMesh = c.waterMesh = null;
   }
 
   // ---------------------------------------------------------------- edits
@@ -193,7 +188,7 @@ class World {
     this.touch(c, lx, lz);
     this.relightAt(x, y, z);
     if (this.batch) for (const tc of this.touched) this.batch.add(tc);
-    else for (const tc of this.touched) if (tc.meshed) { buildChunkMesh(this, tc); tc.dirty = false; }
+    else for (const tc of this.touched) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
     if (this.onEdit) this.onEdit(x, y, z, old, id);
     return true;
   }
@@ -201,7 +196,16 @@ class World {
   beginBatch() { this.batch = new Set(); }
   endBatch() {
     const set = this.batch; this.batch = null;
-    if (set) for (const tc of set) if (tc.meshed) { buildChunkMesh(this, tc); tc.dirty = false; }
+    if (set) for (const tc of set) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
+  }
+  // Runs fn() with remeshing deferred; the outermost call remeshes each touched chunk once, even when fn throws.
+  batched(fn) {
+    if (this.batch) return fn();
+    this.batch = new Set();
+    try { return fn(); } finally {
+      const set = this.batch; this.batch = null;   // reset() inside fn nulls it: drop the set
+      if (set) for (const tc of set) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
+    }
   }
 
   touch(c, lx, lz) {
@@ -415,8 +419,7 @@ class World {
     const R2 = (RD + 0.5) * (RD + 0.5);
     for (const c of this.chunks.values()) {
       const dx = c.cx - pcx, dz = c.cz - pcz, inside = dx * dx + dz * dz <= R2;
-      if (c.opaqueMesh) c.opaqueMesh.visible = inside;
-      if (c.waterMesh) c.waterMesh.visible = inside;
+      this.meshes.show(c, inside);
       if (!inside || !c.lit || (c.meshed && !c.dirty)) continue;
       let ok = true;
       for (let oz = -1; oz <= 1 && ok; oz++) for (let ox = -1; ox <= 1; ox++) {
@@ -429,7 +432,7 @@ class World {
     if (cand.length) {
       cand.sort((a, b) => prio(a.cx, a.cz) - prio(b.cx, b.cz));
       for (const c of cand) {
-        buildChunkMesh(this, c);
+        this.meshes.build(this, c);
         c.meshed = true; c.dirty = false;
         this.stats.meshed++;
         if (performance.now() - t0 > budgetMs) break;

@@ -150,9 +150,19 @@ const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
 function setGlowGain(v) { glowGain = v; }
 
+// The light curves (SPEC_deepen K1): a light level 0..15 to a brightness 0..1. `base` is LIGHT_SKY
+// for sky light or LIGHT_BLK for block light (it falls off slower, so a torch reaches farther).
+// lightCurve(0) is 0 and lightCurve(15) is 1. The constants are rounded to 4 places, as in the
+// shader text. LIGHT_GLSL holds the same curves as the GLSL functions curve and curveB.
+const LIGHT_SKY = 0.83, LIGHT_BLK = 0.85;
+const lightLo = (base) => +(base ** 15).toFixed(4), lightSpan = (base) => +(1 - base ** 15).toFixed(4);
+const lightCurve = (level, base) => (base ** (15 - level) - lightLo(base)) / lightSpan(base);
+const glslCurve = (name, base) => `float ${name}(float l) { return (pow(${base}, (1.0 - l) * 15.0) - ${lightLo(base)}) / ${lightSpan(base)}; }`;
+const LIGHT_GLSL = `${glslCurve('curve', LIGHT_SKY)}\n${glslCurve('curveB', LIGHT_BLK)}`;
+
 export {
   BOB_RATE, ckey, clamp, clampRenderDistance, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
-  LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HEALTH, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
+  LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, LIGHT_BLK, LIGHT_GLSL, LIGHT_SKY, lightCurve, MAX_ANIMALS_PER_CHUNK, MAX_HEALTH, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
   PLAYER_W, randInt, randRange, RD_MAX, RD_MIN, READY_RADIUS, REACH, REALMS, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
   storage, UNLOADED, VOID_Y, VOL, WALK_SPEED, WEATHER_KINDS,
 };

@@ -66,5 +66,7 @@ const heldLight = (() => {
     get on() { return on; },
   };
 })();
+// World reads the held light through its extraLight slot (SPEC_deepen M6), so world.js imports no later module.
+world.extraLight = (x, y, z) => heldLight.levelAt(x, y, z);
 
 export { heldLight };

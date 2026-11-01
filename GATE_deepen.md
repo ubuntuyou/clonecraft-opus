@@ -150,6 +150,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 
 ### S6: world seam, light curve, batched (M6, K1, K9) — `step/deepen-6-world-seam`
 - [ ] Contract commit (W2 contract agent, opus), written against the post-S4 `sky.js`; rsh reviewed it.
+- [ ] Contract amendment: depcheck.test.js:36 plant moves from world.js to mesher.js; the test still expects `upward`.
 - [ ] Wave dispatched: T6.1 opus, T6.2 sonnet, T6.3 sonnet.
 - [ ] Owns check by `git diff --stat`.
 - [ ] Integrate: merged after S5; the "Every step" checks pass.

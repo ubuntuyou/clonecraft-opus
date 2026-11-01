@@ -350,7 +350,7 @@ function fillPadded(world, chunk) {
   }
 }
 
-function buildChunkMesh(world, chunk) {
+function buildChunkMesh(world, scene, chunk) {
   const t0 = performance.now();
   fillPadded(world, chunk);
   const ob = QB_OPAQUE, wb = QB_WATER;
@@ -505,14 +505,14 @@ function buildChunkMesh(world, chunk) {
     }
     if (ob.n + wb.n !== before) { if (y < minYSeen) minYSeen = y; if (y > maxYSeen) maxYSeen = y; }
   }
-  chunk.opaqueMesh = setChunkGeometry(world, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, 0);
-  chunk.waterMesh = setChunkGeometry(world, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, 1);
+  chunk.opaqueMesh = setChunkGeometry(world, scene, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, 0);
+  chunk.waterMesh = setChunkGeometry(world, scene, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, 1);
   world.stats.meshMs = performance.now() - t0;
 }
 
-function setChunkGeometry(world, chunk, mesh, buf, material, y0, y1, order) {
+function setChunkGeometry(world, scene, chunk, mesh, buf, material, y0, y1, order) {
   if (mesh) { mesh.geometry.setIndex(null); mesh.geometry.dispose(); }
-  if (buf.n === 0) { if (mesh) world.scene.remove(mesh); return null; }
+  if (buf.n === 0) { if (mesh) scene.remove(mesh); return null; }
   const n = buf.n;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(buf.pos.slice(0, n * 12), 3));
@@ -532,9 +532,30 @@ function setChunkGeometry(world, chunk, mesh, buf, material, y0, y1, order) {
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     mesh.renderOrder = order;
-    world.scene.add(mesh);
+    scene.add(mesh);
   } else mesh.geometry = g;
   return mesh;
 }
 
-export { buildChunkMesh, crystalXform, doorBox, FACES, UV_CORNERS };
+// The mesh adapter of World (SPEC_deepen M6): build or replace a chunk's meshes in `scene`,
+// free and remove them, and show or hide them.
+function chunkMeshes(scene) {
+  return {
+    build(world, chunk) { buildChunkMesh(world, scene, chunk); },
+    dispose(chunk) {
+      for (const m of [chunk.opaqueMesh, chunk.waterMesh]) {
+        if (!m) continue;
+        scene.remove(m);
+        m.geometry.setIndex(null);          // the quad index buffer is shared; keep it alive
+        m.geometry.dispose();
+      }
+      chunk.opaqueMesh = chunk.waterMesh = null;
+    },
+    show(chunk, visible) {
+      if (chunk.opaqueMesh) chunk.opaqueMesh.visible = visible;
+      if (chunk.waterMesh) chunk.waterMesh.visible = visible;
+    },
+  };
+}
+
+export { chunkMeshes, crystalXform, doorBox, FACES, UV_CORNERS };
