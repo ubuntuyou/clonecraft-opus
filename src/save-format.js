@@ -140,8 +140,8 @@ function takeNotice(session, store) {
 function backup(store, key, text, reason, now) {
   const copy = `${key}.rejected.${now}`;
   if (store.set(copy, text)) {
-    store.remove(key);
-    return { msg: `The saved world could not load: ${reason}. A copy is in ${copy}. A new world starts.`, keep: false };
+    if (store.remove(key)) return { msg: `The saved world could not load: ${reason}. A copy is in ${copy}. A new world starts.`, keep: false };
+    store.remove(copy);   // K12: the save key stays, so the save is kept and the copy is not needed
   }
   return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
 }
