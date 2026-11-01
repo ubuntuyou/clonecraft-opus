@@ -1,11 +1,13 @@
 # DISCOVERY: save-format
 
-Gotchas, pointers, and invariants for `src/save-format.js`: the save checks, the edits codec, and the boot reader. Read this file before you add, rename, or remove a save field. `ARCHITECTURE.md` D16 holds the decisions.
+Gotchas, pointers, and invariants for `src/save-format.js`: the save checks, the edits codec, the boot reader, and the boot policy (`openSave`). Read this file before you add, rename, or remove a save field. `ARCHITECTURE.md` D16 holds the decisions.
 
 ## Invariants
 
 - Only `src/save-format.js` calls `JSON.parse` on save text. The save-reader test enforces this rule.
-- Boot reads `SAVE_KEY` only through `readSave(text, seed)`. The file import checks with `validSave(d)`.
+- Boot reads `SAVE_KEY` only through `openSave`, which calls `readSave(text, seed)`. The file import checks with `validSave(d)`.
+- `openSave` holds the whole boot fallback policy. `boot.js` only passes the stores, the clock, and `persist.apply`, then acts on `blocked` and `reload`. Put a new boot rule in `openSave`, not in `boot.js`.
+- `BOOT_NOTICE` (`clonecraft.bootNotice`) lives only in `save-format.js`.
 - `save-format.js` is pure. It imports only from `config.js` and `blocks.js`. It is in `PURE` in `tools/depcheck.js`.
 - A save that `persist.data()` writes passes `validSave`. The live fixture proves this.
 - Boot never deletes a rejected save. It writes the backup key `clonecraft.world.<seed>.rejected.<epoch ms>` first.
@@ -25,12 +27,17 @@ Gotchas, pointers, and invariants for `src/save-format.js`: the save checks, the
 - `inv.loose` holds the stacks in the craft grid, the altar, and on the cursor. `persist.apply` adds each one to the 36 slots. The rest of a stack that does not fit waits in `persist.leftover` (SPEC_hardening H8). `persist.dropLeftover()` drops it at the player from `onLoaded`, after the chunks are meshed. No loose stack is lost on load.
 - `readSave` returns `{ save: null, reason: null }` only for `null` text. Any other text that fails gives a reason, and boot backs it up.
 - An apply throw reloads the page. The notice waits in `sessionStorage` under `clonecraft.bootNotice`. With `keep: true`, the next boot skips `SAVE_KEY` and sets `persist.blocked`.
+- K7 carrier: when the session write fails and the backup succeeded, the notice waits in `localStorage` under `clonecraft.bootNotice`, and the page still reloads. `takeNotice` reads the session first, then the store, and removes the key from both. It removes the store key only when the store holds one, so a normal boot writes nothing.
+- When the backup failed (`keep: true`) and the session write fails too, there is no reload. `persist.blocked` stays true for the visit.
+- Open finding N1 (not fixed): when the backup write succeeds but `store.remove(SAVE_KEY)` fails, `backup` still returns `keep: false`. An apply throw then reloads, applies the same save again, and writes a new `.rejected.` copy on each boot. `localStorage.removeItem` throws only where `setItem` fails too, so this is hard to reach.
+- `validSlice` is internal (K10). The fixture baseline names it only in reason text.
 - The HUD, and so the toast, is hidden until the game starts. Boot shows the notice in the menu load line first, then as a toast when Play or the overlay click starts the game.
 - The save-reader taint is per file, not per scope. Two variables with the same name in one file share the taint. Rename the variable if the rule fires on a value that is not save text.
 
 ## Pointers
 
-- Tests: `tests/save-format.test.js` (fixture, codec, save-sweep, element checks, `readSave`, save-reader).
+- Tests: `tests/save-format.test.js` (fixture, codec, save-sweep, element checks, `readSave`, save-reader, and the boot policy M4-1..M4-13 with a fake store and op log).
 - Pure-module fail proof: `pure: save-format reaches order.js` in `tests/depcheck.test.js`.
 - QA: put text in `clonecraft.world.<seed>` from a page on the same origin, then open `?seed=<seed>`. Use a throwaway seed. Remove the `.rejected.` keys afterwards.
 - QA for a failed backup write: an init script that makes `localStorage.setItem` throw for keys that contain `.rejected.`.
+- QA for K7: an init script that makes `sessionStorage.setItem` throw, and a scratch patch that makes `persist.apply` throw. Expect one reload, a fresh world, the notice, and no `clonecraft.bootNotice` left in either store.

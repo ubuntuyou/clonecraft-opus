@@ -2,7 +2,7 @@
  * SAVE FORMAT — living header (src/save-format.js, SPEC_hardening H1–H3)
  * -------------------------------------------------------------------------------------
  * The shape of a save and the trust boundary for save text: boot reads SAVE_KEY through
- * readSave, and the file import checks with validSave. Terms: a **slice** is the
+ * openSave (the boot policy), and the file import checks with validSave. Terms: a **slice** is the
  * realm-scoped part of a save (SLICE_FIELDS); the **edits** are the save form of the block
  * overrides. The module is pure: Node tests import it. Rules: DISCOVERY_save-format.md.
  * ===================================================================================== */
