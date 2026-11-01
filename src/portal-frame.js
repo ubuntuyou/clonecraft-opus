@@ -14,7 +14,8 @@
  * SITE_R blocks horizontally of the target: a full solid floor, air (or a replaceable non-liquid)
  * for the frame, one clear side to step out, and no lava near it. Without a site, the plan is the
  * fallback platform: 4 x 3 obsidian at the frame's bottom row, air cleared above it, and every
- * lava cell next to the structure turned to obsidian. Either way, the portal never touches lava.
+ * liquid cell (water or lava) next to the structure turned to obsidian. Either way, the portal never
+ * touches lava, and no liquid can flow into the panes.
  * ===================================================================================== */
 import { B, LIQ_KIND, OPAQUE, REPLACEABLE, SOLID } from './blocks.js';
 import { H, UNLOADED } from './config.js';
@@ -127,13 +128,13 @@ function buildPlan(get, tx, ty, tz) {
   const put = (c, id) => { const k = c.join(','); if (!seen.has(k)) { seen.add(k); edits.push([c[0], c[1], c[2], id]); } };
   const cell = (u, v, d) => cellOf(axis, fx, fy, fz, u, v, d);
   if (platform) {
-    // lava next to the structure (platform row, cleared air, frame) turns to obsidian first
+    // liquid (water or lava) next to the structure (platform row, cleared air, frame) turns to obsidian first
     const inBox = (u, v, d) => u >= 0 && u < 4 && v >= 0 && v < 5 && d >= -1 && d <= 1;
     for (let d = -2; d <= 2; d++) for (let v = -1; v <= 5; v++) for (let u = -1; u <= 4; u++) {
       if (inBox(u, v, d)) continue;
       const touches = inBox(u + 1, v, d) || inBox(u - 1, v, d) || inBox(u, v + 1, d) || inBox(u, v - 1, d) || inBox(u, v, d + 1) || inBox(u, v, d - 1);
       const c = cell(u, v, d);
-      if (touches && LIQ_KIND[get(...c)] === 2) put(c, B.OBSIDIAN);
+      if (touches && LIQ_KIND[get(...c)]) put(c, B.OBSIDIAN);
     }
     for (let d = -1; d <= 1; d++) for (let u = 0; u < 4; u++) {
       put(cell(u, 0, d), B.OBSIDIAN);

@@ -136,3 +136,28 @@ test('buildPlan over open lava builds the platform, and the portal never touches
   assert.deepEqual(portalFoot(g.get, [Math.floor(plan.stand[0]), plan.frame.y0 + 2, Math.floor(plan.stand[2])], B.PORTAL_EMBER),
     [Math.floor(plan.stand[0]), plan.frame.y0, Math.floor(plan.stand[2])]);
 });
+
+// SPEC_hardening H4 (portal-seal): in a world full of one liquid kind, the platform plan leaves no
+// liquid cell next to the structure box (platform row, cleared air, frame, panes). Otherwise water
+// flows into the replaceable panes, and portals.onEdit removes the portal.
+function sealedIn(liquid) {
+  const g = grid(liquid);
+  const plan = buildPlan(g.get, 0.5, 33, 0.5);
+  assert.equal(plan.platform, true, 'the plan uses the platform');
+  assert.equal(plan.frame.axis, 'x', 'the platform frame lies along x');
+  assert.equal(g.get(0, 33, 0), liquid, 'the world holds the liquid before the edits');
+  apply(g, plan);
+  // the structure box: 4 wide (x), 5 tall (y), 3 deep (z), around the 2x3 opening
+  const f = plan.frame, inBox = (x, y, z) => x >= f.x0 - 1 && x <= f.x0 + 2 && y >= f.y0 - 1 && y <= f.y0 + 3 && z >= f.z0 - 1 && z <= f.z0 + 1;
+  const wet = [];
+  for (let z = f.z0 - 2; z <= f.z0 + 2; z++) for (let y = f.y0 - 2; y <= f.y0 + 4; y++) for (let x = f.x0 - 2; x <= f.x0 + 3; x++) {
+    if (inBox(x, y, z)) continue;
+    const touches = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([dx, dy, dz]) => inBox(x + dx, y + dy, z + dz));
+    if (touches && LIQ_KIND[g.get(x, y, z)] !== 0) wet.push([x, y, z]);
+  }
+  assert.deepEqual(wet, [], 'liquid cells touch the structure box');
+}
+
+test('portal-seal: a platform in water leaves no water next to the structure', () => sealedIn(B.WATER));
+
+test('portal-seal: a platform in lava leaves no lava next to the structure', () => sealedIn(B.LAVA));
