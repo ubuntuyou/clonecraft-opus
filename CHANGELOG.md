@@ -27,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- A save that cannot be removed after its backup no longer makes the page reload on every boot (SPEC_deepen K12, finding N1). When `localStorage` refuses to remove the save key, the boot now keeps the save, removes the extra copy, shows "It was kept", and turns saving off. Before, each boot wrote a new `.rejected.` copy and reloaded again.
 - The exit portal build no longer leaves a placed chest, furnace, torch, or door behind a portal pane (SPEC_deepen K5). The build now breaks such a cell first, so the block and its contents drop, and the torch key, the other door half, and the door timer clear. Before, a pane overwrote the block, the chest contents were lost, and the stale tile entity and torch key stayed.
 - Mobs, drops, the held item, particles, arrows, and vehicles no longer draw brighter than the terrain around them (SPEC_deepen K1). `brightnessAt` now uses the same normalized light curves as the terrain shader, from one source in `config.js` (`lightCurve`, `LIGHT_GLSL`). Entities in low light are darker than before: block level 4 drops from 0.167 to 0.088, and level 12 from 0.614 to 0.577. The terrain does not change.
 - `ARCHITECTURE.md` D6 and the `engine.js` header now list the `travel` and `victory` states (SPEC_deepen K9). Both freeze the simulation and leave pointer lock.

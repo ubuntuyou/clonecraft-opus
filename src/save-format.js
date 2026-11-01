@@ -137,6 +137,7 @@ function takeNotice(session, store) {
 }
 
 // Copies the rejected text to `<key>.rejected.<now>`, then removes `key`. -> { msg, keep }
+// `keep` is false only when both writes succeed (K12); otherwise the save stays under `key`.
 function backup(store, key, text, reason, now) {
   const copy = `${key}.rejected.${now}`;
   if (store.set(copy, text)) {
