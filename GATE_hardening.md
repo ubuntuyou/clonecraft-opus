@@ -33,7 +33,7 @@ Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, 
 - [x] Playwright, throwaway seed: an apply throw (a scratch-only patch, then reverted) gives the same result after one reload.
 - [x] Playwright: a failed backup write keeps `SAVE_KEY` and sets `persist.blocked`.
 - [x] Playwright: seed 1379819663 opens with Continue, at the same position, with the boss defeated. — SUBSTITUTED (agent, 2026-10-31): seed 777008 reloads with Continue at the same position, and seed 777001 reloads in the Crystal Realm with the boss defeated. The real seed 1234 check needs the export above. Evidence by rsh, 2026-11-01 16:05 CT: Joe exported clonecraft-1379819663-2026-11-01.json (seed 1379819663, not 1234). Copy in /tmp/deepen-clonecraft/seedcheck/. readSave on v0.2.0: no reason. Playwright on port 8781: Continue, position (-1736.66, 135, -22.62) equal to the export, overworld, boss defeated, 55968 of 55968 edits, 36 of 36 slots, health 20, no rejected key, 0 console errors. Amended by Joe, 2026-11-01 16:25 CT: his world is seed 1379819663; seed 1234 was a test seed ("I exported the one I play").
-- [ ] **(owner)** Joe confirms that his seed 1379819663 world is intact. Amended by Joe, 2026-11-01 16:25 CT: his world is seed 1379819663; seed 1234 was a test seed ("I exported the one I play").
+- [x] **(owner)** Joe confirms that his seed 1379819663 world is intact. Amended by Joe, 2026-11-01 16:25 CT: his world is seed 1379819663; seed 1234 was a test seed ("I exported the one I play"). Confirmed by Joe, 2026-11-01 16:50 CT: "world looks intact" (v0.2.0 build).
 - [x] **(owner)** Joe reviews the toast text and the backup key policy. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
 ### Step 1 close
