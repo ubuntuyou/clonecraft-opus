@@ -33,7 +33,7 @@ test('main: main.js does not import order.js first', () => fires(planted((e) => 
 test('main: a module imports main.js', () => fires(planted((e) => e('hud', (t) => "import './main.js';\n" + t)), 'main'));
 test('downward: a module imports a later module directly', () => fires(planted((e) => e('blocks', (t) => "import { player } from './engine.js';\n" + t)), 'downward'));
 test('upward: an earlier name comes from order.js', () => fires(planted((e) => e('vehicles', (t) => "import { mobs as m2 } from './order.js';\n" + t)), 'upward'));
-test('upward: a later name is used at load time', () => fires(planted((e) => e('world', (t) => t + '\nbuildChunkMesh;\n')), 'upward'));
+test('upward: a later name is used at load time', () => fires(planted((e) => e('mesher', (t) => t + '\nterrainMaterial;\n')), 'upward'));
 test('readonly: a module writes an imported name', () => fires(planted((e) => e('main', (t) => t + '\nfunction f() { world = null; }\n')), 'readonly'));
 test('free: a name that is neither defined nor imported', () => fires(planted((e) => e('hud', (t) => t + '\nfunction f() { return notDefinedAnywhere; }\n')), 'free'));
 // SPEC_hardening H9: an IIFE runs at load time, so a later name used inside one is an error.

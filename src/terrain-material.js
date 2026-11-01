@@ -1,6 +1,6 @@
 /* ---- terrain materials: custom shader with baked light, day scaling, fog ---------- */
 import { THREE } from './three.js';
-import { mulberry32 } from './config.js';
+import { LIGHT_GLSL, mulberry32 } from './config.js';
 import { atlasTexture } from './atlas.js';
 import { CLOUD_GLSL, cloudUniforms } from './clouds.js';
 import { FACE_GLSL } from './face-kind.js';
@@ -128,9 +128,7 @@ const TERRAIN_FS = /* glsl */`
   #endif
   CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
   CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
-  float curve(float l) { return (pow(0.83, (1.0 - l) * 15.0) - 0.0611) / 0.9389; }
-  // block light (torches, lava) falls off slower than sky light, so a torch reaches farther
-  float curveB(float l) { return (pow(0.85, (1.0 - l) * 15.0) - 0.0874) / 0.9126; }
+  ${LIGHT_GLSL}
   // G3 (P2): 1 = sunlit, 0 = in shadow. Hardware-filtered depth compares: each read blends 4 texels.
   // Terrain takes 4 reads on a square turned by per-pixel noise (a soft ~0.3-block penumbra); water takes 1.
   // With Soft shadows off (uShadowSoft 0), terrain also takes 1 read: a hard edge.

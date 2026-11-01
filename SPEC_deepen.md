@@ -342,12 +342,14 @@ Steps in one wave own disjoint source files. Waves run in order.
 | W1 | S3 | K3, K4 | `step/deepen-3-atlas-checks` | `atlas.js`; new `tests/atlas.test.js` |
 | W1 | S4 | M7, K2 | `step/deepen-4-realm-look` | `config.js:32-40`; `sky.js:298-342`; `ash.js:65`; `fireflies.js:92`; new `tests/realm-look.test.js` |
 | W2 | S5 | M1, M2, K8 | `step/deepen-5-realm-scoped` | `realms.js`, `persist.js`, `tile-entities.js`, `homes.js`, `interact.js` (`editIndex` only); new `tests/realm-slice.test.js` |
-| W2 | S6 | M6, K1, K9, `batched` | `step/deepen-6-world-seam` | `world.js`, `engine.js`, `held-light.js`, `mesher.js` (`:356,510-538,543`), `config.js` (new light block, export line), `sky.js` (`curveB`), `terrain-material.js:129-131`, `order.js` (`:17-18,99,138`), `depcheck.js:22`; new `tests/world.test.js`; `tests/config.test.js` |
+| W2 | S6 | M6, K1, K9, `batched` | `step/deepen-6-world-seam` | `world.js`, `engine.js`, `held-light.js`, `mesher.js` (`:353,508-540` at `69da971`; `buildChunkMesh`, `setChunkGeometry`, the export line, new `chunkMeshes`), `config.js` (new light block, export line), `sky.js` (`curveB`), `terrain-material.js:129-131`, `order.js` (`:17-18,99,138`), `depcheck.js:22`; new `tests/world.test.js`; `tests/config.test.js`; `tests/depcheck.test.js` (one plant, `:36`) |
 | W3 | S7 | M3, K5, K11 | `step/deepen-7-boss-lock` | `boss.js`, `portals.js`, `portal-frame.js`, `realms.js` (`boss` field, `load`, `data`); `tests/portals.test.js` |
 | W3 | S8 | M8 | `step/deepen-8-batched` | `world.js` (`beginBatch`, `endBatch`), `grass.js`, `interact.js`, `farming.js`, `explosions.js`, `leaf-decay.js`, `liquids.js`; `tests/world.test.js` |
 | W3 | S9 | M9, M10 | `step/deepen-9-precip-order` | new `precip.js`; `weather.js`; `config.js` (`DRAW_ORDER`, export line); `sky.js:69,91,104,126,185`; `mesher.js:511-512,537`; `targeting.js:62`; `ash.js:28`; `fireflies.js:36`; `particles.js:59`; `order.js` (header count, `:17-18`, the new line); `depcheck.js:22`; new `tests/precip.test.js`; `tests/config.test.js` |
 
 **Shared files.** No wave has two steps in `order.js`, `tools/depcheck.js`, or `config.js` (W1: S2 and S4 split them; W2: S6; W3: S9), so no in-wave resolve is needed. The module count in the `order.js` header goes 51 → 52 (S2) → 53 (S9). The orchestrator writes the shared docs (`ARCHITECTURE.md`, `DISCOVERY_*.md`, `CHANGELOG.md`) at each step close, one step at a time. `index.html` is rebuilt once per wave close on `main`.
+
+**Contract amendment (S6, rsh approved).** S6 Owns adds `tests/depcheck.test.js`. One plant moves: the test "upward: a later name is used at load time" (`:36`) plants `terrainMaterial;` into `mesher.js`, not `buildChunkMesh;` into `world.js`. Reason: under M6, `world.js` has no upward names, so the old plant fails as `free`, not `upward`. The test name and its `upward` expectation stay, so the rule keeps its fail proof. This line is the one exception to "added lines only".
 
 **Merge order.** W1: any. W2: S5, then S6. W3: S7, then S8 (decision 13), then S9. S8's integrate phase first merges `main` (with S7) into its step branch.
 
@@ -452,7 +454,7 @@ Node tests run under `npm test`. QA means the runtime QA agent. A test is named 
 5. A block above lowers sky light below 15; removal restores 15; a stair passes none down.
 6. `setBlock` refuses y -1, y H, a locked cell, an unloaded cell, the same id. `onEdit` gets `(x, y, z, old, new)` after the relight.
 7. `extraLight = () => 14` gives `lightCurve(14, LIGHT_BLK)` at a dark cell; `null` gives 0.04.
-8. `reset` unloads all; one `dispose` per meshed chunk; the hook sees the old realm; an old-epoch result is dropped.
+8. `reset` unloads all; one `dispose` call per loaded chunk (an unmeshed chunk has no meshes, so its call frees nothing); the hook sees the old realm; an old-epoch result is dropped.
 9. A center move of RD+4 unloads and disposes the old chunks.
 10. An Ember dark cell gives `lightCurve(9, LIGHT_BLK)`.
 11. `batched` builds nothing inside and once per chunk after.

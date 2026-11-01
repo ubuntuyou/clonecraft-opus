@@ -150,6 +150,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 
 ### S6: world seam, light curve, batched (M6, K1, K9) — `step/deepen-6-world-seam`
 - [ ] Contract commit (W2 contract agent, opus), written against the post-S4 `sky.js`; rsh reviewed it.
+- [ ] Contract amendment: depcheck.test.js:36 plant moves from world.js to mesher.js; the test still expects `upward`.
 - [ ] Wave dispatched: T6.1 opus, T6.2 sonnet, T6.3 sonnet.
 - [ ] Owns check by `git diff --stat`.
 - [ ] Integrate: merged after S5; the "Every step" checks pass.
@@ -181,7 +182,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [ ] Mutation: `RD + 3` → `RD + 4` → M6-9 fails.
 - [ ] Mutation: drop the `batched` join → M6-12 fails; drop `finally` → M6-13 fails; capture the set at open → M6-14 fails.
 - [ ] Mutation: unrounded curve constants → K1-3 fails; drop the normalization → K1-1 fails.
-- [ ] Structure: `world.js` imports only `config`, `blocks`, `gen-service`; `world` is in `PURE`; `order.js` no longer re-exports `buildChunkMesh` or `heldLight`; one `pow(0.8` site in `src/`; no reader of `world.scene`.
+- [ ] Structure: `world.js` imports only `config`, `blocks`, `gen-service`; `world` is in `PURE`; `order.js` no longer re-exports `buildChunkMesh` or `heldLight`; 0 literal `pow(0.8` sites in `src/`; the curves come only from `LIGHT_GLSL` and `lightCurve` (this states the same intent as "one `pow(0.8` site": one source; `config.js` builds the GLSL text from `LIGHT_SKY` and `LIGHT_BLK`); no reader of `world.scene`.
 - [ ] QA: an edit remeshes once with no hole; a realm round trip does not grow `renderer.info.memory.geometries`; a held torch brightens mobs.
 - [ ] QA: K1 before/after screenshots (mob, drop, held item; dark cave, night) and the level table are attached here.
 - [ ] **(owner)** Joe looks at the K1 screenshots and the level table, and accepts the darker entities.

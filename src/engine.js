@@ -3,6 +3,8 @@
  * -------------------------------------------------------------------------------------
  * The renderer, scene, camera, and world live here because the player owns the view.
  * Game states: 'loading' -> 'menu' -> 'playing' <-> 'paused' | 'inventory' | 'homes' | 'dead'.
+ * 'travel' runs from 'playing' or 'dead' back to 'playing' while a realm loads. 'victory' runs from
+ * 'playing' when the Titan dies. Both freeze the simulation and leave pointer lock.
  * K toggles flight (setFlying). Flight stays on when the player touches the ground.
  * Only 'playing' holds pointer lock. The simulation runs in 'playing', 'inventory', 'homes',
  * and 'dead'; it freezes in 'paused' and before the first start.
@@ -10,6 +12,7 @@
 import { THREE } from './three.js';
 import { CONFIG, MAX_HEALTH, PLAYER_H, PLAYER_W, SEA } from './config.js';
 import { World } from './world.js';
+import { chunkMeshes } from './mesher.js';
 
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -25,7 +28,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x9cc4ff, 80, 120);
 const camera = new THREE.PerspectiveCamera(CONFIG.fov, innerWidth / innerHeight, 0.05, 1400);
 camera.rotation.order = 'YXZ';
-const world = new World(scene);
+const world = new World(chunkMeshes(scene));
 
 const game = {
   state: 'loading', started: false, debug: false,
