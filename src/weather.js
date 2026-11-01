@@ -32,6 +32,8 @@ const weather = (() => {
     for (let y = H - 1; y > 0; y--) if (c.blocks[lidx(lx, y, lz)] !== B.AIR) return y;
     return 0;
   }
+  // TODO M9 (T9.1): zone, precip, and snowFloor keep their names as thin wrappers over precip.js
+  // (zoneOf, precipKind, snowFloor, rainFloor); the spawn and drift lines call the module too.
   // The zone of column (x, z): -1 unloaded, 0 dry (desert), 1 by height (snow at or above MELT, rain
   // below), 2 snow (snowy biomes).
   function zone(x, z) {

@@ -160,8 +160,12 @@ const lightCurve = (level, base) => (base ** (15 - level) - lightLo(base)) / lig
 const glslCurve = (name, base) => `float ${name}(float l) { return (pow(${base}, (1.0 - l) * 15.0) - ${lightLo(base)}) / ${lightSpan(base)}; }`;
 const LIGHT_GLSL = `${glslCurve('curve', LIGHT_SKY)}\n${glslCurve('curveB', LIGHT_BLK)}`;
 
+// The renderOrder of every drawn layer (SPEC_deepen M10). three.js draws a lower value first.
+// TODO M10 (T9.1): the renderOrder sites read this table.
+const DRAW_ORDER = Object.freeze({ DOME: -10, SKY_BODY: -9, TERRAIN: 0, WATER: 1, STARS: 1.5, CLOUDS: 2, CRACK: 2, EFFECTS: 3 });
+
 export {
-  BOB_RATE, ckey, clamp, clampRenderDistance, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
+  BOB_RATE, ckey, clamp, clampRenderDistance, CLIMB_V, CONFIG, CS, DRAW_ORDER, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
   LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, LIGHT_BLK, LIGHT_GLSL, LIGHT_SKY, lightCurve, MAX_ANIMALS_PER_CHUNK, MAX_HEALTH, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
   PLAYER_W, randInt, randRange, RD_MAX, RD_MIN, READY_RADIUS, REACH, REALMS, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
   storage, UNLOADED, VOID_Y, VOL, WALK_SPEED, WEATHER_KINDS,
