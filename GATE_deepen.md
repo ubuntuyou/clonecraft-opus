@@ -17,110 +17,110 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 ### S1: boot policy (M4, K7, K10) — `step/deepen-1-boot-policy`
 - [ ] Contract commit written by the W1 contract agent (opus); rsh reviewed it.
 - [ ] Wave dispatched: T1.1 sonnet, T1.2 sonnet, T1.3 sonnet.
-- [ ] Owns check: `git diff --stat` per task touches only its Owns list.
-- [ ] Integrate: the "Every step" checks pass.
-- [ ] K7 repro (QA, wave base): no reload, `persist.blocked` true, half-applied state. If it does not reproduce, record it here and skip the K7 fix boxes.
-- [ ] Unit: M4-1
-- [ ] Unit: M4-2
-- [ ] Unit: M4-3
-- [ ] Unit: M4-4
-- [ ] Unit: M4-5
-- [ ] Unit: M4-6
-- [ ] Unit: M4-7
-- [ ] Unit: M4-8
-- [ ] Unit: M4-9
-- [ ] Unit (K7): M4-10
-- [ ] Unit (K7): M4-11
-- [ ] Unit (K7): M4-12
-- [ ] Unit (K10): M4-13
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: swap backup `set` and `remove` → M4-3 fails.
-- [ ] Mutation: drop the `keep` skip → M4-5 fails.
-- [ ] Mutation: drop `blocked` on an apply throw → M4-8 fails.
-- [ ] Mutation: no store carrier on a failed session write → M4-10 fails.
-- [ ] Mutation: `reload = true` always → M4-11 fails.
-- [ ] Mutation: `takeNotice` reads the session only → M4-12 fails.
-- [ ] Structure: grep shows `validSlice` is not exported; `takeNotice` and `rejectSave` are gone from `boot.js`; `BOOT_NOTICE` lives only in `save-format.js`.
-- [ ] Structure: `order.js` and `PURE` unchanged (`git diff main -- src/order.js tools/depcheck.js` empty).
-- [ ] QA: a corrupt save gives a fresh world, the notice, and a backup key with the exact text.
-- [ ] QA: K7 fix gives one reload, a fresh world, the notice, `persist.blocked` false, the `.rejected.` key, and no `clonecraft.bootNotice` left in `localStorage`.
-- [ ] QA: 0 game console errors; throwaway keys removed; `lastSeed` restored; snapshots deleted.
-- [ ] Docs: `ARCHITECTURE.md` (save-format Seams row names `openSave`, drops `validSlice`); `DISCOVERY_save-format.md` (boot reads only through `openSave`; the K7 carrier); living headers of `boot.js` and `save-format.js`; `CHANGELOG.md` `[Unreleased]` (Changed M4, Fixed K7, Removed K10).
+- [x] Owns check: `git diff --stat` per task touches only its Owns list. Note: `boot.js`, `save-format.js`, `tests/save-format.test.js` only (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Integrate: the "Every step" checks pass. Note: S1 tip 574603e: depcheck pass, 123/123, build ok; tests add lines only; fixtures unchanged; notice texts byte-equal (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] K7 repro (QA, wave base): no reload, `persist.blocked` true, half-applied state. If it does not reproduce, record it here and skip the K7 fix boxes. Note: reproduced at 8ebe3a7 (seed 790007, forced apply throw): no reload, `blocked` true, realm ember, inventory kept, fresh spawn (`/tmp/deepen-clonecraft/wave-notes.md`).
+- [x] Unit: M4-1 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-2 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-3 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-4 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-5 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-6 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-7 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-8 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit: M4-9 Note: green on `main` 5bacd88 (`npm run check`, 167/167).
+- [x] Unit (K7): M4-10 Note: green on `main` 5bacd88; red on T1.2 497bad7 before T1.1 merged.
+- [x] Unit (K7): M4-11 Note: green on `main` 5bacd88; red on T1.2 497bad7 before T1.1 merged.
+- [x] Unit (K7): M4-12 Note: green on `main` 5bacd88; red on T1.2 497bad7 before T1.1 merged.
+- [x] Unit (K10): M4-13 Note: green on `main` 5bacd88.
+- [x] Ported cases: none deleted. Note: `git diff main -- tests` shows 0 removed lines (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: swap backup `set` and `remove` → M4-3 fails. Note: caught by M4-3, M4-4, M4-11 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: drop the `keep` skip → M4-5 fails. Note: caught by M4-5 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: drop `blocked` on an apply throw → M4-8 fails. Note: caught by M4-8, M4-10, M4-11 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: no store carrier on a failed session write → M4-10 fails. Note: caught by M4-10, M4-12b (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: `reload = true` always → M4-11 fails. Note: caught by M4-1..M4-4, M4-11, M4-12b (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: `takeNotice` reads the session only → M4-12 fails. Note: caught by M4-12, M4-12b (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Structure: grep shows `validSlice` is not exported; `takeNotice` and `rejectSave` are gone from `boot.js`; `BOOT_NOTICE` lives only in `save-format.js`. Note: grep on `main` 5bacd88.
+- [x] Structure: `order.js` and `PURE` unchanged (`git diff main -- src/order.js tools/depcheck.js` empty). Note: empty on the S1 tip (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] QA: a corrupt save gives a fresh world, the notice, and a backup key with the exact text. Note: seed 791015, backup holds `{bad`, `SAVE_KEY` gone (`/tmp/deepen-clonecraft/w1-qa.md` C).
+- [x] QA: K7 fix gives one reload, a fresh world, the notice, `persist.blocked` false, the `.rejected.` key, and no `clonecraft.bootNotice` left in `localStorage`. Note: seed 791006, 2 document requests, no reload loop (`/tmp/deepen-clonecraft/w1-qa.md` D).
+- [x] QA: 0 game console errors; throwaway keys removed; `lastSeed` restored; snapshots deleted. Note: 0 errors; storage cleared on every QA origin (ports 8786..8789, not Joe's origin, so no `lastSeed` to restore); boot shots deleted (`/tmp/deepen-clonecraft/w1-qa.md`).
+- [x] Docs: `ARCHITECTURE.md` (save-format Seams row names `openSave`, drops `validSlice`); `DISCOVERY_save-format.md` (boot reads only through `openSave`; the K7 carrier); living headers of `boot.js` and `save-format.js`; `CHANGELOG.md` `[Unreleased]` (Changed M4, Fixed K7, Removed K10). Note: fce403d (the `boot.js` header came with the S1 merge).
 - [ ] **(owner)** Joe reviews the S1 diff.
-- [ ] Merged to `main`; task worktrees and branches removed.
+- [x] Merged to `main`; task worktrees and branches removed. Note: 5e07936; worktrees d1, d1a..d1c and their branches removed.
 
 ### S2: face kind (M5) — `step/deepen-2-face-kind`
 - [ ] Contract commit (W1 contract agent, opus); rsh reviewed it.
 - [ ] Wave dispatched: T2.1 opus, T2.2 sonnet, T2.3 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: the "Every step" checks pass.
-- [ ] Unit: M5-1
-- [ ] Unit: M5-2
-- [ ] Unit: M5-3
-- [ ] Unit: M5-4
-- [ ] Unit: M5-5 (256-byte equivalence, decision 8)
-- [ ] Unit: M5-6
-- [ ] Unit: M5-7
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: WET 246 → 255 → M5-1 fails.
-- [ ] Mutation: PORTAL_CRYSTAL 172 → 170 → M5-2 fails.
-- [ ] Mutation: swap the PLANT top and base bytes → M5-3 fails.
-- [ ] Mutation: drop STILL from the wet rule → M5-4 fails.
-- [ ] Mutation: decode tolerance 0.5 → 0 → M5-5 fails.
-- [ ] Mutation: leave one kind out of `FACE_GLSL` → M5-6 fails.
-- [ ] Mutation: put `step(0.45, aTint.a)` back in `shadows.js` → M5-7 fails.
-- [ ] Structure: no `SWAY_` constant in `mesher.js`; no `step(0.` reads `aTint.a`; `face-kind` is in `order.js` and `PURE`; the header count is 52.
-- [ ] QA: screenshot pairs (overworld day: leaves, water, torch; ember: lava; crystal: crystal, portal) are identical, or each difference is explained here.
-- [ ] QA: no GLSL compile error; 0 game console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md` (the face-kind seam, `:30-31`); new `DISCOVERY_face-kind.md`; `DISCOVERY_engine.md` drops the obsolete byte-window gotcha; living headers of `face-kind.js` and `order.js`; `CHANGELOG.md` (Changed M5).
+- [x] Owns check by `git diff --stat`. Note: by file; the hunks outside the line ranges are import lines and the `order.js:35` header fix (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Integrate: the "Every step" checks pass. Note: S2 tip 4b079ca: depcheck pass, 130/130, build ok; no user-visible text (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Unit: M5-1 Note: green on `main` 5bacd88.
+- [x] Unit: M5-2 Note: green on `main` 5bacd88.
+- [x] Unit: M5-3 Note: green on `main` 5bacd88.
+- [x] Unit: M5-4 Note: green on `main` 5bacd88.
+- [x] Unit: M5-5 (256-byte equivalence, decision 8) Note: green on `main` 5bacd88.
+- [x] Unit: M5-6 Note: green on `main` 5bacd88.
+- [x] Unit: M5-7 Note: green on `main` 5bacd88.
+- [x] Ported cases: none deleted. Note: `tests/face-kind.test.js` is new; 0 removed lines (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: WET 246 → 255 → M5-1 fails. Note: caught by M5-1..M5-5 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: PORTAL_CRYSTAL 172 → 170 → M5-2 fails. Note: caught by M5-2, M5-5 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: swap the PLANT top and base bytes → M5-3 fails. Note: caught by M5-3 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: drop STILL from the wet rule → M5-4 fails. Note: caught by M5-4 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: decode tolerance 0.5 → 0 → M5-5 fails. Note: caught by M5-5 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: leave one kind out of `FACE_GLSL` → M5-6 fails. Note: caught by M5-6 (GLOW left out) (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: put `step(0.45, aTint.a)` back in `shadows.js` → M5-7 fails. Note: caught by M5-7 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Structure: no `SWAY_` constant in `mesher.js`; no `step(0.` reads `aTint.a`; `face-kind` is in `order.js` and `PURE`; the header count is 52. Note: grep on `main` 5bacd88.
+- [x] QA: screenshot pairs (overworld day: leaves, water, torch; ember: lava; crystal: crystal, portal) are identical, or each difference is explained here. Note: 0 differing pixels in all 4 scenes, overworld night too (`/tmp/deepen-clonecraft/w1-qa.md` B; PNGs in `/tmp/deepen-clonecraft/qa-w1/`).
+- [x] QA: no GLSL compile error; 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w1-qa.md` A and Notes.
+- [x] Docs: `ARCHITECTURE.md` (the face-kind seam, `:30-31`); new `DISCOVERY_face-kind.md`; `DISCOVERY_engine.md` drops the obsolete byte-window gotcha; living headers of `face-kind.js` and `order.js`; `CHANGELOG.md` (Changed M5). Note: 59b1ec4 (D55 and the face kind Seams row); headers came with the S2 merge (4b079ca).
 - [ ] **(owner)** Joe reviews the S2 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: e970ebd; worktrees d2, d2a..d2c and their branches removed.
 
 ### S3: atlas checks (K3, K4) — `step/deepen-3-atlas-checks`
 - [ ] Contract commit (W1 contract agent, opus); rsh reviewed it.
 - [ ] Wave dispatched: T3.1 sonnet, T3.2 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: the "Every step" checks pass.
-- [ ] K4 repro: K3/4-4 is red on the contract commit, before the fix.
-- [ ] Unit: K3/4-1 (the real atlas loads)
-- [ ] Unit: K3/4-2
-- [ ] Unit: K3/4-3
-- [ ] Unit: K3/4-4
-- [ ] Unit: K3/4-5
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: `>=` → `>` in the tile-count check → K3/4-4 fails.
-- [ ] Mutation: remove the K3 throw → K3/4-5 fails.
-- [ ] Structure: the only new export is `ATLAS_TILES`; no other file changed.
-- [ ] QA: boot with 0 console errors; hotbar and terrain look unchanged.
-- [ ] Docs: `DISCOVERY_engine.md` (the 256-tile limit, 147 free); `atlas.js` header; `CHANGELOG.md` (Fixed K3, K4).
+- [x] Owns check by `git diff --stat`. Note: `atlas.js`, `tests/atlas.test.js` only (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Integrate: the "Every step" checks pass. Note: S3 tip 2408024: depcheck pass, 115/115, build ok (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] K4 repro: K3/4-4 is red on the contract commit, before the fix. Note: red on T3.2 7c6bba2 (the contract plus the tests, before T3.1) (`/tmp/deepen-clonecraft/wave-notes.md`).
+- [x] Unit: K3/4-1 (the real atlas loads) Note: green on `main` 5bacd88.
+- [x] Unit: K3/4-2 Note: green on `main` 5bacd88.
+- [x] Unit: K3/4-3 Note: green on `main` 5bacd88.
+- [x] Unit: K3/4-4 Note: green on `main` 5bacd88.
+- [x] Unit: K3/4-5 Note: green on `main` 5bacd88.
+- [x] Ported cases: none deleted. Note: `tests/atlas.test.js` is new (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: `>=` → `>` in the tile-count check → K3/4-4 fails. Note: caught by K3/4-4 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: remove the K3 throw → K3/4-5 fails. Note: caught by K3/4-5, K3/4-6 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Structure: the only new export is `ATLAS_TILES`; no other file changed. Note: `/tmp/deepen-clonecraft/w1-integrate.md`.
+- [x] QA: boot with 0 console errors; hotbar and terrain look unchanged. Note: 0 errors; 0 differing pixels in whole frames with the HUD (`/tmp/deepen-clonecraft/w1-qa.md` A, B).
+- [x] Docs: `DISCOVERY_engine.md` (the 256-tile limit, 147 free); `atlas.js` header; `CHANGELOG.md` (Fixed K3, K4). Note: 70e8073 (also D56 in `ARCHITECTURE.md`).
 - [ ] **(owner)** Joe reviews the S3 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: 1bb34ac; worktrees d3, d3a, d3b and their branches removed.
 
 ### S4: realm look (M7, K2) — `step/deepen-4-realm-look`
 - [ ] Contract commit (W1 contract agent, opus); rsh reviewed it.
 - [ ] Wave dispatched: T4.1 sonnet, T4.2 sonnet, T4.3 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: the "Every step" checks pass.
-- [ ] Unit: M7-1
-- [ ] Unit: M7-2
-- [ ] Unit: M7-3
-- [ ] Unit: M7-4
-- [ ] Unit (K2): M7-5
-- [ ] Unit: M7-6
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: ember daylight 0.3 → 0.35 → M7-3 fails.
-- [ ] Mutation: flip crystal `fx.ash` → M7-4 fails.
-- [ ] Mutation: delete ember `ambientTint` → M7-5 fails.
-- [ ] Mutation: put `realm.current === 'ember'` back in `ash.js` → M7-6 fails.
-- [ ] Structure: no `EMBER_`/`CRYSTAL_` constant in `sky.js`; `git diff main -- src/post.js src/weather.js` is empty.
-- [ ] QA: terrain uniforms equal per realm, wave base versus step; screenshot pairs identical or explained.
-- [ ] QA: 0 game console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md` D48 (the look in the row); `DISCOVERY_engine.md:21-22`; `sky.js` header; `CHANGELOG.md` (Changed M7, Fixed K2).
+- [x] Owns check by `git diff --stat`. Note: `/tmp/deepen-clonecraft/w1-integrate.md`.
+- [x] Integrate: the "Every step" checks pass. Note: S4 tip c23f4e4: depcheck pass, 126/126, build ok; `enter` texts byte-equal (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Unit: M7-1 Note: green on `main` 5bacd88.
+- [x] Unit: M7-2 Note: green on `main` 5bacd88.
+- [x] Unit: M7-3 Note: green on `main` 5bacd88.
+- [x] Unit: M7-4 Note: green on `main` 5bacd88.
+- [x] Unit (K2): M7-5 Note: the tests are named `K2 ...` (2 tests); green on `main` 5bacd88.
+- [x] Unit: M7-6 Note: green on `main` 5bacd88.
+- [x] Ported cases: none deleted. Note: `tests/realm-look.test.js` is new (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: ember daylight 0.3 → 0.35 → M7-3 fails. Note: caught by M7-3 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: flip crystal `fx.ash` → M7-4 fails. Note: caught by M7-4 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: delete ember `ambientTint` → M7-5 fails. Note: caught by the `K2 ...` tests (this box's M7-5), M7-2, M7-3 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Mutation: put `realm.current === 'ember'` back in `ash.js` → M7-6 fails. Note: caught by M7-6 (`/tmp/deepen-clonecraft/w1-integrate.md`).
+- [x] Structure: no `EMBER_`/`CRYSTAL_` constant in `sky.js`; `git diff main -- src/post.js src/weather.js` is empty. Note: grep on `main` 5bacd88; `git diff 8ebe3a7 -- src/post.js src/weather.js` is empty.
+- [x] QA: terrain uniforms equal per realm, wave base versus step; screenshot pairs identical or explained. Note: 21 uniforms equal in 4 states; 0 differing pixels (`/tmp/deepen-clonecraft/w1-qa.md` B).
+- [x] QA: 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w1-qa.md` A and Notes.
+- [x] Docs: `ARCHITECTURE.md` D48 (the look in the row); `DISCOVERY_engine.md:21-22`; `sky.js` header; `CHANGELOG.md` (Changed M7, Fixed K2). Note: 01f838e (the look note sits at the end of D47; D48 names `look.ambientTint`).
 - [ ] **(owner)** Joe reviews the S4 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: 14a147a; worktrees d4, d4a..d4c and their branches removed.
 
 ### W1 close
-- [ ] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once.
+- [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: 5bacd88; depcheck pass, 167/167, fresh-build check pass.
 - [ ] **(owner)** Joe approves the W1 merge.
 
 ## Wave 2
