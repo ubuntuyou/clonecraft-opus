@@ -194,13 +194,6 @@ class World {
     if (this.onEdit) this.onEdit(x, y, z, old, id);
     return true;
   }
-  // Legacy pair. boss.js and portals.js still call it until S7 converts them; the S8 integrate step deletes it.
-  // Use batched() in new code.
-  beginBatch() { this.batch = new Set(); }
-  endBatch() {
-    const set = this.batch; this.batch = null;
-    if (set) for (const tc of set) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
-  }
   // Runs fn() with remeshing deferred; the outermost call remeshes each touched chunk once, even when fn throws.
   batched(fn) {
     if (this.batch) return fn();
