@@ -454,7 +454,7 @@ Node tests run under `npm test`. QA means the runtime QA agent. A test is named 
 5. A block above lowers sky light below 15; removal restores 15; a stair passes none down.
 6. `setBlock` refuses y -1, y H, a locked cell, an unloaded cell, the same id. `onEdit` gets `(x, y, z, old, new)` after the relight.
 7. `extraLight = () => 14` gives `lightCurve(14, LIGHT_BLK)` at a dark cell; `null` gives 0.04.
-8. `reset` unloads all; one `dispose` per meshed chunk; the hook sees the old realm; an old-epoch result is dropped.
+8. `reset` unloads all; one `dispose` call per loaded chunk (an unmeshed chunk has no meshes, so its call frees nothing); the hook sees the old realm; an old-epoch result is dropped.
 9. A center move of RD+4 unloads and disposes the old chunks.
 10. An Ember dark cell gives `lightCurve(9, LIGHT_BLK)`.
 11. `batched` builds nothing inside and once per chunk after.
