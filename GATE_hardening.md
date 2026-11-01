@@ -7,7 +7,7 @@ The gate file for `SPEC_hardening.md`. Check a box only after you verify it your
 Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, so the notice shows in the menu load line, and a 12 s toast repeats it when the game starts. Baseline: 226 accepted mutants, each applied in Chromium with no throw.
 
 ### Before the step
-- [ ] Back up Joe's seed 1234 save text to the session scratchpad (not the repo). — NOT POSSIBLE: Joe plays from `file://` in his own browser (23:06 CT). Substitute: Joe exports the world, and rsh runs `readSave` on it before Joe opens the new build.
+- [ ] Back up Joe's seed 1234 save text to the session scratchpad (not the repo). — NOT POSSIBLE: Joe plays from `file://` in his own browser (23:06 CT). Substitute: Joe exports the world, and rsh runs `readSave` on it before Joe opens the new build. Evidence by rsh, 2026-11-01 16:05 CT: Joe exported clonecraft-1379819663-2026-11-01.json (seed 1379819663, not 1234). Copy in /tmp/deepen-clonecraft/seedcheck/. readSave on v0.2.0: no reason. Playwright on port 8781: Continue, position (-1736.66, 135, -22.62) equal to the export, overworld, boss defeated, 55968 of 55968 edits, 36 of 36 slots, health 20, no rejected key, 0 console errors. Open until Joe confirms which seed is his world.
 - [x] Export `tests/fixtures/save-live.json` from a throwaway seed. Every slice field is populated in the overworld, the Ember slice, and the Crystal slice. `portals.crystalBack` and `boss` are set.
 
 ### H3: the pure save-format module
@@ -32,7 +32,7 @@ Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, 
 - [x] Playwright, throwaway seed: a corrupt save gives a fresh world, a toast with the reason and the key, and a backup key that holds the exact text.
 - [x] Playwright, throwaway seed: an apply throw (a scratch-only patch, then reverted) gives the same result after one reload.
 - [x] Playwright: a failed backup write keeps `SAVE_KEY` and sets `persist.blocked`.
-- [ ] Playwright: seed 1234 opens with Continue, at the same position, with the boss defeated. — SUBSTITUTED (agent, 2026-10-31): seed 777008 reloads with Continue at the same position, and seed 777001 reloads in the Crystal Realm with the boss defeated. The real seed 1234 check needs the export above.
+- [ ] Playwright: seed 1234 opens with Continue, at the same position, with the boss defeated. — SUBSTITUTED (agent, 2026-10-31): seed 777008 reloads with Continue at the same position, and seed 777001 reloads in the Crystal Realm with the boss defeated. The real seed 1234 check needs the export above. Evidence by rsh, 2026-11-01 16:05 CT: Joe exported clonecraft-1379819663-2026-11-01.json (seed 1379819663, not 1234). Copy in /tmp/deepen-clonecraft/seedcheck/. readSave on v0.2.0: no reason. Playwright on port 8781: Continue, position (-1736.66, 135, -22.62) equal to the export, overworld, boss defeated, 55968 of 55968 edits, 36 of 36 slots, health 20, no rejected key, 0 console errors. Open until Joe confirms which seed is his world.
 - [ ] **(owner)** Joe confirms that his seed 1234 world is intact.
 - [x] **(owner)** Joe reviews the toast text and the backup key policy. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
