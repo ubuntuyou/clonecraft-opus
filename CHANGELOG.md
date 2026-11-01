@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- One travel ratio (SPEC_hardening H10): `defaultTarget` reads `REALMS.ember.scale` instead of a bare 8. The y offset and the clamp are named: `EMBER_DY` (64), `EMBER_Y_MIN` (33), and `EMBER_Y_MAX` (110). No code read `REALMS.*.label`, so it is removed. The Ember travel target does not change.
 - The boot reader (SPEC_hardening H1): boot reads the save through `readSave`, which runs the same checks as the import. A save that fails, or that throws while it loads, is copied to `clonecraft.world.<seed>.rejected.<epoch ms>` and removed. A new world starts, and the menu and a toast name the reason and the backup key. When the backup cannot be written, the save stays and saving is off for that visit.
 - The save checks (SPEC_hardening H2) now check each liquid and leaf queue cell, each chest (27 slots) and furnace (3 slots and its burn state), each home yaw, the hotbar slot, the player health, and the stack durability type. An import of a bad file shows the "not a Clonecraft world save" alert instead of blocking its seed.
 - The save module (SPEC_hardening H3): the save checks, the edits codec, and the boot reader live in the pure module `src/save-format.js`. `REALMS` and `WEATHER_KINDS` move to `config.js`, and `VEHICLE_KINDS` moves to `blocks.js`.
@@ -20,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 - `?rd=2` no longer hangs on the loading screen (SPEC_hardening H6). The render distance range is 3–16. The URL parameter, the saved setting, and the slider are held to that range.
 - The exit portal can no longer be broken after the boss kill (SPEC_hardening H7). Mining, TNT, and placement leave its frame and its panes whole. Nothing rebuilt it before.
 - A load no longer deletes the stacks that do not fit the inventory (SPEC_hardening H8). Stacks from the crafting grid, the altar, or the cursor that find no slot drop at the player.
+- A travel during the Titan's death animation no longer loses the kill (SPEC_hardening H5). The death and respawn path and the arrival portal both keep it. `realm.leave()` shatters a dying Titan at once. Its loot and the exit portal go into the crystal stash, and the save records `defeated: true`. The victory screen shows once, after the arrival. Loot left on the ground is still lost on a reload, because dropped items are not saved.
 - The depcheck `upward` rule now catches a later-module name inside an immediately-invoked function (SPEC_hardening H9). Such a function runs at load time.
 
 ### Added

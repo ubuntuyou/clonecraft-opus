@@ -16,6 +16,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - A structure stamp writes only cells inside its own chunk (`structCtx` drops the others). Every placement decision uses a world hash or `column()`, never the chunk's own blocks, so neighbour chunks agree (D28).
 - A structure must stay reachable on foot. After a stamp change, run the walk check (see Pointers).
 - New realm-scoped state must join `realm.leave()` and `realm.enter()` in `src/realms.js`, and the slice fields (`SLICE_FIELDS`) if it is saved. Otherwise it leaks from one realm into the next (D47).
+- `realm.leave()` calls `boss.finish()` first. A Titan in the 'dying' state shatters at once, without effects, so its loot and the exit portal join the crystal stash and the save records `defeated: true` (D53). The victory screen shows after the arrival. Dropped items are not saved, so the loot on the ground is lost on a reload.
 - During `world.reset`, `world.realm` is still the realm of the chunks that unload. Code in `onChunkUnloaded` can trust it. `realm.current` may already name the target.
 - Hooks that act only in the overworld (passive spawns, `entityStore`, hostile spawns, fireflies, weather) check `world.realm` or `realm.current`. Check this for any new ambient feature.
 - The realm light floor has two readers: `uAmbient` in the terrain shader (set by `sky.js`) and `world.brightnessAt` (`world.ambient`). Change `REALMS[*].ambient`, not either reader (D48).
