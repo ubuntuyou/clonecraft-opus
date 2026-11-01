@@ -26,16 +26,17 @@
  * Leaving the realm clears `mobs[]` (realm.enter), so the next visit spawns a fresh boss.
  *
  * `boss.update(dt)` spawns the boss when the Crystal Realm is current, the save has no kill
- * (realm.boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
+ * (boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
  * boss bar (hud.bossBar), and shows the victory screen once the kill ends.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { randRange, UNLOADED } from './config.js';
-import { B } from './blocks.js';
+import { B, baseOf } from './blocks.js';
 import { ringHas } from './portal-frame.js';
 import { WG } from './gen-service.js';
 import { game, player, scene, world } from './engine.js';
 import { damagePlayer } from './player.js';
+import { breakBlock } from './interact.js';
 import { moveEntity } from './collision.js';
 import { spawnDrop } from './drops.js';
 import { angleLerp, Mob, MOB_TYPES, mobs } from './mobs.js';
@@ -64,6 +65,8 @@ const DEATH_T = 3;
 const EXIT = { x0: -1, y0: FLOOR, z: 0, w: 3, h: 4 };
 // EXIT as a portal-frame frame, for ringHas (boss.locks). EXIT keeps `z` (SPEC_deepen M3).
 const EXIT_FRAME = { axis: 'x', x0: EXIT.x0, y0: EXIT.y0, z0: EXIT.z, w: EXIT.w, h: EXIT.h };
+// The placed entities (by base) that buildExitPortal breaks before it overwrites their cell (K5).
+const ENTITY_BASE = new Set([B.CHEST, B.FURNACE, B.TORCH, B.DOOR]);
 const PYLONS = WG.PYLONS;
 
 const pylonStands = ([x, y, z]) => { const id = world.getBlock(x, y, z); return id === B.PYLON || id === UNLOADED; };
@@ -302,17 +305,17 @@ class Titan extends Mob {
 }
 
 // The exit portal: a Crystal Frame ring around a 3 x 4 opening, built lit (portals.ignite fills the panes).
-// TODO K5 (T7.1): breakBlock(x, y, z, true, true) first on a box cell whose base is CHEST, FURNACE,
-// TORCH, or DOOR (ENTITY_BASE).
-// TODO M8 (T7.1): world.batched in place of beginBatch and endBatch.
+// A box cell that holds a placed entity (ENTITY_BASE) breaks first, so its block and contents drop
+// and its torch key, other door half, and door timer clear. Other cells are overwritten, no drop.
 function buildExitPortal() {
-  const E = EXIT, own = !world.batch;
-  if (own) world.beginBatch();
-  for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
-    const ring = u === -1 || u === E.w || v === -1 || v === E.h;
-    world.setBlock(E.x0 + u, E.y0 + v, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
-  }
-  if (own) world.endBatch();
+  const E = EXIT;
+  world.batched(() => {
+    for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
+      const x = E.x0 + u, y = E.y0 + v, ring = u === -1 || u === E.w || v === -1 || v === E.h;
+      if (ENTITY_BASE.has(baseOf(world.getBlock(x, y, E.z)))) breakBlock(x, y, E.z, true, true);
+      world.setBlock(x, y, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
+    }
+  });
   const r = portals.ignite(E.x0 - 1, E.y0, E.z, B.PORTAL_CRYSTAL);
   if (r !== 'lit') console.warn(`exit portal: ignite returned ${r}`);
 }

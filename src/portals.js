@@ -26,7 +26,7 @@
  *
  * The arrival portal is generated terrain, not edits (ARCHITECTURE D52). world.locked refuses every
  * edit to its frame and opening, so it is always lit and the player can never be stranded. After
- * the boss kill (realm.boss.defeated), world.locked also refuses every edit to the exit portal box.
+ * the boss kill (boss.defeated), world.locked also refuses every edit to the exit portal box (boss.locks).
  *
  * `cells` maps "x,y,z" to the pane id of every pane cell in the loaded realm (the overrides, plus
  * the arrival panes in the Crystal Realm), for the sparks and the hum. It rebuilds when
@@ -34,7 +34,7 @@
  * ===================================================================================== */
 import { B } from './blocks.js';
 import { game, player, world } from './engine.js';
-import { buildPlan, findFrame, frameCells, nearestPortal, portalFoot } from './portal-frame.js';
+import { buildPlan, findFrame, frameCells, nearestPortal, portalFoot, ringHas } from './portal-frame.js';
 import { particles } from './particles.js';
 import { audio } from './audio.js';
 import { hud } from './hud.js';
@@ -55,20 +55,17 @@ const KINDS = {
 const PANE_OF = { [B.OBSIDIAN]: PE, [B.CRYSTAL_FRAME]: PC };   // frame block -> pane id
 const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 const A = WG.CRYSTAL_ARRIVAL;
-// The arrival portal: its stand point (the middle of the opening's floor) and its locked box.
+// The arrival portal: its stand point (the middle of the opening's floor).
 const ARRIVAL_STAND = [A.x0 + (A.w >> 1) + 0.5, A.y0, A.z0 + 0.5];
-const inArrival = (x, y, z) => z === A.z0 && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
-// The exit portal (boss.EXIT). boss.js loads after this module, so inExit reads EXIT only inside the
-// function. Its locked box is the frame ring around the panes.
-const inExit = (x, y, z) => { const E = boss.EXIT; return z === E.z && x >= E.x0 - 1 && x <= E.x0 + E.w && y >= E.y0 - 1 && y <= E.y0 + E.h; };
 
 const portals = (() => {
   const cells = new Map();          // "x,y,z" -> pane id of every pane cell in the loaded realm
   let known = null;                 // the override map that `cells` mirrors
   let t = 0, armed = false, warned = false, removing = false, kind = PE;
   const get = (x, y, z) => world.getBlock(x, y, z);
-  // TODO M3 (T7.1): world.realm === 'crystal' && (ringHas(A, x, y, z) || boss.locks(x, y, z)); delete inArrival and inExit.
-  world.locked = (x, y, z) => world.realm === 'crystal' && (inArrival(x, y, z) || (boss.defeated && inExit(x, y, z)));
+  // The crystal lock: the arrival portal box always, the exit portal box after the kill. boss.js
+  // loads after this module, so `boss` is read only at call time.
+  world.locked = (x, y, z) => world.realm === 'crystal' && (ringHas(A, x, y, z) || boss.locks(x, y, z));
 
   function sync() {
     if (known === world.overrides) return;
@@ -90,10 +87,7 @@ const portals = (() => {
     }
     if (!out.length) return;
     removing = true;
-    const own = !world.batch;   // TODO M8 (T7.1): world.batched
-    if (own) world.beginBatch();
-    for (const c of out) world.setBlock(c[0], c[1], c[2], B.AIR);
-    if (own) world.endBatch();
+    world.batched(() => { for (const c of out) world.setBlock(c[0], c[1], c[2], B.AIR); });
     removing = false;
     const c = out[0];
     audio.fizz(c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
@@ -115,10 +109,7 @@ const portals = (() => {
     if (N6.some(([dx, dy, dz]) => get(x + dx, y + dy, z + dz) === P)) return 'busy';
     const f = findFrame(get, x, y, z, KINDS[P].ring);
     if (!f) return 'open';
-    const own = !world.batch;   // TODO M8 (T7.1): world.batched
-    if (own) world.beginBatch();
-    for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P);
-    if (own) world.endBatch();
+    world.batched(() => { for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P); });
     const [cx, cy, cz] = frameCells(f)[0], pos = { x: cx, y: cy, z: cz };
     if (P === PC) {   // a rising glass chime
       for (const [i, f0] of [[0, 660], [1, 880], [2, 1320]]) audio.tone({ type: 'sine', f0, f1: f0 * 1.5, dur: 1.2 + i * 0.3, vol: 0.18, attack: 0.05 + i * 0.12, pos });
@@ -169,10 +160,7 @@ const portals = (() => {
   // Arrival with no portal: builds an Ember portal at the target (the chunks there are meshed now).
   function build(to) {
     const plan = buildPlan(get, to[0], to[1], to[2]);
-    const own = !world.batch;   // TODO M8 (T7.1): world.batched
-    if (own) world.beginBatch();
-    for (const [x, y, z, id] of plan.edits) world.setBlock(x, y, z, id);
-    if (own) world.endBatch();
+    world.batched(() => { for (const [x, y, z, id] of plan.edits) world.setBlock(x, y, z, id); });
     lastBuild = plan;
     return plan.stand;
   }
