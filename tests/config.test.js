@@ -42,6 +42,7 @@ test('rd-ready: the README range equals RD_MIN..RD_MAX', () => {
 
 // SPEC_deepen K1: the light curves live in config.js. brightnessAt, sky.js, and the terrain shader share them.
 import { LIGHT_BLK, LIGHT_GLSL, LIGHT_SKY, lightCurve } from '../src/config.js';
+import { DRAW_ORDER } from '../src/config.js';
 import { readdirSync } from 'node:fs';
 
 // The shader text before K1 (terrain-material.js, `curve` and `curveB`), one function per line.
@@ -101,4 +102,41 @@ test('K1-6 the terrain shader and sky.js use the shared curves', () => {
   const sky = read('../src/sky.js');
   assert.ok(!/const curveB\b/.test(sky), 'sky.js has no local curveB');
   assert.ok(sky.includes('lightCurve(def.ambient, LIGHT_BLK)'), 'sky.js feeds uAmbient from lightCurve');
+});
+
+// ---- M10: one draw-order table (SPEC_deepen M10) ---------------------------------------------------
+test('M10-1 DRAW_ORDER is frozen', () => {
+  assert.ok(Object.isFrozen(DRAW_ORDER));
+});
+test('M10-1 the order holds: DOME < SKY_BODY < TERRAIN < WATER < EFFECTS', () => {
+  const chain = ['DOME', 'SKY_BODY', 'TERRAIN', 'WATER', 'EFFECTS'];
+  for (let i = 1; i < chain.length; i++) {
+    assert.ok(DRAW_ORDER[chain[i - 1]] < DRAW_ORDER[chain[i]], `${chain[i - 1]} < ${chain[i]}`);
+  }
+});
+test('M10-1 the stars draw before the clouds', () => {
+  assert.ok(DRAW_ORDER.STARS < DRAW_ORDER.CLOUDS);
+});
+test('M10-1 the crack overlay draws after the water', () => {
+  assert.ok(DRAW_ORDER.CRACK > DRAW_ORDER.WATER);
+});
+test('M10-2 pin: every DRAW_ORDER value', () => {
+  assert.deepEqual({ ...DRAW_ORDER }, {
+    DOME: -10, SKY_BODY: -9, TERRAIN: 0, WATER: 1, STARS: 1.5, CLOUDS: 2, CRACK: 2, EFFECTS: 3,
+  });
+});
+test('M10-3 source: no src file assigns a numeric literal to renderOrder', () => {
+  // The renderOrder sites read the table (sky, targeting, weather, ash, fireflies, particles).
+  const bad = [];
+  for (const f of readdirSync(new URL('../src/', import.meta.url)).filter((n) => n.endsWith('.js'))) {
+    read(`../src/${f}`).split('\n').forEach((line, i) => {
+      if (/renderOrder\s*=\s*(?:[\w.]+\s*=\s*)*-?\d/.test(line)) bad.push(`${f}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(bad, []);
+});
+test('M10-3 source: mesher.js passes DRAW_ORDER.TERRAIN and DRAW_ORDER.WATER to setChunkGeometry', () => {
+  const m = read('../src/mesher.js');
+  assert.ok(/setChunkGeometry\([^\n]*opaqueMesh[^\n]*DRAW_ORDER\.TERRAIN\)/.test(m), 'opaque mesh uses TERRAIN');
+  assert.ok(/setChunkGeometry\([^\n]*waterMesh[^\n]*DRAW_ORDER\.WATER\)/.test(m), 'water mesh uses WATER');
 });

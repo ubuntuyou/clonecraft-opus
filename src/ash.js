@@ -7,6 +7,7 @@
 // points, so the bloom pass gives them a halo; they fade with distance by hand. The save holds no
 // ash state.
 import { THREE } from './three.js';
+import { DRAW_ORDER } from './config.js';
 import { camera, player, scene } from './engine.js';
 import { realm } from './realms.js';
 
@@ -25,7 +26,7 @@ const ash = (() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const pts = new THREE.Points(geo, mat);
-    pts.frustumCulled = false; pts.renderOrder = 3; pts.visible = false; scene.add(pts);   // after the water (1)
+    pts.frustumCulled = false; pts.renderOrder = DRAW_ORDER.EFFECTS; pts.visible = false; scene.add(pts);   // after the water (1)
     for (let i = 0; i < n; i++) { ph[i] = Math.random() * 100; sp[i] = 0.6 + Math.random() * 0.8; }
     return { n, pos, ph, sp, geo, pts };
   }

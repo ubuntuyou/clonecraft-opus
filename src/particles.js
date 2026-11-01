@@ -8,7 +8,7 @@
  * Positional sounds pan with the camera's right vector and fade over 32 blocks.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { glowGain, randInt, randRange, UNLOADED } from './config.js';
+import { DRAW_ORDER, glowGain, randInt, randRange, UNLOADED } from './config.js';
 import { BLOCKS, DIR4, SOLID } from './blocks.js';
 import { FACE_TILE, ITEM_PIX, TILE, tintedPixels } from './atlas.js';
 import { terrainUniforms } from './terrain-material.js';
@@ -56,7 +56,7 @@ const particles = (() => {
       }`,
   });
   const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false; points.renderOrder = 3;
+  points.frustumCulled = false; points.renderOrder = DRAW_ORDER.EFFECTS;
   scene.add(points);
 
   // palette of a block: opaque pixels of its side and top tiles (grass and leaves tinted)

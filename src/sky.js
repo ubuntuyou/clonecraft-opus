@@ -19,7 +19,7 @@
  * bands, a small pale star disc at the fixed light direction, and no clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { clamp, CONFIG, CS, glowGain, lerp, LIGHT_BLK, lightCurve, mulberry32, REALMS } from './config.js';
+import { clamp, CONFIG, CS, DRAW_ORDER, glowGain, lerp, LIGHT_BLK, lightCurve, mulberry32, REALMS } from './config.js';
 import { CLOUD_GLSL, CLOUD_Y, clouds as cloudField, cloudUniforms as fieldUniforms } from './clouds.js';
 import { terrainUniforms } from './terrain-material.js';
 import { camera, game, player, renderer, scene } from './engine.js';
@@ -66,7 +66,7 @@ const sky = (() => {
         gl_FragColor = vec4(c, 1.0);
       }`,
   }));
-  dome.renderOrder = -10; dome.frustumCulled = false;
+  dome.renderOrder = DRAW_ORDER.DOME; dome.frustumCulled = false;
   group.add(dome);
 
   // Sun and moon: a square disc with a rim inside a round soft glow (64 px), after `clonecraft-fable`.
@@ -88,7 +88,7 @@ const sky = (() => {
   const moon = new THREE.Mesh(new THREE.PlaneGeometry(68, 68),
     discMat(discTexture('#f8fbff', '#ffffff', 'rgba(215,225,255,0.4)', 'rgba(200,210,255,0)')));
   const bodyMat = (map) => new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
-  sun.renderOrder = moon.renderOrder = -9;
+  sun.renderOrder = moon.renderOrder = DRAW_ORDER.SKY_BODY;
   group.add(sun, moon);
   // soft halo around the sun: a radial gradient, additive, strongest when the view faces it
   const haloTex = (() => {
@@ -101,7 +101,7 @@ const sky = (() => {
     return t;
   })();
   const halo = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), bodyMat(haloTex));
-  halo.renderOrder = -9;
+  halo.renderOrder = DRAW_ORDER.SKY_BODY;
   group.add(halo);
 
   // stars: random directions on the upper sphere, rotating with the sky
@@ -123,7 +123,7 @@ const sky = (() => {
   });
   const stars = new THREE.Points(starGeo, starMat);
   // Stars draw before the clouds (renderOrder 2). The clouds write no depth: their alpha covers the stars.
-  stars.renderOrder = 1.5; stars.frustumCulled = false;
+  stars.renderOrder = DRAW_ORDER.STARS; stars.frustumCulled = false;
   group.add(stars);
 
   // G5 clouds: one flat quad at CLOUD_Y, moved under the camera each frame. It writes no depth.
@@ -182,7 +182,7 @@ const sky = (() => {
       }`,
   });
   const clouds = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), cloudMat);
-  clouds.frustumCulled = false; clouds.renderOrder = 2;
+  clouds.frustumCulled = false; clouds.renderOrder = DRAW_ORDER.CLOUDS;
   scene.add(clouds);
 
   const C = (r, g, b) => new THREE.Color(r, g, b);

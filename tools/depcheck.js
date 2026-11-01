@@ -19,7 +19,7 @@ import * as escope from 'eslint-scope';
 import globals from 'globals';
 
 // Modules that tests import in Node. They must never pull in the rest of the game.
-export const PURE = ['three', 'config', 'blocks', 'portal-frame', 'biomes', 'atlas', 'worldgen', 'gen-service', 'world', 'face-kind', 'clouds', 'terrain-material', 'crafting', 'save-format'];
+export const PURE = ['three', 'config', 'blocks', 'portal-frame', 'biomes', 'precip', 'atlas', 'worldgen', 'gen-service', 'world', 'face-kind', 'clouds', 'terrain-material', 'crafting', 'save-format'];
 const GLOBALS = new Set([...Object.keys(globals.builtin), ...Object.keys(globals.browser)]);
 
 // The function nodes that run at once: the callee of a CallExpression, as in `(() => x)()`.

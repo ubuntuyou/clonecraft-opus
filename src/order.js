@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 52 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 53 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -14,8 +14,8 @@
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, world, face-kind,
- *    clouds, terrain-material, crafting, and save-format never reach this file. Node tests import them.
+ *  - three, config, blocks, portal-frame, biomes, precip, atlas, worldgen, gen-service, world,
+ *    face-kind, clouds, terrain-material, crafting, and save-format never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
@@ -92,6 +92,7 @@ import './blocks.js';
 import './portal-frame.js';
 import './save-format.js';
 import './biomes.js';
+import './precip.js';
 import './atlas.js';
 import './worldgen.js';
 import './gen-service.js';
