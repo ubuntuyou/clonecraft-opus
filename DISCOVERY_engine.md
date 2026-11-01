@@ -7,7 +7,7 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - Chunk index: `lidx(x, y, z) = (y << 8) | (z << 4) | x`. Local x and z are 0..15. y is 0..175 (`H` 176).
 - `getBlock()` returns `UNLOADED` (255) outside loaded chunks. Treat `UNLOADED` as "do not act", never as air.
 - The world meshes a chunk only when the chunk and all 8 neighbours are lit.
-- `world.setBlock()` is the only write path for blocks. Wrap many edits in `beginBatch()` and `endBatch()`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, registers farming cells, and adds new dirt and grass to the grass candidate lists. `beginBatch()` does not nest: an inner `endBatch()` ends the outer batch. Check `world.batch` first (see `batched()` in `farming`).
+- `world.setBlock()` is the only write path for blocks. Wrap many edits in `world.batched(fn)`. Every call ends with `world.onEdit`, which wakes liquids, queues leaf decay, registers farming cells, and adds new dirt and grass to the grass candidate lists. `world.batched(fn)` nests: an inner call joins the outer batch, and the outer end remeshes even when `fn` throws. The old `beginBatch()` does not nest (an inner `endBatch()` ends the outer batch), so a site that still uses the pair checks `world.batch` first. S8 moves those sites to `world.batched` and deletes the pair.
 - Use `baseOf(id)`, not `BLOCKS[id].base`, when `id` can be `UNLOADED`. `BLOCKS[255]` is undefined.
 - `setState()` is the only function that shows or hides screens.
 - A block id is 0..254. An item-only id may be 256 or more (D46). Never index a `Uint8Array(256)` block table with an item id: it returns `undefined`, and arithmetic on it gives `NaN`. Look up `ITEMS[id]` first.
@@ -173,7 +173,8 @@ Gotchas, pointers, and invariants for the game modules in `src/`. Read this file
 - Before `game.started`, `updateCamera()` shows the menu panorama and ignores the player's yaw.
 - Liquids: `LIQ_KIND` (1 water, 2 lava) and `LIQ_LEVEL` (8 source, 1..7 flow). `liquids.pending` counts queued cells. F3 shows it.
 - Tile entities: `tileEntities` (`src/tile-entities.js`; "x,y,z"). A furnace has `slots` [input, fuel, output], `burn`, `burnMax`, and `cook`. `SMELT_TIME` is 5 s.
-- Light curves: sky light uses `0.83^(15 - l)` and block light uses `0.85^(15 - l)`. The shader (`curve`, `curveB`) and `world.brightnessAt()` must match.
+- Light curves: sky light uses `LIGHT_SKY` (0.83) and block light uses `LIGHT_BLK` (0.85), normalized so level 0 is 0 and level 15 is 1. `config.js` is the only source: `lightCurve(level, base)` for JS and `LIGHT_GLSL` for the shaders. Never write a `pow(0.8…` curve in another file; test K1-4 fails on one.
+- `World` is Node-testable: `world.js` is pure, and `tests/world.test.js` drives it with a recorder mesh adapter (D57). Put three.js code in the adapter (`chunkMeshes` in `mesher.js`), never in `world.js`.
 - Wall torches: `B.TORCH_WALL + f` leans toward `DIR4[f]`, and its wall is the cell at `-DIR4[f]`. `torchFor()` picks the id on placement. `breakBlock()` breaks wall torches on the four sides of a removed block.
 - Doors: `doorTimers` maps the bottom half to the close time in `game.clock`. A blocked doorway retries every 0.5 s.
 - Leaves: `IS_LEAF`, `LEAF_DECAYS` (natural only), and `LEAF_COLOR` (0 green, 1 red, 2 orange, 3 brown, 4 pink, 5 white, 6 yellow). Natural yellow is 87 and placed yellow is 86, so natural ids are not one range. The worker-side `isLeaf` in tree generation lists them explicitly; update it with any new color. Natural ids are `LEAF_NATURAL[color]`. Placed ids are `B.LEAVES_PLACED + color`. `placeBlock()` maps a natural id to the placed id. Test for a leaf with `IS_LEAF`, never `=== B.LEAVES`.

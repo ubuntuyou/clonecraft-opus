@@ -8,6 +8,8 @@
  * then switches the realm and the override maps (SPEC_realms). An `onChunkUnloaded` hook
  * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air. `ambient`
  * is the realm's light floor: brightnessAt never reads below it (the shader uses uAmbient).
+ * Meshes: World takes a mesh adapter { build, dispose, show } and never touches three.js, so the
+ * module is pure (PURE in tools/depcheck.js). chunkMeshes(scene) in mesher.js is the game's adapter.
  * ===================================================================================== */
 import { ckey, CONFIG, CS, H, LIGHT_BLK, LIGHT_SKY, lidx, lightCurve, UNLOADED, VOL } from './config.js';
 import { ATTEN, B, EMIT, EMIT_CRY, LIGHT_STOP, OPAQUE, SKY_FREE, SOLID } from './blocks.js';

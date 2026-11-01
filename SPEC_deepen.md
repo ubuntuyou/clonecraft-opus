@@ -488,7 +488,7 @@ Node tests run under `npm test`. QA means the runtime QA agent. A test is named 
 1. `lightCurve(0, b)` is 0 and `lightCurve(15, b)` is 1 within 1e-4, for both bases.
 2. Monotonic over 0..15 in steps of 0.5.
 3. Each function in `LIGHT_GLSL` equals today's `curve` or `curveB` line byte for byte.
-4. Grep: one `pow(0.8` definition site in `src/` (`config.js`).
+4. Grep: 0 literal `pow(0.8` sites in `src/`; the curves come only from `LIGHT_GLSL` and `lightCurve` (`config.js` defines `LIGHT_SKY` and `LIGHT_BLK` once).
 
 **K3, K4** (`tests/atlas.test.js`, stubbed copy of `src/`; named K3/4-1..K3/4-5)
 1. The real atlas loads; `tileCount <= ATLAS_TILES`.

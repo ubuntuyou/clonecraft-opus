@@ -21,12 +21,12 @@ The save (D16) stores only `overridesByChunk`. Liquid flows are edits too, so a 
 Section 7 keeps three 0..15 channels per cell: sky light, block light, and crystal light. A BFS flood fill in world coordinates computes them. The fill crosses into any lit neighbour chunk. The fill functions take the channel number, so all channels share one code path.
 The world meshes a chunk only when the chunk and all 8 neighbours are lit. Smooth light and ambient occlusion read one cell across every border, so an unlit neighbour gives dark seams.
 A `LIGHT_STOP` cell (a stair) takes light from its neighbours but never passes it on. A stair therefore shades like a solid roof, and its own faces still get a light value.
-`world.setBlock()` relights only the affected area and remeshes the touched chunks. `beginBatch()` and `endBatch()` group many edits (explosions) into one relight and remesh pass.
+`world.setBlock()` relights only the affected area and remeshes the touched chunks. `world.batched(fn)` groups many edits (explosions) into one remesh pass: inside it, `setBlock` only collects the touched chunks, and the outermost call remeshes each one once, even when `fn` throws. A nested call joins the outer batch (SPEC_deepen M8). The old pair `beginBatch()` and `endBatch()` remains until its call sites move to `batched` (S8).
 
 ### D4. Light is baked per vertex, and daylight is a uniform
 
 The mesher writes sky light, block light, ambient occlusion, and face shade into the `aLight` vertex attribute. The terrain shader scales sky light by `uDaylight` and tints it with `uSkyLight`.
-A change of time of day never remeshes. Block light falls off slower than sky light (0.85 against 0.83 per level), so torches light a wider area without brighter days. The shader also adds a small directional term. It takes the face normal from screen-space derivatives and compares it to `uSunDir`, so the vertex format holds no normals.
+A change of time of day never remeshes. Block light falls off slower than sky light (`LIGHT_BLK` 0.85 against `LIGHT_SKY` 0.83 per level), so torches light a wider area without brighter days. The curves have one source in `config.js` (SPEC_deepen K1): `lightCurve(level, base)` for JS and `LIGHT_GLSL` (the shader functions `curve` and `curveB`) for the shaders. `world.brightnessAt` uses `lightCurve`, so mobs, drops, and the held item match the terrain. The shader also adds a small directional term. It takes the face normal from screen-space derivatives and compares it to `uSunDir`, so the vertex format holds no normals.
 The water pass uses the same normal for a horizon reflection and a sun glint. The `aTint` alpha carries the face kind (D55), so sway and glow need no new attribute.
 Crystal light has its own attribute, `aCry`. The shader tints it turquoise and takes the maximum of it and the other light. A crystal face is emissive: the face kind `CRYSTAL` marks it (D55).
 
@@ -37,7 +37,7 @@ This keeps procedural texture colors identical to their canvas values.
 
 ### D6. One state machine owns the screens
 
-`setState()` is the only function that shows or hides screens. The states are `loading`, `menu`, `paused`, `playing`, `inventory`, `homes`, and `dead`.
+`setState()` is the only function that shows or hides screens. The states are `loading`, `menu`, `paused`, `playing`, `inventory`, `homes`, `dead`, `travel`, and `victory`. `travel` runs from `playing` or `dead` to `playing` while a realm loads. `victory` runs from `playing` when the Titan dies. Both freeze the simulation and leave pointer lock (SPEC_deepen K9).
 `game.simulating()` is true for `playing`, `inventory`, `homes`, and `dead`. The main loop runs the simulation only then. A pause therefore freezes time, mobs, drops, and particles.
 A menu close returns to `playing`, not `paused`. Esc on the pause screen also returns to `playing`. After Esc, the lock request waits for the Esc keyup. In Chrome and Brave, Joe saw a lock taken on the keydown end at once. A browser can refuse the lock without a user gesture. The game then shows a resume hint, and the next click takes the lock.
 
@@ -193,7 +193,7 @@ The box is 128 blocks wide and follows the camera, snapped to whole texels, so s
 
 ### D31. The held torch is a flood fill, not a point light
 
-A point light would shine through walls. `heldLight` instead fills light of level 14 from the head cell with the block-light rules (1 per block plus `ATTEN`, stopped by `OPAQUE`) into a 32³ texture. The shader reads it like baked block light, and `world.brightnessAt` reads the same array, so terrain, water, mobs, drops, and the held item agree. It refills only when the head cell, the held item, or `world.editSerial` changes.
+A point light would shine through walls. `heldLight` instead fills light of level 14 from the head cell with the block-light rules (1 per block plus `ATTEN`, stopped by `OPAQUE`) into a 32³ texture. The shader reads it like baked block light, and `world.brightnessAt` reads the same array through the `world.extraLight` slot, so terrain, water, mobs, drops, and the held item agree. `held-light.js` sets `world.extraLight` after it loads, so `world.js` imports nothing from it. It refills only when the head cell, the held item, or `world.editSerial` changes.
 
 ### D32. Caustics ride on a mesher flag
 
@@ -280,7 +280,7 @@ The look of a realm lives in its `REALMS` row (SPEC_deepen M7). `look` is `null`
 ### D48. The Ember Realm is a density field with its own seeds; its light floor lives in two places
 
 `emberChunk` in `worldgen.js` builds the Ember Realm from a 3D density field: two simplex octaves, a floor height, and a ceiling height. The field is sampled on a 4×4×4 grid and interpolated, so one chunk costs about 1.2 ms. Every ember noise takes its own seed (`SEED ^ 0xe3be5`), never `S()`. So the overworld noise sequence, and its golden hashes, do not change.
-The bedrock roof keeps sky light at 0 in the whole realm. The realm needs a light floor instead, so unlit caves are not black. The floor is `REALMS.ember.ambient` (block light level 9). It applies in two places, and both read the same number. `sky.js` sets the terrain uniform `uAmbient` (curveB of the level, tinted by the row's `look.ambientTint`). `world.brightnessAt` never returns less than the level, so mobs, drops, particles, and the held item match the terrain. `realm.enter` copies the level into `world.ambient`.
+The bedrock roof keeps sky light at 0 in the whole realm. The realm needs a light floor instead, so unlit caves are not black. The floor is `REALMS.ember.ambient` (block light level 9). It applies in two places, and both read the same number. `sky.js` sets the terrain uniform `uAmbient` (`lightCurve(level, LIGHT_BLK)`, the JS twin of the shader's `curveB`, tinted by the row's `look.ambientTint`). `world.brightnessAt` never returns less than the level, so mobs, drops, particles, and the held item match the terrain. `realm.enter` copies the level into `world.ambient`.
 
 ### D49. Portal geometry is pure; portal blocks exist only as edits
 
@@ -343,6 +343,12 @@ Rejected: a new `aKind` attribute (memory), a decode in the fragment shader (a p
 The atlas is one 256×256 canvas of 16×16 tiles, so it holds `ATLAS_TILES` (256) tiles. `paintTile` throws when the atlas is full (SPEC_deepen K4). The `FACE_TILE` table throws when a block's `tex` names an unknown tile (K3). So a misspelled tile name or a tile past the limit fails at load with a clear message. Before, the first drew tile 0 on the face, and the second painted the tile off the canvas. Neither fires today: the atlas holds 109 tiles, and 147 are free.
 Rejected: a throwing `Proxy` on `TILE`, because `TILE` is on the hot path.
 
+### D57. `World` takes a mesh adapter, so `world.js` is pure
+
+`World` owns the chunks, the light, and the edits, but it never touches a three.js object (SPEC_deepen M6). Its constructor takes a mesh adapter `{ build(world, chunk), dispose(chunk), show(chunk, visible) }`. `chunkMeshes(scene)` in `mesher.js` is the game's adapter: `engine.js` calls `new World(chunkMeshes(scene))`, and the scene is a parameter of the mesher, not `world.scene`. The held torch reaches `brightnessAt` through the `world.extraLight` slot (D31).
+`world.js` therefore imports only `config`, `blocks`, and `gen-service`, and `world` is in `PURE`. Node tests drive the real streaming, light, edit, reset, and `batched` code with a recorder adapter (`tests/world.test.js`). Two adapters exist, so the seam is real.
+Rejected: `.visible` writes in `World`, the adapter in `engine.js` (`QUAD_INDEX` lives in `mesher.js`), and `heldLight` as a constructor parameter (`held-light.js` loads after `engine.js`).
+
 ### D12. Procedural audio and particles
 
 `audio` synthesizes every sound with WebAudio oscillators and noise buffers. The context starts on the first user gesture.
@@ -355,7 +361,8 @@ The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the
 | --- | --- |
 | `GenService` to world | A request carries the realm and the epoch. A result from an older epoch is dropped. A request gives `{blocks, biomes, heights}` typed arrays and a `features` list (chests, spawners) for one chunk. |
 | world to mobs | `onChunkLoaded(chunk)` and `onChunkUnloaded(chunk)` hooks. |
-| block edits | `world.setBlock(x, y, z, id)` is the only write path. `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
+| block edits | `world.setBlock(x, y, z, id)` is the only write path. `world.batched(fn)` groups edits into one remesh per touched chunk; `beginBatch()` and `endBatch()` remain until S8 moves their sites (D3). `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
+| world to meshes | `new World(meshes)` takes the mesh adapter `{ build(world, chunk), dispose(chunk), show(chunk, visible) }`. `chunkMeshes(scene)` in `mesher.js` is the game's adapter. `World` hides the chunk lifecycle and the light; the adapter hides three.js (D57). |
 | world to liquids, leaves, farming, and grass | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, `farming.onEdit()`, and `grass.onEdit()`. |
 | block edits to portals | `targeting.js` calls `portals.onEdit(x, y, z, old, id)` after every edit. `interact.js` calls `portals.ignite(x, y, z)` for a Magma Core on obsidian or an Ember Heart on a Crystal Frame. `portals.update(dt)` runs once per frame (D49). `world.locked(x, y, z)` guards the arrival portal (D52). |
 | realms to the scoped modules | `SCOPED` in `realms.js` maps each saved slice field except `edits` to an adapter `{ data, load, clear }`, in `SLICE_FIELDS` order. `CLEARED` lists the state that a realm change clears but never saves (torches and door timers, TNT, projectiles, spawners, mining). A load-time guard throws when the `SCOPED` keys do not equal `SLICE_FIELDS`. `realm.leave()` clears each `SCOPED` entry, then each `CLEARED` entry. `realm.enter(stash)` calls `editIndex.load(world.overrides)`, then each `SCOPED` `load(v)`. `realm.data()` writes the realm layout of the save, and `realm.load(d)` reads it. New realm-scoped state adds one `SCOPED` entry (saved) or one `CLEARED` entry (not saved). |
@@ -363,7 +370,7 @@ The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the
 | save | `persist.save()` writes the save. `persist.data()` holds the player, the inventory, the armor, `enchantSeed`, and the weather, and spreads `...realm.data()` for the realm layout. Boot calls `openSave({ store, session, key, seed, now, apply })` once. `openSave` reads the text with `readSave`, passes the checked save to `persist.apply`, and returns `{ save, notice, blocked, reload }` (D16). |
 | save-format | `src/save-format.js` is pure. `readSave(text, seed)` returns `{ save, reason }`. `validSave(d)` checks a save. `openSave(...)` holds the boot fallback policy: the carried notice, the backup of a rejected save, and the apply throw. `editsOf` and `mapsOf` convert the edits. `SLICE_FIELDS` names the realm-scoped fields. It hides the check of every save element and the boot policy (D16). |
 | face kind | The mesher writes the `aTint` alpha only through `faceByte(kind, top, wet)`. A shader reads it only through `FACE_GLSL` (`faceIs`, `FACE_<NAME>`). `face-kind.js` hides the byte of each kind (D55). |
-| light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch (`heldLight.levelAt`). |
+| light queries | `world.brightnessAt(x, y, z, daylight)` returns 0.04..1 for mobs, drops, and the held item. It includes the held torch through `world.extraLight`. The light curves have one source: `lightCurve` and `LIGHT_GLSL` in `config.js` (D4). |
 | player damage | `damagePlayer(amount, cause, from, kind)` is the only damage path for the player. `kind` selects armor (D24). |
 | projectiles | `projectiles.shoot(x, y, z, vx, vy, vz, dmg, shooter)` launches an arrow. `projectiles.fireball(x, y, z, dx, dy, dz, dmg, shooter)` launches a fireball along a unit direction (D51). `projectiles.shard(...)` takes the same arguments and launches a crystal shard (D53). `projectiles.update(dt)` runs once per frame. |
 | boss | `boss.update(dt)` runs once per frame. It spawns the Titan, draws the pylon beams, and drives `hud.bossBar(fraction, shielded)` and `showVictory()` (D53). |

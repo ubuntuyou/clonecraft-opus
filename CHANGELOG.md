@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- The world seam (SPEC_deepen M6): `World` takes a mesh adapter `{ build, dispose, show }`, and `chunkMeshes(scene)` in `mesher.js` is the game's adapter. `world.js` no longer touches three.js, so it is a pure module, and Node tests now cover its streaming, light, edits, and reset. The held torch reaches `brightnessAt` through the `world.extraLight` slot.
+- `world.batched(fn)` (SPEC_deepen M8): it groups block edits into one remesh per touched chunk. A nested call joins the outer batch, and the remesh runs even when `fn` throws. `beginBatch` and `endBatch` stay until their call sites move.
 - The realm-scoped table (SPEC_deepen M1): one table, `SCOPED` in `realms.js`, drives the realm slice, `leave`, and `enter`. Each entry is an adapter `{ data, load, clear }`. `CLEARED` lists the state that a travel clears but never saves. A load-time guard keeps `SCOPED` equal to `SLICE_FIELDS`. A new realm-scoped field now adds one entry instead of three edits.
 - The realm save layout (SPEC_deepen M2): `realm.data()` writes the realm part of the save, and `persist.data()` spreads it. `enchantSeed` and `weather` move after `boss` in the key order. The saved key paths do not change.
 - The realm look (SPEC_deepen M7): each `REALMS` row holds its sky look (`look`) and its ambient effects (`fx`). `sky.js` reads the row instead of its own Ember and Crystal constants. Ash and fireflies read `fx.ash` and `fx.fireflies` instead of the realm name. The picture does not change: the terrain uniforms and the screenshots match.
@@ -22,6 +24,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- Mobs, drops, the held item, particles, arrows, and vehicles no longer draw brighter than the terrain around them (SPEC_deepen K1). `brightnessAt` now uses the same normalized light curves as the terrain shader, from one source in `config.js` (`lightCurve`, `LIGHT_GLSL`). Entities in low light are darker than before: block level 4 drops from 0.167 to 0.088, and level 12 from 0.614 to 0.577. The terrain does not change.
+- `ARCHITECTURE.md` D6 and the `engine.js` header now list the `travel` and `victory` states (SPEC_deepen K9). Both freeze the simulation and leave pointer lock.
 - The Seams row "realms to the scoped modules" in `ARCHITECTURE.md` now states `SCOPED`, `CLEARED`, the guard, and `realm.data()` and `realm.load(d)` (SPEC_deepen K8). Before, it named only a `save()` and `load(d)` call per module.
 - Each realm with a light floor now tints it with its own `look.ambientTint` (SPEC_deepen K2). Before, every realm took the Ember tint. Only the Ember Realm has a light floor today, so nothing looks different.
 - The atlas now fails at load with a clear message when a block's `tex` names no tile (SPEC_deepen K3), or when a new tile does not fit the 256-tile atlas (K4). Before, the first drew tile 0 on the face, and the second painted the tile off the canvas. Neither happens in the current game.

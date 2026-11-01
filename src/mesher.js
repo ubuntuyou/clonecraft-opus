@@ -8,6 +8,7 @@
  * Smooth lighting: each vertex averages the light of the 4 cells around it in front of
  * the face; ambient occlusion comes from the 3 opaque neighbours of that vertex.
  * Two meshes per chunk: opaque/cutout and water (transparent). Portal panes go in the water mesh.
+ * chunkMeshes(scene) is World's mesh adapter (build, dispose, show). The scene is a parameter.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { ckey, CS, H, mulberry32, UNLOADED } from './config.js';

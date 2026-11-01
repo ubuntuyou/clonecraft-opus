@@ -10,9 +10,9 @@ Gotchas, pointers, and invariants for the module source in `src/` and the build.
 - A module imports an earlier module's names from that module. It imports a later module's names (upward names) from `./order.js` and uses them only inside a function.
 - An imported binding is read-only. A write to another module's `let` goes through the owner's setter (`setTarget`, `setHomes`, and 7 more).
 - `src/worldgen.js` has no imports. The worker runs `WorldGenModule.toString()` alone.
-- The pure modules (`PURE` in `tools/depcheck.js`) never reach `order.js`. Node tests import them without a browser.
+- The pure modules (`PURE` in `tools/depcheck.js`) never reach `order.js`. Node tests import them without a browser. `world` is in `PURE` (SPEC_deepen M6), so `world.js` imports only `config`, `blocks`, and `gen-service`.
 - `tools/depcheck.js` enforces all of these. Each error starts with its rule id: `order`, `main`, `downward`, `upward`, `readonly`, `free`, `worker`, or `pure`.
-- An immediately-invoked function runs at load time. The `upward` rule treats its body as load time, so a later-module name inside `(() => …)()` is an error. A plain function body still defers the read. The `planted` test helper asserts that each plant changes its file.
+- An immediately-invoked function runs at load time. The `upward` rule treats its body as load time, so a later-module name inside `(() => …)()` is an error. A plain function body still defers the read. The `planted` test helper asserts that each plant changes its file. The load-time `upward` plant sits in `mesher.js`; it moved from `world.js` when `world` became pure.
 
 ## Gotchas
 
