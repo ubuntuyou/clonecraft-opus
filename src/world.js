@@ -194,8 +194,8 @@ class World {
     if (this.onEdit) this.onEdit(x, y, z, old, id);
     return true;
   }
-  // Batch mode (explosions): setBlock only collects touched chunks; endBatch remeshes each once.
-  // TODO M8 (T8.1): delete beginBatch and endBatch once every caller uses batched (decision 13).
+  // Legacy pair. boss.js and portals.js still call it until S7 converts them; the S8 integrate step deletes it.
+  // Use batched() in new code.
   beginBatch() { this.batch = new Set(); }
   endBatch() {
     const set = this.batch; this.batch = null;

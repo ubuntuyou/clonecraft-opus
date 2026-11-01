@@ -78,13 +78,13 @@ const liquids = (() => {
     queues[kind] = new Map();
     const t0 = performance.now();
     let n = 0, late = false;
-    world.beginBatch();
-    for (const [k, c] of q) {
-      if (!late && (n++ & 15) === 0 && performance.now() - t0 > 6) late = true;   // time budget: the rest waits a tick
-      if (late) { queues[kind].set(k, c); continue; }
-      tickCell(c[0], c[1], c[2], kind);
-    }
-    world.endBatch();
+    world.batched(() => {
+      for (const [k, c] of q) {
+        if (!late && (n++ & 15) === 0 && performance.now() - t0 > 6) late = true;   // time budget: the rest waits a tick
+        if (late) { queues[kind].set(k, c); continue; }
+        tickCell(c[0], c[1], c[2], kind);
+      }
+    });
   }
   return {
     wake,

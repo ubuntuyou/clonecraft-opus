@@ -29,12 +29,6 @@ const farming = (() => {
     if (!reg.has(k)) reg.set(k, [x, y, z, game.clock + firstDelay(id, x, y, z), 0]);
     return reg.get(k);
   }
-  // TODO M8 (T8.1): delete this copy; its three callers call world.batched.
-  function batched(fn) {
-    if (world.batch) return fn();
-    world.beginBatch();
-    try { return fn(); } finally { world.endBatch(); }
-  }
   function wet(x, y, z) {
     const R = WATER_REACH;
     for (let dy = 0; dy <= 1; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
@@ -58,7 +52,7 @@ const farming = (() => {
       if (Y >= H) return false;
       if (b === B.LOG && !(X === x && Y === y && Z === z) && !free(world.getBlock(X, Y, Z))) return false;
     }
-    batched(() => {
+    world.batched(() => {
       if (world.getBlock(x, y - 1, z) === B.GRASS) world.setBlock(x, y - 1, z, B.DIRT);
       for (const [X, Y, Z, b] of cells) if (b === B.LOG || free(world.getBlock(X, Y, Z))) world.setBlock(X, Y, Z, b);
     });
@@ -85,7 +79,7 @@ const farming = (() => {
     update() {
       if (!reg.size) return;
       const now = game.clock;
-      batched(() => {
+      world.batched(() => {
         for (const [k, c] of reg) {
           if (c[3] > now) continue;
           const [x, y, z] = c, id = world.getBlock(x, y, z);
@@ -104,7 +98,7 @@ const farming = (() => {
     boost(x, y, z) {
       const id = world.getBlock(x, y, z);
       if (!IS_SAPLING(id) && !(IS_CROP(id) && id < RIPE)) return false;
-      return batched(() => step(add(x, y, z, id), id));
+      return world.batched(() => step(add(x, y, z, id), id));
     },
     toDirt,
     get pending() { return reg.size; },
