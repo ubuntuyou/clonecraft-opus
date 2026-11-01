@@ -120,6 +120,7 @@ function onLoaded() {
     player.spawn.copy(player.pos);
     player.yaw = openYaw(player.pos);
   }
+  persist.dropLeftover();            // loose stacks that did not fit the inventory; the chunks are meshed
   setState('menu');
   playBtn.disabled = false; playBtn.textContent = restored ? 'Continue' : 'Play';
   $('loadbar').style.display = 'none';
