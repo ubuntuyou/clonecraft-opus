@@ -34,7 +34,7 @@ Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, 
 - [x] Playwright: a failed backup write keeps `SAVE_KEY` and sets `persist.blocked`.
 - [ ] Playwright: seed 1234 opens with Continue, at the same position, with the boss defeated. — SUBSTITUTED (agent, 2026-10-31): seed 777008 reloads with Continue at the same position, and seed 777001 reloads in the Crystal Realm with the boss defeated. The real seed 1234 check needs the export above.
 - [ ] **(owner)** Joe confirms that his seed 1234 world is intact.
-- [ ] **(owner)** Joe reviews the toast text and the backup key policy.
+- [x] **(owner)** Joe reviews the toast text and the backup key policy. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
 ### Step 1 close
 - [x] `npm run build`, then `npm run check` passes on the merged branch. `index.html` is committed once.
@@ -44,7 +44,7 @@ Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, 
 - [x] `DISCOVERY_engine.md` points to `DISCOVERY_save-format.md` for save rules.
 - [x] `CHANGELOG.md` `[Unreleased]` lists H1–H3.
 - [x] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
-- [ ] **(owner)** Joe approves the Step 1 merge.
+- [x] **(owner)** Joe approves the Step 1 merge. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
 ## Step 2: the wave (H4, H6, H7, H8, H9)
 
@@ -84,7 +84,7 @@ Merged on main (4eaa7ba code, 40b6fef exit box from boss.EXIT, docs accc3b5), 20
 - [x] `DISCOVERY_engine.md`: the exit lock and `READY_RADIUS` are recorded.
 - [x] `CHANGELOG.md` `[Unreleased]` lists H4 and H6–H9.
 - [x] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
-- [ ] **(owner)** Joe approves the Step 2 merge.
+- [x] **(owner)** Joe approves the Step 2 merge. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
 ## Step 3: boss kill and travel ratio (H5, H10)
 
@@ -106,7 +106,7 @@ Merged on main (code cb40199, docs ec1686f), 2026-10-31. Case A seed 780001 (tra
 - [x] `ARCHITECTURE.md` D53 notes that `leave` finishes a dying Titan.
 - [x] `CHANGELOG.md` `[Unreleased]` lists H5 and H10.
 - [x] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
-- [ ] **(owner)** Joe approves the Step 3 merge.
+- [x] **(owner)** Joe approves the Step 3 merge. Approved by Joe, 2026-11-01 14:28 CT: "I approve all the rest".
 
 ## Release
 - [ ] **(owner)** Joe approves the release tag and the version number.
