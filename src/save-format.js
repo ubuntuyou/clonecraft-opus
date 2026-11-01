@@ -125,10 +125,15 @@ function readSave(text, seed) {
 // It returns { save, notice, blocked, reload }; `notice` is { msg, keep } or null.
 const BOOT_NOTICE = 'clonecraft.bootNotice';
 
-// The notice that a reload carried, or null. It removes the key.
-// TODO K7 (T1.1): read the session, then the store; remove the key from both.
+// The notice that a reload carried, or null. It reads the session, then the store (K7: the store
+// carries the notice when the session write fails). It removes the key from both.
 function takeNotice(session, store) {
-  try { const t = session.getItem(BOOT_NOTICE); session.removeItem(BOOT_NOTICE); return t ? JSON.parse(t) : null; } catch (e) { return null; }
+  let found = null;
+  try { found = session.getItem(BOOT_NOTICE); } catch (e) { /* the session is unreadable */ }
+  try { session.removeItem(BOOT_NOTICE); } catch (e) { /* nothing to remove */ }
+  if (!found) found = store.get(BOOT_NOTICE);
+  store.remove(BOOT_NOTICE);
+  try { return found ? JSON.parse(found) : null; } catch (e) { return null; }
 }
 
 // Copies the rejected text to `<key>.rejected.<now>`, then removes `key`. -> { msg, keep }
@@ -141,8 +146,9 @@ function backup(store, key, text, reason, now) {
   return { msg: `The saved world could not load: ${reason}. It was kept. Saving is off until the next visit.`, keep: true };
 }
 
-// TODO M4, K7 (T1.1): the body below is today's boot.js policy, moved. K7 adds the store carrier
-// when the session write fails and the backup succeeded.
+// K7: after an apply throw, the notice goes to the session. When that write fails and the backup
+// succeeded, the notice goes to `store` instead and the page still reloads: SAVE_KEY is gone, so
+// the reload cannot loop. When the backup failed (`keep`), a failed session write gives no reload.
 function openSave({ store, session, key, seed, now, apply }) {
   let notice = takeNotice(session, store), blocked = !!notice?.keep, reload = false;
   const text = notice?.keep ? null : store.get(key);
@@ -154,7 +160,10 @@ function openSave({ store, session, key, seed, now, apply }) {
       save = null;
       blocked = true;                               // nothing may write the half-restored game
       notice = backup(store, key, text, `it failed to load (${e.message})`, now);
-      try { session.setItem(BOOT_NOTICE, JSON.stringify(notice)); reload = true; } catch (err) { /* no reload: it could loop */ }
+      const carried = JSON.stringify(notice);
+      try { session.setItem(BOOT_NOTICE, carried); reload = true; } catch (err) {
+        if (!notice.keep) { store.set(BOOT_NOTICE, carried); reload = true; }   // the notice may be lost; the world is clean
+      }
     }
   }
   return { save, notice, blocked, reload };
