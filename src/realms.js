@@ -19,7 +19,7 @@
  * Save: the top-level slice fields hold the overworld. `realms.ember` and `realms.crystal` hold
  * the other slices. `realm` names the realm of player.pos. persist.js calls slice() and load().
  * ===================================================================================== */
-import { CONFIG, H, REALMS, UNLOADED, VOID_Y } from './config.js';
+import { CONFIG, H, READY_RADIUS, REALMS, UNLOADED, VOID_Y } from './config.js';
 import { B, baseOf, IS_LEAF, LIQ_KIND, SOLID } from './blocks.js';
 import { canvas, game, player, scene, world } from './engine.js';
 import { resumeEl } from './player.js';
@@ -152,7 +152,7 @@ const realm = {
   updateTravel() {
     const t = this.travelling;
     if (!t) return;
-    const r = world.readyAround(t.to[0], t.to[2], 3);
+    const r = world.readyAround(t.to[0], t.to[2], READY_RADIUS);
     travelBar.style.width = `${Math.round(r * 100)}%`;
     if (r < 1) return;
     const p = t.arrive(t.to) || t.to;

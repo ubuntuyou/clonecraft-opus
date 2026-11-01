@@ -4,7 +4,7 @@
 // views are not game states: the state stays 'loading', 'menu', or 'paused'. Esc in the
 // settings view returns to the main view (a capture listener runs before player.js's Esc).
 // Any state that hides the overlay also resets the panel to the main view.
-import { CONFIG, saveSettings, SEED } from './config.js';
+import { CONFIG, clampRenderDistance, saveSettings, SEED } from './config.js';
 import { game, input } from './engine.js';
 import { requestLock, respawn, resumeEl, resumeGame, setEscLock, setPausedAt } from './player.js';
 import { resetMining } from './interact.js';
@@ -86,16 +86,16 @@ addEventListener('keydown', (e) => {
   if (!e.repeat) showSettings(false);
 }, true);
 
-function bindSetting(id, valId, key, fmt, apply) {
+function bindSetting(id, valId, key, fmt, apply, norm) {
   const el = $(id), val = $(valId);
   el.value = CONFIG[key]; val.textContent = fmt(CONFIG[key]);
   el.addEventListener('input', () => {
-    CONFIG[key] = +el.value; val.textContent = fmt(CONFIG[key]);
+    CONFIG[key] = norm ? norm(+el.value) : +el.value; val.textContent = fmt(CONFIG[key]);
     if (apply) apply(CONFIG[key]);
     saveSettings();
   });
 }
-bindSetting('setRd', 'valRd', 'renderDistance', (v) => `${v} chunks`);
+bindSetting('setRd', 'valRd', 'renderDistance', (v) => `${v} chunks`, null, clampRenderDistance);
 bindSetting('setFov', 'valFov', 'fov', (v) => `${v}°`);
 bindSetting('setSens', 'valSens', 'sensitivity', (v) => `${(+v).toFixed(2)}×`);
 bindSetting('setVol', 'valVol', 'volume', (v) => `${Math.round(v * 100)}%`, (v) => audio.setVolume(v));

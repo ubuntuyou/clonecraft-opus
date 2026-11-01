@@ -31,7 +31,7 @@ Edit the modules in `src/`. Never edit the root `index.html`; the build overwrit
 | `seed=N` | Opens the world for seed `N`, with its save if one exists. |
 | `new` | Starts a new world with a random seed. |
 | (none) | Reopens the last world played. |
-| `rd=N` | Sets the render distance in chunks (2–16). |
+| `rd=N` | Sets the render distance in chunks (3–16). |
 | `fx=N` | Sets the effects: 0 none, 1 shadows, 2 bloom and light shafts, 3 both. |
 
 ## Controls

@@ -71,8 +71,13 @@ const SEED = (() => {
 storage.set('clonecraft.lastSeed', String(SEED));
 const SAVE_KEY = `clonecraft.world.${SEED}`;
 
+// Render distance limits (SPEC_hardening H6). The mesh radius is (RD + 0.5) chunks, and loading waits for
+// readyAround(..., READY_RADIUS). RD_MIN must keep (RD_MIN + 0.5) >= READY_RADIUS, or loading never ends.
+const RD_MIN = 3, RD_MAX = 16, RD_DEFAULT = 8, READY_RADIUS = 3;
+const clampRenderDistance = (n) => (Number.isFinite(n) ? Math.max(RD_MIN, Math.min(RD_MAX, Math.round(n))) : RD_DEFAULT);
+
 const CONFIG = {
-  renderDistance: 8, fov: 75, sensitivity: 1, volume: 0.6,
+  renderDistance: RD_DEFAULT, fov: 75, sensitivity: 1, volume: 0.6,
   shadows: true,               // sun and moon shadows (settings "Shadows: On")
   softShadows: true,           // a soft shadow edge (4 reads); false gives a hard edge (settings "Shadows: Soft edges")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
@@ -89,11 +94,12 @@ try {
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
   for (const k of ['freezeTime', 'shadows', 'softShadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
   if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
+  CONFIG.renderDistance = clampRenderDistance(CONFIG.renderDistance);
   if ([0, 1, 2, 4, 8].includes(saved.aa)) CONFIG.aa = saved.aa;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
 } catch (e) { /* storage blocked: keep defaults */ }
 if (urlParams.has('fx')) { const fx = parseInt(urlParams.get('fx'), 10) || 0; CONFIG.shadows = !!(fx & 1); CONFIG.bloom = !!(fx & 2); }   // 1 shadows, 2 bloom + shafts, 3 both
-if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseInt(urlParams.get('rd'), 10) || 8));
+if (urlParams.has('rd')) CONFIG.renderDistance = clampRenderDistance(parseInt(urlParams.get('rd'), 10));
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
@@ -119,8 +125,8 @@ const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 function setGlowGain(v) { glowGain = v; }
 
 export {
-  BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
+  BOB_RATE, ckey, clamp, clampRenderDistance, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
   LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HEALTH, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
-  PLAYER_W, randInt, randRange, REACH, REALMS, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
+  PLAYER_W, randInt, randRange, RD_MAX, RD_MIN, READY_RADIUS, REACH, REALMS, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
   storage, UNLOADED, VOID_Y, VOL, WALK_SPEED, WEATHER_KINDS,
 };

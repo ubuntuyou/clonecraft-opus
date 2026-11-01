@@ -1,6 +1,6 @@
 import './order.js';
 import { THREE } from './three.js';
-import { CONFIG, REALMS, SAVE_KEY } from './config.js';
+import { CONFIG, READY_RADIUS, REALMS, SAVE_KEY } from './config.js';
 import {
   altarOffers, ARMOR_TIERS, armorId, B, blockDrop, BLOCKS, breakTime, ENCH, enchantSeed, FUEL, I, IS_RAIL,
   ITEMS, LIQ_KIND, LIQ_LEVEL, RAIL_ENDS, SMELT, TIERS, toolId, validEnch,
@@ -62,7 +62,7 @@ function frame(now) {
   world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' || game.state === 'travel' ? 40 : 7);
 
   if (game.state === 'loading') {
-    const r = world.readyAround(player.pos.x, player.pos.z, 3);
+    const r = world.readyAround(player.pos.x, player.pos.z, READY_RADIUS);
     loadBar.style.width = `${Math.round(r * 100)}%`;
     loadText.textContent = `Generating terrain… ${world.chunks.size} chunks`;
     if (r >= 1) onLoaded();
