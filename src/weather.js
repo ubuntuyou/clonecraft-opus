@@ -10,9 +10,9 @@
 // Weather falls only in a realm with `weather: true` (the overworld). The kind and its timer keep
 // counting in every realm; elsewhere k and storm target 0. snap() sets them at once (realm travel).
 import { THREE } from './three.js';
-import { clamp, CS, H, lidx, randRange, REALMS, WEATHER_KINDS } from './config.js';
+import { clamp, CS, DRAW_ORDER, H, lidx, randRange, REALMS, WEATHER_KINDS } from './config.js';
 import { B } from './blocks.js';
-import { BIOME } from './biomes.js';
+import { precipKind, rainFloor, snowFloor as snowFloorOf, zoneOf } from './precip.js';
 import { WG } from './gen-service.js';
 import { camera, game, player, scene, world } from './engine.js';
 import { damagePlayer } from './player.js';
@@ -32,29 +32,16 @@ const weather = (() => {
     for (let y = H - 1; y > 0; y--) if (c.blocks[lidx(lx, y, lz)] !== B.AIR) return y;
     return 0;
   }
-  // TODO M9 (T9.1): zone, precip, and snowFloor keep their names as thin wrappers over precip.js
-  // (zoneOf, precipKind, snowFloor, rainFloor); the spawn and drift lines call the module too.
-  // The zone of column (x, z): -1 unloaded, 0 dry (desert), 1 by height (snow at or above MELT, rain
-  // below), 2 snow (snowy biomes).
+  // The zone of column (x, z): -1 unloaded, else precip.js zoneOf (0 dry, 1 by height, 2 snow).
   function zone(x, z) {
     const c = world.chunkAt(x, z);
-    if (!c) return -1;
-    const b = c.biomes[(z & 15) * CS + (x & 15)];
-    return b === BIOME.DESERT ? 0 : b === BIOME.SNOWY_PLAINS || b === BIOME.SNOWY_MOUNTAINS ? 2 : 1;
+    return c ? zoneOf(c.biomes[(z & 15) * CS + (x & 15)]) : -1;
   }
   const melt = () => WG.SNOW_LINE + 1;
   // What lands on the top block t of column (x, z): 0 none, 1 rain, 2 snow.
-  function precip(x, z, t) {
-    if (t < 0) return 0;
-    const zn = zone(x, z);
-    return zn === 1 ? (t + 1 >= melt() ? 2 : 1) : Math.max(0, zn);
-  }
-  // The floor of a snow flake in column (x, z) with top block t: the top, or MELT in zone 1.
-  // Returns -1 when no snow falls in the column.
-  function snowFloor(x, z, t) {
-    const zn = t < 0 ? -1 : zone(x, z);
-    return zn === 2 ? t + 1 : zn === 1 ? Math.max(t + 1, melt()) : -1;
-  }
+  function precip(x, z, t) { return precipKind(zone(x, z), t, melt()); }
+  // The floor of a snow flake in column (x, z) with top block t. Returns -1 when no snow falls.
+  function snowFloor(x, z, t) { return snowFloorOf(zone(x, z), t, melt()); }
 
   // Particle pools: rain as line streaks, snow as points. Each drop stores x, y, z, its floor, and a phase.
   const group = new THREE.Group(); group.visible = false; scene.add(group);
@@ -70,7 +57,7 @@ const weather = (() => {
     const mat = snow ? new THREE.PointsMaterial({ color: 0xffffff, map: flakeTex, size: 0.16, transparent: true, opacity: 0.95, depthWrite: false })
       : new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
     const obj = snow ? new THREE.Points(g, mat) : new THREE.LineSegments(g, mat);
-    obj.frustumCulled = false; obj.renderOrder = 3; group.add(obj);   // after the water (1): see DISCOVERY_engine.md
+    obj.frustumCulled = false; obj.renderOrder = DRAW_ORDER.EFFECTS; group.add(obj);   // after the water (1): see DISCOVERY_engine.md
     for (let i = 0; i < n; i++) d[i * 5 + 3] = 1e9;   // floor above everything: respawn on the first frame
     return { n, d, pos, g, mat, snow };
   }
@@ -86,8 +73,9 @@ const weather = (() => {
       floor = snowFloor(ix, iz, t);
       if (floor < 0 || y0 + span <= floor) return false;
     } else {
-      if (t < 0 || zone(ix, iz) !== 1 || t + 1 >= melt()) return false;
-      floor = t + 1; y = Math.min(y, melt());
+      floor = rainFloor(zone(ix, iz), t, melt());
+      if (floor < 0) return false;
+      y = Math.min(y, melt());
     }
     d[o] = x; d[o + 1] = Math.max(floor, y); d[o + 2] = z; d[o + 3] = floor; d[o + 4] = Math.random() * 6.28;
     return true;

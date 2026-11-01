@@ -161,7 +161,6 @@ const glslCurve = (name, base) => `float ${name}(float l) { return (pow(${base},
 const LIGHT_GLSL = `${glslCurve('curve', LIGHT_SKY)}\n${glslCurve('curveB', LIGHT_BLK)}`;
 
 // The renderOrder of every drawn layer (SPEC_deepen M10). three.js draws a lower value first.
-// TODO M10 (T9.1): the renderOrder sites read this table.
 const DRAW_ORDER = Object.freeze({ DOME: -10, SKY_BODY: -9, TERRAIN: 0, WATER: 1, STARS: 1.5, CLOUDS: 2, CRACK: 2, EFFECTS: 3 });
 
 export {
