@@ -32,7 +32,7 @@
  *      overrides, unloading; sky, block, and crystal light, BFS flood fill, incremental
  *      updates; a LIGHT_STOP cell such as a stair takes light but never passes it on)
  *   8. Mesh generation: mesher (hidden-face culling, smooth light + AO, sloped liquids, doors,
- *      crystals, stairs, wet faces for caustics: WET_ALPHA; rails: railMesh() rotates one
+ *      crystals, stairs, wet faces for caustics: FACE_KIND.WET; rails: railMesh() rotates one
  *      flat, slope, or curve quad); clouds (the shared cloud density: one baked noise
  *      texture, GLSL cloudDensity(), the wind, coverage from the weather); terrain-material
  *      (TERRAIN_FS: water waves and glitter, shadows, held light, cloud shadows)
