@@ -512,3 +512,8 @@ export function batchReads(dir = 'src') {
   }
   return out;
 }
+
+test('M8-1 no src/*.js except world.js reads beginBatch, endBatch, or world.batch', () => {
+  const hits = batchReads();
+  assert.equal(hits.length, 0, `old batch API still read in ${hits.length} places:\n${hits.join('\n')}`);
+});
