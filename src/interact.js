@@ -347,6 +347,19 @@ function stairFor(t, id) {
 
 // ---- doors: right click toggles both halves; an open door closes after CONFIG.doorCloseDelay
 const doorTimers = new Map();   // "x,y,z" of the bottom half -> game.clock time to close
+// The edit index: `torches` and `doorTimers`, derived from the override map of a realm
+// (SPEC_deepen M1; realms.js CLEARED and enter). load() sets a timer only for an open bottom
+// door half, due at game.clock + CONFIG.doorCloseDelay. clear() empties both in place.
+const editIndex = {
+  load(overrides) {
+    for (const [k, id] of overrides) {
+      if (baseOf(id) === B.TORCH) torches.add(k);
+      const v = id - B.DOOR;
+      if (baseOf(id) === B.DOOR && (v & 4) && !(v & 8)) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay);
+    }
+  },
+  clear() { torches.clear(); doorTimers.clear(); },
+};
 function toggleDoor(x, y, z) {
   let id = world.getBlock(x, y, z);
   if (baseOf(id) !== B.DOOR) return false;
@@ -536,7 +549,7 @@ function setTargetMob(v) { targetMob = v; }
 function setTargetVehicle(v) { targetVehicle = v; }
 
 export {
-  _dir, attackMob, bonusDrops, bow, breakBlock, canHarvest, doorTimers, FACE_NORMAL, mineComplete, mining,
+  _dir, attackMob, bonusDrops, bow, breakBlock, canHarvest, doorTimers, editIndex, FACE_NORMAL, mineComplete, mining,
   placeBlock, primaryClick, railJoin, railLink, railPlan, rayBox, raycast, raycastMobs, resetMining, SEL_BOX,
   setTarget, setTargetMob, setTargetVehicle, target, targetMob, targetVehicle, toggleDoor, torches, updateBow,
   updateDoors, useItem,
