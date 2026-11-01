@@ -269,13 +269,14 @@ import * as saveFormat from '../src/save-format.js';
 import { BOOT_NOTICE, openSave } from '../src/save-format.js';
 // A fake `storage` (config.js shape) with an op log: each call pushes [op, key].
 // `failSet` makes every set return false (a full or blocked store); `init` seeds the entries.
-function fakeStore(init = {}, { failSet = false } = {}) {
+// `failRemove` makes every remove return false and keep the entry.
+function fakeStore(init = {}, { failSet = false, failRemove = false } = {}) {
   const map = new Map(Object.entries(init)), ops = [];
   return {
     map, ops,
     get(k) { ops.push(['get', k]); return map.has(k) ? map.get(k) : null; },
     set(k, v) { ops.push(['set', k]); if (failSet) return false; map.set(k, String(v)); return true; },
-    remove(k) { ops.push(['remove', k]); map.delete(k); return true; },
+    remove(k) { ops.push(['remove', k]); if (failRemove) return false; map.delete(k); return true; },
   };
 }
 // A fake sessionStorage with an op log. `throwGet` and `throwSet` make those calls throw, as a
@@ -436,6 +437,38 @@ test('M4-12b K7 round trip: the boot after a blocked-session apply throw shows t
   assert.equal(second.blocked, false);
   assert.deepEqual(a.applied, []);
   assert.equal(store.map.has(BOOT_NOTICE), false);
+});
+test('K12-1 openSave keeps a bad-JSON save when the key remove fails, and drops the copy', () => {
+  const store = fakeStore({ [BOOT_KEY]: '{not json' }, { failRemove: true });
+  const o = openSave(bootArgs({ store }));
+  assert.equal(o.notice.keep, true);
+  assert.equal(o.blocked, true);
+  assert.match(o.notice.msg, /It was kept\. Saving is off until the next visit\.$/);
+  assert.equal(store.map.get(BOOT_KEY), '{not json');
+  assert.equal(store.map.has(BACKUP_KEY), false);
+  assert.deepEqual(writes(store), [['set', BACKUP_KEY], ['remove', BOOT_KEY], ['remove', BACKUP_KEY]]);
+});
+test('K12-2 an apply throw with a failing key remove reloads once, and the next boot does not loop', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failRemove: true }), session = fakeSession();
+  const first = openSave(bootArgs({ store, session, apply: boom }));
+  assert.equal(first.reload, true);
+  assert.equal(JSON.parse(session.map.get(BOOT_NOTICE)).keep, true);
+  store.ops.length = 0;
+  const a = bootArgs({ store, session, apply: boom });   // the reload: the same tab session and store
+  const second = openSave(a);
+  assert.equal(second.reload, false);
+  assert.equal(second.blocked, true);
+  assert.equal(second.notice.keep, true);
+  assert.deepEqual(a.applied, []);
+  assert.equal(store.ops.some(([op, k]) => op === 'get' && k === BOOT_KEY), false, 'the save key is not read');
+  assert.equal(store.ops.some(([op, k]) => op === 'set' && k.includes('.rejected.')), false, 'no new copy');
+});
+test('K12-3 an apply throw with a failing key remove and a throwing session write does not reload', () => {
+  const store = fakeStore({ [BOOT_KEY]: liveText() }, { failRemove: true }), session = fakeSession({}, { throwSet: true });
+  const o = openSave(bootArgs({ store, session, apply: boom }));
+  assert.equal(o.reload, false);
+  assert.equal(o.blocked, true);
+  assert.equal(store.map.get(BOOT_KEY), liveText());
 });
 test('M4-13 K10 save-format.js does not export validSlice', () => {
   assert.equal(typeof saveFormat.validSave, 'function', 'precondition: the namespace holds the real exports');
