@@ -410,6 +410,9 @@ const lightCurve = (level, base) => (base ** (15 - level) - lightLo(base)) / lig
 const glslCurve = (name, base) => `float ${name}(float l) { return (pow(${base}, (1.0 - l) * 15.0) - ${lightLo(base)}) / ${lightSpan(base)}; }`;
 const LIGHT_GLSL = `${glslCurve('curve', LIGHT_SKY)}\n${glslCurve('curveB', LIGHT_BLK)}`;
 
+// The renderOrder of every drawn layer (SPEC_deepen M10). three.js draws a lower value first.
+const DRAW_ORDER = Object.freeze({ DOME: -10, SKY_BODY: -9, TERRAIN: 0, WATER: 1, STARS: 1.5, CLOUDS: 2, CRACK: 2, EFFECTS: 3 });
+
 /* =====================================================================================
  * === 2. BLOCK AND ITEM DEFINITIONS
  * ===================================================================================== */
@@ -1003,6 +1006,14 @@ function findFrame(get, x, y, z, ring = B.OBSIDIAN) {
   return null;
 }
 
+// True when (x, y, z) lies in the plane of frame f ({ axis, x0, y0, z0, w, h }), inside the
+// opening plus its 1-block ring (corners included). world.locked uses it for the crystal portals.
+function ringHas(f, x, y, z) {
+  const [u, d] = f.axis === 'x' ? [x - f.x0, z - f.z0] : [z - f.z0, x - f.x0];
+  const v = y - f.y0;
+  return d === 0 && u >= -1 && u <= f.w && v >= -1 && v <= f.h;
+}
+
 // Every opening cell of frame f, as [x, y, z].
 function frameCells(f) {
   const out = [];
@@ -1289,6 +1300,39 @@ const BIOME_FOLIAGE = BIOME_GRASS.map(([r, g, b], i) =>
   i === BIOME.SNOWY_MOUNTAINS || i === BIOME.SNOWY_PLAINS ? [96, 138, 116] :
   i === BIOME.RAINFOREST ? [60, 170, 30] : [Math.round(r * 0.82), Math.round(g * 0.9), Math.round(b * 0.75)]);
 const TINT_ALPHA = 191;
+
+/* =====================================================================================
+ * PRECIP — living header (src/precip.js, SPEC_deepen M9)
+ * -------------------------------------------------------------------------------------
+ * The precipitation rule, pure. Terms: a biome's **zone** (0 dry, 1 height rule, 2 always snow);
+ * a column's **kind** (0 none, 1 rain, 2 snow) from its zone, its top block `top`, and the snow
+ * line `melt`; a **floor** is the y where a drop lands, or -1. weather.js wraps these per column.
+ * Imports only biomes.js; never reaches order.js. Why: ARCHITECTURE.md D29. Gotchas: DISCOVERY_engine.md.
+ * ===================================================================================== */
+
+// The zone of a biome: 0 dry (desert), 2 snow (snowy plains, snowy mountains), 1 for the rest.
+function zoneOf(biome) {
+  return biome === BIOME.DESERT ? 0 : biome === BIOME.SNOWY_PLAINS || biome === BIOME.SNOWY_MOUNTAINS ? 2 : 1;
+}
+
+// What lands on top block `top` in zone `zone`: 0 none, 1 rain, 2 snow. Zone 1 snows when
+// top + 1 >= melt. top < 0 (an unloaded column) gives 0. weather.js passes zone -1 for an
+// unloaded column; that gives 0 too.
+function precipKind(zone, top, melt) {
+  if (top < 0) return 0;
+  return zone === 1 ? (top + 1 >= melt ? 2 : 1) : Math.max(0, zone);
+}
+
+// The floor of a snow flake: top + 1, or max(top + 1, melt) in zone 1; -1 when no snow falls.
+function snowFloor(zone, top, melt) {
+  const zn = top < 0 ? -1 : zone;
+  return zn === 2 ? top + 1 : zn === 1 ? Math.max(top + 1, melt) : -1;
+}
+
+// The floor of a rain drop: top + 1 where the kind is rain, else -1. weather.js caps its y at melt.
+function rainFloor(zone, top, melt) {
+  return precipKind(zone, top, melt) === 1 ? top + 1 : -1;
+}
 
 // ---- texture atlas (section 3) ---------------------------------------------------------
 // Paints every block tile into one 256×256 canvas at startup (16×16 pixels per tile).
@@ -3898,6 +3942,8 @@ class GenService {
  * is the realm's light floor: brightnessAt never reads below it (the shader uses uAmbient).
  * Meshes: World takes a mesh adapter { build, dispose, show } and never touches three.js, so the
  * module is pure (PURE in tools/depcheck.js). chunkMeshes(scene) in mesher.js is the game's adapter.
+ * Batches: batched(fn) is the one batch API. A nested call joins the outer batch; the outermost
+ * call remeshes each touched chunk once, also when fn throws. Only world.js reads `batch`.
  * ===================================================================================== */
 
 class Chunk {
@@ -4078,12 +4124,6 @@ class World {
     else for (const tc of this.touched) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
     if (this.onEdit) this.onEdit(x, y, z, old, id);
     return true;
-  }
-  // Batch mode (explosions): setBlock only collects touched chunks; endBatch remeshes each once.
-  beginBatch() { this.batch = new Set(); }
-  endBatch() {
-    const set = this.batch; this.batch = null;
-    if (set) for (const tc of set) if (tc.meshed) { this.meshes.build(this, tc); tc.dirty = false; }
   }
   // Runs fn() with remeshing deferred; the outermost call remeshes each touched chunk once, even when fn throws.
   batched(fn) {
@@ -4870,8 +4910,8 @@ function buildChunkMesh(world, scene, chunk) {
     }
     if (ob.n + wb.n !== before) { if (y < minYSeen) minYSeen = y; if (y > maxYSeen) maxYSeen = y; }
   }
-  chunk.opaqueMesh = setChunkGeometry(world, scene, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, 0);
-  chunk.waterMesh = setChunkGeometry(world, scene, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, 1);
+  chunk.opaqueMesh = setChunkGeometry(world, scene, chunk, chunk.opaqueMesh, ob, terrainMaterial, minYSeen, maxYSeen, DRAW_ORDER.TERRAIN);
+  chunk.waterMesh = setChunkGeometry(world, scene, chunk, chunk.waterMesh, wb, waterMaterial, minYSeen, maxYSeen, DRAW_ORDER.WATER);
   world.stats.meshMs = performance.now() - t0;
 }
 
@@ -6153,11 +6193,12 @@ function railJoin(x, y, z) {
 
 function placeBlock(x, y, z, id) {
   if (LEAF_DECAYS[id]) id = B.LEAVES_PLACED + LEAF_COLOR[id];   // a placed leaf never decays
-  const own = IS_RAIL(id) && !world.batch;   // one remesh for the rail and the rails it re-shapes
-  if (own) world.beginBatch();
-  const ok = world.setBlock(x, y, z, id);
-  if (ok && IS_RAIL(id)) railJoin(x, y, z);
-  if (own) world.endBatch();
+  const set = () => {
+    const done = world.setBlock(x, y, z, id);
+    if (done && IS_RAIL(id)) railJoin(x, y, z);
+    return done;
+  };
+  const ok = IS_RAIL(id) ? world.batched(set) : set();   // one remesh for the rail and the rails it re-shapes
   if (!ok) return false;
   if (baseOf(id) === B.TORCH) {
     torches.add(`${x},${y},${z}`);
@@ -6235,10 +6276,10 @@ function toggleDoor(x, y, z) {
   if (baseOf(id) !== B.DOOR) return false;
   if ((id - B.DOOR) & 8) { y--; id = world.getBlock(x, y, z); if (baseOf(id) !== B.DOOR) return false; }
   const v = id - B.DOOR, open = !(v & 4), nv = (v & 3) | (open ? 4 : 0);
-  world.beginBatch();
-  world.setBlock(x, y, z, B.DOOR + nv);
-  if (baseOf(world.getBlock(x, y + 1, z)) === B.DOOR) world.setBlock(x, y + 1, z, B.DOOR + 8 + nv);
-  world.endBatch();
+  world.batched(() => {
+    world.setBlock(x, y, z, B.DOOR + nv);
+    if (baseOf(world.getBlock(x, y + 1, z)) === B.DOOR) world.setBlock(x, y + 1, z, B.DOOR + 8 + nv);
+  });
   const k = `${x},${y},${z}`;
   if (open) doorTimers.set(k, game.clock + CONFIG.doorCloseDelay); else doorTimers.delete(k);
   audio.door(open, x + 0.5, y + 1, z + 0.5);
@@ -6371,9 +6412,7 @@ function useItem() {
   if (item.kind === 'door') {
     const up = world.getBlock(x, y + 1, z);
     if (y + 1 >= H || up === UNLOADED || !REPLACEABLE[up] || cellBlockedByEntity(x, y + 1, z)) return;
-    world.beginBatch();
-    const ok = placeBlock(x, y, z, id) && world.setBlock(x, y + 1, z, id + 8);
-    world.endBatch();
+    const ok = world.batched(() => placeBlock(x, y, z, id) && world.setBlock(x, y + 1, z, id + 8));
     if (ok) { inv.consumeHeld(1); viewModel.swing(); }
     return;
   }
@@ -6493,13 +6532,13 @@ const liquids = (() => {
     queues[kind] = new Map();
     const t0 = performance.now();
     let n = 0, late = false;
-    world.beginBatch();
-    for (const [k, c] of q) {
-      if (!late && (n++ & 15) === 0 && performance.now() - t0 > 6) late = true;   // time budget: the rest waits a tick
-      if (late) { queues[kind].set(k, c); continue; }
-      tickCell(c[0], c[1], c[2], kind);
-    }
-    world.endBatch();
+    world.batched(() => {
+      for (const [k, c] of q) {
+        if (!late && (n++ & 15) === 0 && performance.now() - t0 > 6) late = true;   // time budget: the rest waits a tick
+        if (late) { queues[kind].set(k, c); continue; }
+        tickCell(c[0], c[1], c[2], kind);
+      }
+    });
   }
   return {
     wake,
@@ -6573,16 +6612,16 @@ const leafDecay = (() => {
       if (!queue.size) return;
       const now = game.clock, t0 = performance.now();
       let n = 0;
-      world.beginBatch();
-      for (const [k, c] of queue) {
-        if (c[3] > now) continue;
-        if ((n++ & 7) === 0 && performance.now() - t0 > BUDGET_MS) break;   // the rest waits a frame
-        const id = world.getBlock(c[0], c[1], c[2]);
-        if (id === UNLOADED) { c[3] = now + 2; continue; }
-        queue.delete(k);
-        if (LEAF_DECAYS[id] && !supported(c[0], c[1], c[2])) decay(c[0], c[1], c[2], id);
-      }
-      world.endBatch();
+      world.batched(() => {
+        for (const [k, c] of queue) {
+          if (c[3] > now) continue;
+          if ((n++ & 7) === 0 && performance.now() - t0 > BUDGET_MS) break;   // the rest waits a frame
+          const id = world.getBlock(c[0], c[1], c[2]);
+          if (id === UNLOADED) { c[3] = now + 2; continue; }
+          queue.delete(k);
+          if (LEAF_DECAYS[id] && !supported(c[0], c[1], c[2])) decay(c[0], c[1], c[2], id);
+        }
+      });
     },
     get pending() { return queue.size; },
     save() { return [...queue.values()].map((c) => [c[0], c[1], c[2]]); },
@@ -6615,11 +6654,6 @@ const farming = (() => {
     if (!reg.has(k)) reg.set(k, [x, y, z, game.clock + firstDelay(id, x, y, z), 0]);
     return reg.get(k);
   }
-  function batched(fn) {
-    if (world.batch) return fn();
-    world.beginBatch();
-    try { return fn(); } finally { world.endBatch(); }
-  }
   function wet(x, y, z) {
     const R = WATER_REACH;
     for (let dy = 0; dy <= 1; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
@@ -6643,7 +6677,7 @@ const farming = (() => {
       if (Y >= H) return false;
       if (b === B.LOG && !(X === x && Y === y && Z === z) && !free(world.getBlock(X, Y, Z))) return false;
     }
-    batched(() => {
+    world.batched(() => {
       if (world.getBlock(x, y - 1, z) === B.GRASS) world.setBlock(x, y - 1, z, B.DIRT);
       for (const [X, Y, Z, b] of cells) if (b === B.LOG || free(world.getBlock(X, Y, Z))) world.setBlock(X, Y, Z, b);
     });
@@ -6670,7 +6704,7 @@ const farming = (() => {
     update() {
       if (!reg.size) return;
       const now = game.clock;
-      batched(() => {
+      world.batched(() => {
         for (const [k, c] of reg) {
           if (c[3] > now) continue;
           const [x, y, z] = c, id = world.getBlock(x, y, z);
@@ -6689,7 +6723,7 @@ const farming = (() => {
     boost(x, y, z) {
       const id = world.getBlock(x, y, z);
       if (!IS_SAPLING(id) && !(IS_CROP(id) && id < RIPE)) return false;
-      return batched(() => step(add(x, y, z, id), id));
+      return world.batched(() => step(add(x, y, z, id), id));
     },
     toDirt,
     get pending() { return reg.size; },
@@ -6771,16 +6805,15 @@ const grass = (() => {
     return grassNear(x, y, z) ? B.GRASS : 0;
   }
   function apply() {
-    const own = !world.batch;   // beginBatch does not nest
-    if (own) world.beginBatch();
     try {
-      for (let k = 0; k < changes.length; k += 4) {
-        const x = changes[k], y = changes[k + 1], z = changes[k + 2], to = changes[k + 3];
-        if (next(x, y, z) === to) world.setBlock(x, y, z, to);   // an earlier change this frame can void it
-      }
+      world.batched(() => {
+        for (let k = 0; k < changes.length; k += 4) {
+          const x = changes[k], y = changes[k + 1], z = changes[k + 2], to = changes[k + 3];
+          if (next(x, y, z) === to) world.setBlock(x, y, z, to);   // an earlier change this frame can void it
+        }
+      });
     } finally {
       changes.length = 0;
-      if (own) world.endBatch();
     }
   }
 
@@ -6880,7 +6913,7 @@ const crackMesh = new THREE.Mesh(crackGeo, new THREE.MeshBasicMaterial({
   map: atlasTexture, transparent: true, depthWrite: false, fog: false,
   polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
 crackMesh.visible = false;
-crackMesh.renderOrder = 2;
+crackMesh.renderOrder = DRAW_ORDER.CRACK;
 scene.add(crackMesh);
 let crackStage = -1;
 function setCrackStage(s) {
@@ -9049,19 +9082,19 @@ const projectiles = (() => {
 function explode(x, y, z, r, cause = 'was blown up by a creeper') {
   audio.explode(x, y, z);
   particles.explosion(x, y, z, r);
-  world.beginBatch();
-  const R = Math.ceil(r);
-  for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
-    const d = Math.hypot(dx, dy, dz);
-    if (d > r - Math.random() * 1.1) continue;
-    const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz;
-    const id = world.getBlock(bx, by, bz);
-    if (id === B.AIR || LIQ_KIND[id] || id === UNLOADED || BLOCKS[id].hardness < 0) continue;
-    if (id === B.TNT) { primeTnt(bx, by, bz, 0.5 + Math.random()); continue; }   // chain reaction
-    const drop = Math.random() < 0.3;
-    breakBlock(bx, by, bz, drop, true);
-  }
-  world.endBatch();
+  world.batched(() => {
+    const R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy, dz);
+      if (d > r - Math.random() * 1.1) continue;
+      const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz;
+      const id = world.getBlock(bx, by, bz);
+      if (id === B.AIR || LIQ_KIND[id] || id === UNLOADED || BLOCKS[id].hardness < 0) continue;
+      if (id === B.TNT) { primeTnt(bx, by, bz, 0.5 + Math.random()); continue; }   // chain reaction
+      const drop = Math.random() < 0.3;
+      breakBlock(bx, by, bz, drop, true);
+    }
+  });
   // damage and knockback fall off with distance (up to twice the radius)
   const hitEntity = (e, isPlayer) => {
     const ex = e.pos.x - x, ey = e.pos.y + e.h / 2 - y, ez = e.pos.z - z;
@@ -9350,7 +9383,7 @@ const particles = (() => {
       }`,
   });
   const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false; points.renderOrder = 3;
+  points.frustumCulled = false; points.renderOrder = DRAW_ORDER.EFFECTS;
   scene.add(points);
 
   // palette of a block: opaque pixels of its side and top tiles (grass and leaves tinted)
@@ -10403,7 +10436,7 @@ const realm = {
   current: 'overworld',
   travelling: null,                     // { from, pos, to, arrive } while the travel screen shows
   portals: { crystalBack: null },
-  boss: { defeated: false },
+  get boss() { return { defeated: boss.defeated }; },   // read-only; boss.js owns the flag (SPEC_deepen M3)
   stash: new Map(),                     // realm name -> stash, for every realm except current
   voidT: 0,
 
@@ -10427,7 +10460,7 @@ const realm = {
   data() {
     const realms = {};
     for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = this.slice(name); if (sl) realms[name] = sl; }
-    return { ...this.slice('overworld'), realm: this.place().name, realms, portals: { ...this.portals }, boss: { ...this.boss } };
+    return { ...this.slice('overworld'), realm: this.place().name, realms, portals: { ...this.portals }, boss: boss.data() };
   },
   // Where the save puts the player: the realm before travel during a load, the overworld when dead.
   place() {
@@ -10440,7 +10473,7 @@ const realm = {
   load(d) {
     this.current = REALMS[d.realm] ? d.realm : 'overworld';
     this.portals = { crystalBack: d.portals?.crystalBack ?? null };
-    this.boss = { defeated: !!d.boss?.defeated };
+    boss.load(d.boss);
     this.stash.clear();
     const slices = { overworld: d, ...(d.realms || {}) };
     for (const name of Object.keys(REALMS)) if (name !== this.current && slices[name]) this.stash.set(name, stashOf(slices[name]));
@@ -10585,7 +10618,7 @@ const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('trave
  *
  * The arrival portal is generated terrain, not edits (ARCHITECTURE D52). world.locked refuses every
  * edit to its frame and opening, so it is always lit and the player can never be stranded. After
- * the boss kill (realm.boss.defeated), world.locked also refuses every edit to the exit portal box.
+ * the boss kill (boss.defeated), world.locked also refuses every edit to the exit portal box (boss.locks).
  *
  * `cells` maps "x,y,z" to the pane id of every pane cell in the loaded realm (the overrides, plus
  * the arrival panes in the Crystal Realm), for the sparks and the hum. It rebuilds when
@@ -10605,19 +10638,17 @@ const KINDS = {
 const PANE_OF = { [B.OBSIDIAN]: PE, [B.CRYSTAL_FRAME]: PC };   // frame block -> pane id
 const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 const A = WG.CRYSTAL_ARRIVAL;
-// The arrival portal: its stand point (the middle of the opening's floor) and its locked box.
+// The arrival portal: its stand point (the middle of the opening's floor).
 const ARRIVAL_STAND = [A.x0 + (A.w >> 1) + 0.5, A.y0, A.z0 + 0.5];
-const inArrival = (x, y, z) => z === A.z0 && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
-// The exit portal (boss.EXIT). boss.js loads after this module, so inExit reads EXIT only inside the
-// function. Its locked box is the frame ring around the panes.
-const inExit = (x, y, z) => { const E = boss.EXIT; return z === E.z && x >= E.x0 - 1 && x <= E.x0 + E.w && y >= E.y0 - 1 && y <= E.y0 + E.h; };
 
 const portals = (() => {
   const cells = new Map();          // "x,y,z" -> pane id of every pane cell in the loaded realm
   let known = null;                 // the override map that `cells` mirrors
   let t = 0, armed = false, warned = false, removing = false, kind = PE;
   const get = (x, y, z) => world.getBlock(x, y, z);
-  world.locked = (x, y, z) => world.realm === 'crystal' && (inArrival(x, y, z) || (realm.boss.defeated && inExit(x, y, z)));
+  // The crystal lock: the arrival portal box always, the exit portal box after the kill. boss.js
+  // loads after this module, so `boss` is read only at call time.
+  world.locked = (x, y, z) => world.realm === 'crystal' && (ringHas(A, x, y, z) || boss.locks(x, y, z));
 
   function sync() {
     if (known === world.overrides) return;
@@ -10639,10 +10670,7 @@ const portals = (() => {
     }
     if (!out.length) return;
     removing = true;
-    const own = !world.batch;
-    if (own) world.beginBatch();
-    for (const c of out) world.setBlock(c[0], c[1], c[2], B.AIR);
-    if (own) world.endBatch();
+    world.batched(() => { for (const c of out) world.setBlock(c[0], c[1], c[2], B.AIR); });
     removing = false;
     const c = out[0];
     audio.fizz(c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
@@ -10664,10 +10692,7 @@ const portals = (() => {
     if (N6.some(([dx, dy, dz]) => get(x + dx, y + dy, z + dz) === P)) return 'busy';
     const f = findFrame(get, x, y, z, KINDS[P].ring);
     if (!f) return 'open';
-    const own = !world.batch;
-    if (own) world.beginBatch();
-    for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P);
-    if (own) world.endBatch();
+    world.batched(() => { for (const c of frameCells(f)) world.setBlock(c[0], c[1], c[2], P); });
     const [cx, cy, cz] = frameCells(f)[0], pos = { x: cx, y: cy, z: cz };
     if (P === PC) {   // a rising glass chime
       for (const [i, f0] of [[0, 660], [1, 880], [2, 1320]]) audio.tone({ type: 'sine', f0, f1: f0 * 1.5, dur: 1.2 + i * 0.3, vol: 0.18, attack: 0.05 + i * 0.12, pos });
@@ -10718,10 +10743,7 @@ const portals = (() => {
   // Arrival with no portal: builds an Ember portal at the target (the chunks there are meshed now).
   function build(to) {
     const plan = buildPlan(get, to[0], to[1], to[2]);
-    const own = !world.batch;
-    if (own) world.beginBatch();
-    for (const [x, y, z, id] of plan.edits) world.setBlock(x, y, z, id);
-    if (own) world.endBatch();
+    world.batched(() => { for (const [x, y, z, id] of plan.edits) world.setBlock(x, y, z, id); });
     lastBuild = plan;
     return plan.stand;
   }
@@ -10820,7 +10842,7 @@ const portals = (() => {
  * Leaving the realm clears `mobs[]` (realm.enter), so the next visit spawns a fresh boss.
  *
  * `boss.update(dt)` spawns the boss when the Crystal Realm is current, the save has no kill
- * (realm.boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
+ * (boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
  * boss bar (hud.bossBar), and shows the victory screen once the kill ends.
  * ===================================================================================== */
 
@@ -10838,6 +10860,10 @@ const SUMMON_T = 12, SUMMON_N = 2, SHARDLINGS_MAX = 4;
 const DEATH_T = 3;
 // The exit portal: an opening 3 wide and 4 tall (like the arrival portal) in the plane z = 0.
 const EXIT = { x0: -1, y0: FLOOR, z: 0, w: 3, h: 4 };
+// EXIT as a portal-frame frame, for ringHas (boss.locks). EXIT keeps `z` (SPEC_deepen M3).
+const EXIT_FRAME = { axis: 'x', x0: EXIT.x0, y0: EXIT.y0, z0: EXIT.z, w: EXIT.w, h: EXIT.h };
+// The placed entities (by base) that buildExitPortal breaks before it overwrites their cell (K5).
+const ENTITY_BASE = new Set([B.CHEST, B.FURNACE, B.TORCH, B.DOOR]);
 const PYLONS = WG.PYLONS;
 
 const pylonStands = ([x, y, z]) => { const id = world.getBlock(x, y, z); return id === B.PYLON || id === UNLOADED; };
@@ -11069,21 +11095,24 @@ class Titan extends Mob {
     const dz = Math.abs(x - 0.5) < 4 && Math.abs(z) < 3 ? 3.5 - z : 0;
     for (const [id, n] of this.def.drops()) if (n > 0) spawnDrop(id, n, x, FLOOR + 0.5, z + dz, null, 0.6);
     buildExitPortal();
-    realm.boss.defeated = true;
+    boss.defeated = true;
     boss.victoryPending = true;
     persist.save();
   }
 }
 
 // The exit portal: a Crystal Frame ring around a 3 x 4 opening, built lit (portals.ignite fills the panes).
+// A box cell that holds a placed entity (ENTITY_BASE) breaks first, so its block and contents drop
+// and its torch key, other door half, and door timer clear. Other cells are overwritten, no drop.
 function buildExitPortal() {
-  const E = EXIT, own = !world.batch;
-  if (own) world.beginBatch();
-  for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
-    const ring = u === -1 || u === E.w || v === -1 || v === E.h;
-    world.setBlock(E.x0 + u, E.y0 + v, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
-  }
-  if (own) world.endBatch();
+  const E = EXIT;
+  world.batched(() => {
+    for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
+      const x = E.x0 + u, y = E.y0 + v, ring = u === -1 || u === E.w || v === -1 || v === E.h;
+      if (ENTITY_BASE.has(baseOf(world.getBlock(x, y, E.z)))) breakBlock(x, y, E.z, true, true);
+      world.setBlock(x, y, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
+    }
+  });
   const r = portals.ignite(E.x0 - 1, E.y0, E.z, B.PORTAL_CRYSTAL);
   if (r !== 'lit') console.warn(`exit portal: ignite returned ${r}`);
 }
@@ -11102,6 +11131,13 @@ const boss = {
   victoryPending: false,     // the kill ended; the victory screen waits for the 'playing' state
   wasDead: false,
   HOME, PYLONS, EXIT, WAKE_R, SLEEP_R,
+  defeated: false,           // the Titan is dead (the save path boss.defeated). Only Titan.shatter sets it.
+  // The save part of the boss (realm.data and realm.load call these). A missing value loads as false.
+  data() { return { defeated: this.defeated }; },
+  load(d) { this.defeated = !!d?.defeated; },
+  // True when (x, y, z) is in the exit portal box after the kill. portals.js reads it in world.locked.
+  // The flag is set after buildExitPortal, so the build is never locked.
+  locks(x, y, z) { return this.defeated && ringHas(EXIT_FRAME, x, y, z); },
   get pylonsStanding() { return standingPylons().length; },
 
   // realm.leave calls this first. A Titan in its death animation shatters at once, so the loot and
@@ -11115,7 +11151,7 @@ const boss = {
     const crystal = realm.current === 'crystal';
     if (this.titan && !mobs.includes(this.titan)) this.titan = null;   // realm.enter or a chunk unload removed it, or the death ended
     if (!crystal) this.hp = null;                                 // a new visit starts a full fight
-    if (crystal && !realm.boss.defeated && !this.titan) {
+    if (crystal && !this.defeated && !this.titan) {
       const c = world.chunkAt(Math.floor(HOME.x), Math.floor(HOME.z));
       if (c && c.lit) { this.titan = new Titan(); if (this.hp) this.titan.hp = this.hp; mobs.push(this.titan); }
     }
@@ -11217,7 +11253,7 @@ const sky = (() => {
         gl_FragColor = vec4(c, 1.0);
       }`,
   }));
-  dome.renderOrder = -10; dome.frustumCulled = false;
+  dome.renderOrder = DRAW_ORDER.DOME; dome.frustumCulled = false;
   group.add(dome);
 
   // Sun and moon: a square disc with a rim inside a round soft glow (64 px), after `clonecraft-fable`.
@@ -11239,7 +11275,7 @@ const sky = (() => {
   const moon = new THREE.Mesh(new THREE.PlaneGeometry(68, 68),
     discMat(discTexture('#f8fbff', '#ffffff', 'rgba(215,225,255,0.4)', 'rgba(200,210,255,0)')));
   const bodyMat = (map) => new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
-  sun.renderOrder = moon.renderOrder = -9;
+  sun.renderOrder = moon.renderOrder = DRAW_ORDER.SKY_BODY;
   group.add(sun, moon);
   // soft halo around the sun: a radial gradient, additive, strongest when the view faces it
   const haloTex = (() => {
@@ -11252,7 +11288,7 @@ const sky = (() => {
     return t;
   })();
   const halo = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), bodyMat(haloTex));
-  halo.renderOrder = -9;
+  halo.renderOrder = DRAW_ORDER.SKY_BODY;
   group.add(halo);
 
   // stars: random directions on the upper sphere, rotating with the sky
@@ -11274,7 +11310,7 @@ const sky = (() => {
   });
   const stars = new THREE.Points(starGeo, starMat);
   // Stars draw before the clouds (renderOrder 2). The clouds write no depth: their alpha covers the stars.
-  stars.renderOrder = 1.5; stars.frustumCulled = false;
+  stars.renderOrder = DRAW_ORDER.STARS; stars.frustumCulled = false;
   group.add(stars);
 
   // G5 clouds: one flat quad at CLOUD_Y, moved under the camera each frame. It writes no depth.
@@ -11333,7 +11369,7 @@ const sky = (() => {
       }`,
   });
   const clouds$1 = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), cloudMat);
-  clouds$1.frustumCulled = false; clouds$1.renderOrder = 2;
+  clouds$1.frustumCulled = false; clouds$1.renderOrder = DRAW_ORDER.CLOUDS;
   scene.add(clouds$1);
 
   const C = (r, g, b) => new THREE.Color(r, g, b);
@@ -11502,8 +11538,10 @@ const sky = (() => {
 // daylight to 0.75x in rain and 0.55x in a storm, greys the sky and clouds, and pulls the fog 30% in.
 // The precipitation depends on the biome and the height: none in a desert, snow at every height in
 // snowy biomes. Elsewhere the drop's height decides: snow at or above MELT (SNOW_LINE + 1), rain below
-// it, so a slope or a treetop never mixes the two. A drop never falls below the top non-air block of
-// its column, so roofs, trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
+// it, so a slope or a treetop never mixes the two. precip.js holds this rule (pure; SPEC_deepen M9);
+// zone, precip, and snowFloor here wrap it for one column. A drop never falls below the top non-air
+// block of its column, so roofs, trees, and caves stay dry. The pools draw at DRAW_ORDER.EFFECTS,
+// after the water. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
 // the player and mobs within 3 blocks and lights nothing. Thunder follows at THUNDER_SPEED blocks/s.
 // Weather falls only in a realm with `weather: true` (the overworld). The kind and its timer keep
 // counting in every realm; elsewhere k and storm target 0. snap() sets them at once (realm travel).
@@ -11520,27 +11558,16 @@ const weather = (() => {
     for (let y = H - 1; y > 0; y--) if (c.blocks[lidx(lx, y, lz)] !== B.AIR) return y;
     return 0;
   }
-  // The zone of column (x, z): -1 unloaded, 0 dry (desert), 1 by height (snow at or above MELT, rain
-  // below), 2 snow (snowy biomes).
+  // The zone of column (x, z): -1 unloaded, else precip.js zoneOf (0 dry, 1 by height, 2 snow).
   function zone(x, z) {
     const c = world.chunkAt(x, z);
-    if (!c) return -1;
-    const b = c.biomes[(z & 15) * CS + (x & 15)];
-    return b === BIOME.DESERT ? 0 : b === BIOME.SNOWY_PLAINS || b === BIOME.SNOWY_MOUNTAINS ? 2 : 1;
+    return c ? zoneOf(c.biomes[(z & 15) * CS + (x & 15)]) : -1;
   }
   const melt = () => WG.SNOW_LINE + 1;
   // What lands on the top block t of column (x, z): 0 none, 1 rain, 2 snow.
-  function precip(x, z, t) {
-    if (t < 0) return 0;
-    const zn = zone(x, z);
-    return zn === 1 ? (t + 1 >= melt() ? 2 : 1) : Math.max(0, zn);
-  }
-  // The floor of a snow flake in column (x, z) with top block t: the top, or MELT in zone 1.
-  // Returns -1 when no snow falls in the column.
-  function snowFloor(x, z, t) {
-    const zn = t < 0 ? -1 : zone(x, z);
-    return zn === 2 ? t + 1 : zn === 1 ? Math.max(t + 1, melt()) : -1;
-  }
+  function precip(x, z, t) { return precipKind(zone(x, z), t, melt()); }
+  // The floor of a snow flake in column (x, z) with top block t. Returns -1 when no snow falls.
+  function snowFloor$1(x, z, t) { return snowFloor(zone(x, z), t, melt()); }
 
   // Particle pools: rain as line streaks, snow as points. Each drop stores x, y, z, its floor, and a phase.
   const group = new THREE.Group(); group.visible = false; scene.add(group);
@@ -11556,7 +11583,7 @@ const weather = (() => {
     const mat = snow ? new THREE.PointsMaterial({ color: 0xffffff, map: flakeTex, size: 0.16, transparent: true, opacity: 0.95, depthWrite: false })
       : new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
     const obj = snow ? new THREE.Points(g, mat) : new THREE.LineSegments(g, mat);
-    obj.frustumCulled = false; obj.renderOrder = 3; group.add(obj);   // after the water (1): see DISCOVERY_engine.md
+    obj.frustumCulled = false; obj.renderOrder = DRAW_ORDER.EFFECTS; group.add(obj);   // after the water (1): see DISCOVERY_engine.md
     for (let i = 0; i < n; i++) d[i * 5 + 3] = 1e9;   // floor above everything: respawn on the first frame
     return { n, d, pos, g, mat, snow };
   }
@@ -11569,11 +11596,12 @@ const weather = (() => {
     const t = top(ix, iz), d = P.d, o = i * 5;
     let floor, y = y0 + Math.random() * span;
     if (P.snow) {
-      floor = snowFloor(ix, iz, t);
+      floor = snowFloor$1(ix, iz, t);
       if (floor < 0 || y0 + span <= floor) return false;
     } else {
-      if (t < 0 || zone(ix, iz) !== 1 || t + 1 >= melt()) return false;
-      floor = t + 1; y = Math.min(y, melt());
+      floor = rainFloor(zone(ix, iz), t, melt());
+      if (floor < 0) return false;
+      y = Math.min(y, melt());
     }
     d[o] = x; d[o + 1] = Math.max(floor, y); d[o + 2] = z; d[o + 3] = floor; d[o + 4] = Math.random() * 6.28;
     return true;
@@ -11589,7 +11617,7 @@ const weather = (() => {
         const cx = Math.floor(d[o]);
         d[o] += Math.sin(game.clock * 1.3 + d[o + 4]) * 0.5 * dt;
         if (Math.floor(d[o]) !== cx) {
-          const nx = Math.floor(d[o]), nz = Math.floor(d[o + 2]), f = snowFloor(nx, nz, top(nx, nz));
+          const nx = Math.floor(d[o]), nz = Math.floor(d[o + 2]), f = snowFloor$1(nx, nz, top(nx, nz));
           moved = f < 0; d[o + 3] = f;
         }
       }
@@ -11761,7 +11789,7 @@ const fireflies = (() => {
   const mat = new THREE.PointsMaterial({ size: 0.35, map: new THREE.CanvasTexture(cv), vertexColors: true,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false; points.renderOrder = 3; points.visible = false; scene.add(points);   // after the water (1)
+  points.frustumCulled = false; points.renderOrder = DRAW_ORDER.EFFECTS; points.visible = false; scene.add(points);   // after the water (1)
   for (let i = 0; i < N; i++) d[i * S + 9] = d[i * S + 10] = 0;   // age = life = 0: spawn on the first frame
 
   let t = 0, level = 0, shown = 0;
@@ -11894,7 +11922,7 @@ const ash = (() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const pts = new THREE.Points(geo, mat);
-    pts.frustumCulled = false; pts.renderOrder = 3; pts.visible = false; scene.add(pts);   // after the water (1)
+    pts.frustumCulled = false; pts.renderOrder = DRAW_ORDER.EFFECTS; pts.visible = false; scene.add(pts);   // after the water (1)
     for (let i = 0; i < n; i++) { ph[i] = Math.random() * 100; sp[i] = 0.6 + Math.random() * 0.8; }
     return { n, pos, ph, sp, geo, pts };
   }
@@ -12491,7 +12519,7 @@ const post = (() => {
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 52 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 53 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -12503,8 +12531,8 @@ const post = (() => {
  *  - An imported binding is read-only. A write to another module's `let` goes through the
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
- *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, world, face-kind,
- *    clouds, terrain-material, crafting, and save-format never reach this file. Node tests import them.
+ *  - three, config, blocks, portal-frame, biomes, precip, atlas, worldgen, gen-service, world,
+ *    face-kind, clouds, terrain-material, crafting, and save-format never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
@@ -12512,7 +12540,8 @@ const post = (() => {
  *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
  *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan);
  *      save-format (the save checks, the edits codec, and the boot reader readSave; pure)
- *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
+ *   3. Procedural texture atlas: biomes, precip (the pure precipitation rule), atlas (blocks,
+ *      cracks, item icons, mob skins)
  *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
  *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
  *      Structures (dungeon, temple, tower, mineshaft) stamp only cells of their own chunk and
