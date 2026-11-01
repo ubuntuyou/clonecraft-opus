@@ -3,6 +3,7 @@ import { THREE } from './three.js';
 import { mulberry32 } from './config.js';
 import { atlasTexture } from './atlas.js';
 import { CLOUD_GLSL, cloudUniforms } from './clouds.js';
+import { FACE_GLSL } from './face-kind.js';
 
 const terrainUniforms = {
   map: { value: atlasTexture },
@@ -86,26 +87,27 @@ const TERRAIN_VS = /* glsl */`
   CENTROID varying vec2 vUv; CENTROID varying vec4 vLight; varying vec3 vTint; varying float vDist; varying vec3 vWorld; varying float vGlow;
   CENTROID varying float vCry; varying float vCrystal; varying float vWet; varying float vPortal;
   uniform float uTime;
+  ${FACE_GLSL}
   void main() {
-    vPortal = step(0.6, aTint.a) * step(aTint.a, 0.66) + 2.0 * step(0.665, aTint.a) * step(aTint.a, 0.69);   // pane: 1 ember (160), 2 crystal (172)
+    vPortal = faceIs(aTint.a, FACE_PORTAL_EMBER) + 2.0 * faceIs(aTint.a, FACE_PORTAL_CRYSTAL);   // pane: 1 ember, 2 crystal
     vUv = aUv / 4096.0; vLight = aLight; vTint = aTint.rgb; vCry = aCry;
-    vCrystal = step(0.88, aTint.a) * step(aTint.a, 0.94);                                // crystal faces glow
-    vGlow = step(0.7, aTint.a) * step(aTint.a, 0.85) * (aTint.a > 0.82 ? 0.5 : 1.0);   // 1 glow, 0.5 soft glow
-    vWet = step(0.955, aTint.a) * step(aTint.a, 0.975);                                   // WET_ALPHA 246: caustics
+    vCrystal = faceIs(aTint.a, FACE_CRYSTAL);                                             // crystal faces glow
+    vGlow = faceIs(aTint.a, FACE_GLOW) + 0.5 * faceIs(aTint.a, FACE_SOFT_GLOW);           // 1 glow, 0.5 soft glow
+    vWet = faceIs(aTint.a, FACE_WET);                                                     // caustics
     vec3 p = position;
     vec4 wp = modelMatrix * vec4(p, 1.0);
     #ifdef WATER
       if (aLight.w > 0.99) p.y += (sin(wp.x * 1.3 + uTime * 1.7) + sin(wp.z * 1.1 + uTime * 1.3)) * 0.35 - 0.7;
     #else
       // wind sway (position is in 1/16 block units): leaves up to 1/32 block, plant tops 1/10
-      float sw = aTint.a < 0.6 ? 1.0 - aTint.a : 0.0;
-      if (sw > 0.01) {
+      float leaf = faceIs(aTint.a, FACE_LEAF), plant = faceIs(aTint.a, FACE_PLANT);
+      if (leaf + plant > 0.5) {
         float ph = uTime * 1.6 + wp.x * 0.35 + wp.z * 0.25;
         float gust = 0.65 + 0.35 * sin(uTime * 0.37 + wp.x * 0.05);
-        float amt = (sw > 0.75 ? 1.6 : 0.5) * gust;
+        float amt = (plant > 0.5 ? 1.6 : 0.5) * gust;
         p.x += sin(ph) * amt;
         p.z += sin(ph * 0.8 + 1.7) * amt * 0.7;
-        p.y += sin(ph * 1.3 + wp.z) * amt * 0.25 * step(sw, 0.75);
+        p.y += sin(ph * 1.3 + wp.z) * amt * 0.25 * leaf;
       }
     #endif
     vWorld = (modelMatrix * vec4(p, 1.0)).xyz;

@@ -23,6 +23,7 @@ import { CONFIG } from './config.js';
 import { atlasTexture } from './atlas.js';
 import { terrainMaterial, terrainUniforms } from './terrain-material.js';
 import { camera, game, renderer, scene } from './engine.js';
+import { FACE_GLSL } from './face-kind.js';
 
 const shadows = (() => {
   const SIZE = 2048, HALF = 64, DEPTH = 320;
@@ -31,7 +32,7 @@ const shadows = (() => {
   rt.depthTexture.compareFunction = THREE.LessEqualCompare;   // P2: sampler2DShadow, hardware-filtered compares
   rt.depthTexture.minFilter = rt.depthTexture.magFilter = THREE.LinearFilter;
   const cam = new THREE.OrthographicCamera(-HALF, HALF, HALF, -HALF, 0.5, DEPTH);
-  const VS = (uv) => `${uv ? 'attribute vec2 aUv; attribute vec4 aTint; varying vec2 vUv; varying float vLeaf;' : ''} void main() { ${uv ? 'vUv = aUv / 4096.0; vLeaf = step(0.45, aTint.a) * step(aTint.a, 0.55);' : ''} gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const VS = (uv) => `${uv ? 'attribute vec2 aUv; attribute vec4 aTint; varying vec2 vUv; varying float vLeaf;' : ''} ${uv ? FACE_GLSL : ''} void main() { ${uv ? 'vUv = aUv / 4096.0; vLeaf = faceIs(aTint.a, FACE_LEAF);' : ''} gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
   // Leaf faces (sway alpha 128) drop half of their 4x4-texel cells, so light dapples through a canopy.
   const cutMat = new THREE.ShaderMaterial({ uniforms: { map: { value: atlasTexture } }, side: THREE.DoubleSide, vertexShader: VS(true),
     fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying float vLeaf;
