@@ -10,6 +10,8 @@
  * is the realm's light floor: brightnessAt never reads below it (the shader uses uAmbient).
  * Meshes: World takes a mesh adapter { build, dispose, show } and never touches three.js, so the
  * module is pure (PURE in tools/depcheck.js). chunkMeshes(scene) in mesher.js is the game's adapter.
+ * Batches: batched(fn) is the one batch API. A nested call joins the outer batch; the outermost
+ * call remeshes each touched chunk once, also when fn throws. Only world.js reads `batch`.
  * ===================================================================================== */
 import { ckey, CONFIG, CS, H, LIGHT_BLK, LIGHT_SKY, lidx, lightCurve, UNLOADED, VOL } from './config.js';
 import { ATTEN, B, EMIT, EMIT_CRY, LIGHT_STOP, OPAQUE, SKY_FREE, SOLID } from './blocks.js';

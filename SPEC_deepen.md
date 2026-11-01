@@ -255,7 +255,7 @@ batched(fn) {
 }
 ```
 
-Sites (decision 13). S7: `boss.js:303-309`, `portals.js:92-95,117-120,171-174`. S8: `grass.js:76-85` (keep `changes.length = 0` in an inner `finally`), `interact.js:286-290,355-358,491-493`, `explosions.js:14-26`, `leaf-decay.js:65-74`, `liquids.js:81-87`, and `farming.js:32-35` (its local `batched` goes; `:60,87,106` call `world.batched`). S8 deletes `beginBatch` and `endBatch` (`world.js:200-205`).
+Sites (decision 13). S7: `boss.js:303-309`, `portals.js:92-95,117-120,171-174`. S8: `grass.js:76-85` (keep `changes.length = 0` in the `finally` around the `world.batched` call), `interact.js:286-290,355-358,491-493`, `explosions.js:14-26`, `leaf-decay.js:65-74`, `liquids.js:81-87`, and `farming.js:32-35` (its local `batched` goes; `:60,87,106` call `world.batched`). S8 deletes `beginBatch` and `endBatch` (`world.js:200-205`).
 
 Every site that can nest is guarded today, so only a throw inside `fn` behaves differently. Rejected: a depth counter (underflow after `reset`).
 

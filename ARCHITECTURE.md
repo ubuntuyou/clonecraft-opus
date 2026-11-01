@@ -21,7 +21,7 @@ The save (D16) stores only `overridesByChunk`. Liquid flows are edits too, so a 
 Section 7 keeps three 0..15 channels per cell: sky light, block light, and crystal light. A BFS flood fill in world coordinates computes them. The fill crosses into any lit neighbour chunk. The fill functions take the channel number, so all channels share one code path.
 The world meshes a chunk only when the chunk and all 8 neighbours are lit. Smooth light and ambient occlusion read one cell across every border, so an unlit neighbour gives dark seams.
 A `LIGHT_STOP` cell (a stair) takes light from its neighbours but never passes it on. A stair therefore shades like a solid roof, and its own faces still get a light value.
-`world.setBlock()` relights only the affected area and remeshes the touched chunks. `world.batched(fn)` groups many edits (explosions) into one remesh pass: inside it, `setBlock` only collects the touched chunks, and the outermost call remeshes each one once, even when `fn` throws. A nested call joins the outer batch (SPEC_deepen M8). The old pair `beginBatch()` and `endBatch()` remains until its call sites move to `batched` (S8).
+`world.setBlock()` relights only the affected area and remeshes the touched chunks. `world.batched(fn)` groups many edits (explosions) into one remesh pass: inside it, `setBlock` only collects the touched chunks, and the outermost call remeshes each one once, even when `fn` throws. A nested call joins the outer batch. `world.batched` is the one batch API: every batch site calls it, and `world.batch` is internal to `world.js` (SPEC_deepen M8).
 
 ### D4. Light is baked per vertex, and daylight is a uniform
 
@@ -361,7 +361,7 @@ The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the
 | --- | --- |
 | `GenService` to world | A request carries the realm and the epoch. A result from an older epoch is dropped. A request gives `{blocks, biomes, heights}` typed arrays and a `features` list (chests, spawners) for one chunk. |
 | world to mobs | `onChunkLoaded(chunk)` and `onChunkUnloaded(chunk)` hooks. |
-| block edits | `world.setBlock(x, y, z, id)` is the only write path. `world.batched(fn)` groups edits into one remesh per touched chunk; `beginBatch()` and `endBatch()` remain until S8 moves their sites (D3). `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
+| block edits | `world.setBlock(x, y, z, id)` is the only write path. `world.batched(fn)` groups edits into one remesh per touched chunk. It is the one batch API (D3). `breakBlock()` and `placeBlock()` add drops, sounds, particles, the torch set, door halves, and tile-entity spills. |
 | world to meshes | `new World(meshes)` takes the mesh adapter `{ build(world, chunk), dispose(chunk), show(chunk, visible) }`. `chunkMeshes(scene)` in `mesher.js` is the game's adapter. `World` hides the chunk lifecycle and the light; the adapter hides three.js (D57). |
 | world to liquids, leaves, farming, and grass | `world.onEdit(x, y, z, old, id)` after every edit calls `liquids.wake()`, `leafDecay.onEdit()`, `farming.onEdit()`, and `grass.onEdit()`. |
 | block edits to portals | `targeting.js` calls `portals.onEdit(x, y, z, old, id)` after every edit. `interact.js` calls `portals.ignite(x, y, z)` for a Magma Core on obsidian or an Ember Heart on a Crystal Frame. `portals.update(dt)` runs once per frame (D49). `world.locked(x, y, z)` guards the arrival portal, and the exit portal box through `boss.locks(x, y, z)` after the kill (D52). |
