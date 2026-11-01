@@ -40,6 +40,7 @@ import { audio } from './audio.js';
 import { hud } from './hud.js';
 import { defaultTarget, realm } from './realms.js';
 import { WG } from './gen-service.js';
+import { boss } from './order.js';
 
 const TRAVEL_T = 2.5;               // seconds in the portal before travel
 const LINK_R = { ember: 16, overworld: 128 };
@@ -57,10 +58,9 @@ const A = WG.CRYSTAL_ARRIVAL;
 // The arrival portal: its stand point (the middle of the opening's floor) and its locked box.
 const ARRIVAL_STAND = [A.x0 + (A.w >> 1) + 0.5, A.y0, A.z0 + 0.5];
 const inArrival = (x, y, z) => z === A.z0 && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
-// The exit portal (boss.js EXIT) has the arrival portal's shape and floor, in the plane z = 0. boss.js
-// loads after this module, so this box repeats EXIT.z; keep the two in step. Its locked box is the frame ring.
-const EXIT_Z = 0;
-const inExit = (x, y, z) => z === EXIT_Z && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
+// The exit portal (boss.EXIT). boss.js loads after this module, so inExit reads EXIT only inside the
+// function. Its locked box is the frame ring around the panes.
+const inExit = (x, y, z) => { const E = boss.EXIT; return z === E.z && x >= E.x0 - 1 && x <= E.x0 + E.w && y >= E.y0 - 1 && y <= E.y0 + E.h; };
 
 const portals = (() => {
   const cells = new Map();          // "x,y,z" -> pane id of every pane cell in the loaded realm

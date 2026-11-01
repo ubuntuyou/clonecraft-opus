@@ -128,7 +128,7 @@ export { persist } from './persist.js';
 export { homes, homesEl, homesKey, openHomes, setHomes } from './homes.js';
 export { realm } from './realms.js';
 export { portals } from './portals.js';
-import './boss.js';
+export { boss } from './boss.js';
 import './sky.js';
 export { weather } from './weather.js';
 import './fireflies.js';
