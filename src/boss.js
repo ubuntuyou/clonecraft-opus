@@ -26,15 +26,17 @@
  * Leaving the realm clears `mobs[]` (realm.enter), so the next visit spawns a fresh boss.
  *
  * `boss.update(dt)` spawns the boss when the Crystal Realm is current, the save has no kill
- * (realm.boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
+ * (boss.defeated), and the center chunk is lit. It also draws the pylon beams, drives the
  * boss bar (hud.bossBar), and shows the victory screen once the kill ends.
  * ===================================================================================== */
 import { THREE } from './three.js';
 import { randRange, UNLOADED } from './config.js';
-import { B } from './blocks.js';
+import { B, baseOf } from './blocks.js';
+import { ringHas } from './portal-frame.js';
 import { WG } from './gen-service.js';
 import { game, player, scene, world } from './engine.js';
 import { damagePlayer } from './player.js';
+import { breakBlock } from './interact.js';
 import { moveEntity } from './collision.js';
 import { spawnDrop } from './drops.js';
 import { angleLerp, Mob, MOB_TYPES, mobs } from './mobs.js';
@@ -61,6 +63,10 @@ const SUMMON_T = 12, SUMMON_N = 2, SHARDLINGS_MAX = 4;
 const DEATH_T = 3;
 // The exit portal: an opening 3 wide and 4 tall (like the arrival portal) in the plane z = 0.
 const EXIT = { x0: -1, y0: FLOOR, z: 0, w: 3, h: 4 };
+// EXIT as a portal-frame frame, for ringHas (boss.locks). EXIT keeps `z` (SPEC_deepen M3).
+const EXIT_FRAME = { axis: 'x', x0: EXIT.x0, y0: EXIT.y0, z0: EXIT.z, w: EXIT.w, h: EXIT.h };
+// The placed entities (by base) that buildExitPortal breaks before it overwrites their cell (K5).
+const ENTITY_BASE = new Set([B.CHEST, B.FURNACE, B.TORCH, B.DOOR]);
 const PYLONS = WG.PYLONS;
 
 const pylonStands = ([x, y, z]) => { const id = world.getBlock(x, y, z); return id === B.PYLON || id === UNLOADED; };
@@ -292,21 +298,24 @@ class Titan extends Mob {
     const dz = Math.abs(x - 0.5) < 4 && Math.abs(z) < 3 ? 3.5 - z : 0;
     for (const [id, n] of this.def.drops()) if (n > 0) spawnDrop(id, n, x, FLOOR + 0.5, z + dz, null, 0.6);
     buildExitPortal();
-    realm.boss.defeated = true;
+    boss.defeated = true;
     boss.victoryPending = true;
     persist.save();
   }
 }
 
 // The exit portal: a Crystal Frame ring around a 3 x 4 opening, built lit (portals.ignite fills the panes).
+// A box cell that holds a placed entity (ENTITY_BASE) breaks first, so its block and contents drop
+// and its torch key, other door half, and door timer clear. Other cells are overwritten, no drop.
 function buildExitPortal() {
-  const E = EXIT, own = !world.batch;
-  if (own) world.beginBatch();
-  for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
-    const ring = u === -1 || u === E.w || v === -1 || v === E.h;
-    world.setBlock(E.x0 + u, E.y0 + v, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
-  }
-  if (own) world.endBatch();
+  const E = EXIT;
+  world.batched(() => {
+    for (let v = -1; v <= E.h; v++) for (let u = -1; u <= E.w; u++) {
+      const x = E.x0 + u, y = E.y0 + v, ring = u === -1 || u === E.w || v === -1 || v === E.h;
+      if (ENTITY_BASE.has(baseOf(world.getBlock(x, y, E.z)))) breakBlock(x, y, E.z, true, true);
+      world.setBlock(x, y, E.z, ring ? B.CRYSTAL_FRAME : B.AIR);
+    }
+  });
   const r = portals.ignite(E.x0 - 1, E.y0, E.z, B.PORTAL_CRYSTAL);
   if (r !== 'lit') console.warn(`exit portal: ignite returned ${r}`);
 }
@@ -325,6 +334,13 @@ const boss = {
   victoryPending: false,     // the kill ended; the victory screen waits for the 'playing' state
   wasDead: false,
   HOME, PYLONS, EXIT, WAKE_R, SLEEP_R,
+  defeated: false,           // the Titan is dead (the save path boss.defeated). Only Titan.shatter sets it.
+  // The save part of the boss (realm.data and realm.load call these). A missing value loads as false.
+  data() { return { defeated: this.defeated }; },
+  load(d) { this.defeated = !!d?.defeated; },
+  // True when (x, y, z) is in the exit portal box after the kill. portals.js reads it in world.locked.
+  // The flag is set after buildExitPortal, so the build is never locked.
+  locks(x, y, z) { return this.defeated && ringHas(EXIT_FRAME, x, y, z); },
   get pylonsStanding() { return standingPylons().length; },
 
   // realm.leave calls this first. A Titan in its death animation shatters at once, so the loot and
@@ -338,7 +354,7 @@ const boss = {
     const crystal = realm.current === 'crystal';
     if (this.titan && !mobs.includes(this.titan)) this.titan = null;   // realm.enter or a chunk unload removed it, or the death ended
     if (!crystal) this.hp = null;                                 // a new visit starts a full fight
-    if (crystal && !realm.boss.defeated && !this.titan) {
+    if (crystal && !this.defeated && !this.titan) {
       const c = world.chunkAt(Math.floor(HOME.x), Math.floor(HOME.z));
       if (c && c.lit) { this.titan = new Titan(); if (this.hp) this.titan.hp = this.hp; mobs.push(this.titan); }
     }

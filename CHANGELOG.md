@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Changed
 
+- The boss lock (SPEC_deepen M3): `boss` owns the save flag `defeated` and the exit portal lock. `boss.locks(x, y, z)` holds the build-before-flag rule, and `world.locked` calls it. `boss.data()` and `boss.load(d)` save and load the flag; `realm.boss` is now a read-only getter. One pure test, `ringHas(frame, x, y, z)` in `portal-frame.js`, replaces `inArrival` and `inExit`, and Node tests cover it. The 4 batch sites in `boss.js` and `portals.js` use `world.batched`. The save layout and the locked cells do not change.
 - The world seam (SPEC_deepen M6): `World` takes a mesh adapter `{ build, dispose, show }`, and `chunkMeshes(scene)` in `mesher.js` is the game's adapter. `world.js` no longer touches three.js, so it is a pure module, and Node tests now cover its streaming, light, edits, and reset. The held torch reaches `brightnessAt` through the `world.extraLight` slot.
 - `world.batched(fn)` (SPEC_deepen M8): it groups block edits into one remesh per touched chunk. A nested call joins the outer batch, and the remesh runs even when `fn` throws. `beginBatch` and `endBatch` stay until their call sites move.
 - The realm-scoped table (SPEC_deepen M1): one table, `SCOPED` in `realms.js`, drives the realm slice, `leave`, and `enter`. Each entry is an adapter `{ data, load, clear }`. `CLEARED` lists the state that a travel clears but never saves. A load-time guard keeps `SCOPED` equal to `SLICE_FIELDS`. A new realm-scoped field now adds one entry instead of three edits.
@@ -24,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
 
 ### Fixed
 
+- The exit portal build no longer leaves a placed chest, furnace, torch, or door behind a portal pane (SPEC_deepen K5). The build now breaks such a cell first, so the block and its contents drop, and the torch key, the other door half, and the door timer clear. Before, a pane overwrote the block, the chest contents were lost, and the stale tile entity and torch key stayed.
 - Mobs, drops, the held item, particles, arrows, and vehicles no longer draw brighter than the terrain around them (SPEC_deepen K1). `brightnessAt` now uses the same normalized light curves as the terrain shader, from one source in `config.js` (`lightCurve`, `LIGHT_GLSL`). Entities in low light are darker than before: block level 4 drops from 0.167 to 0.088, and level 12 from 0.614 to 0.577. The terrain does not change.
 - `ARCHITECTURE.md` D6 and the `engine.js` header now list the `travel` and `victory` states (SPEC_deepen K9). Both freeze the simulation and leave pointer lock.
 - The Seams row "realms to the scoped modules" in `ARCHITECTURE.md` now states `SCOPED`, `CLEARED`, the guard, and `realm.data()` and `realm.load(d)` (SPEC_deepen K8). Before, it named only a `save()` and `load(d)` call per module.

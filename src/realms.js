@@ -69,7 +69,7 @@ const realm = {
   current: 'overworld',
   travelling: null,                     // { from, pos, to, arrive } while the travel screen shows
   portals: { crystalBack: null },
-  boss: { defeated: false },
+  get boss() { return { defeated: boss.defeated }; },   // read-only; boss.js owns the flag (SPEC_deepen M3)
   stash: new Map(),                     // realm name -> stash, for every realm except current
   voidT: 0,
 
@@ -93,7 +93,7 @@ const realm = {
   data() {
     const realms = {};
     for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = this.slice(name); if (sl) realms[name] = sl; }
-    return { ...this.slice('overworld'), realm: this.place().name, realms, portals: { ...this.portals }, boss: { ...this.boss } };
+    return { ...this.slice('overworld'), realm: this.place().name, realms, portals: { ...this.portals }, boss: boss.data() };
   },
   // Where the save puts the player: the realm before travel during a load, the overworld when dead.
   place() {
@@ -106,7 +106,7 @@ const realm = {
   load(d) {
     this.current = REALMS[d.realm] ? d.realm : 'overworld';
     this.portals = { crystalBack: d.portals?.crystalBack ?? null };
-    this.boss = { defeated: !!d.boss?.defeated };
+    boss.load(d.boss);
     this.stash.clear();
     const slices = { overworld: d, ...(d.realms || {}) };
     for (const name of Object.keys(REALMS)) if (name !== this.current && slices[name]) this.stash.set(name, stashOf(slices[name]));
