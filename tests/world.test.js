@@ -132,6 +132,30 @@ test('M6-2 streaming lights and meshes the chunks around the player', () => {
   assert.equal(world.stats.meshed, meshed.length);
 });
 
+test('M6-2 under a zero budget no chunk meshes before its 8 neighbors are lit', () => {
+  // A zero budget lights one chunk per frame, so loaded but unlit neighbors exist while chunks mesh.
+  const { world, meshes } = create();
+  const early = [];
+  let unlitSeen = 0;
+  const build = meshes.build;
+  meshes.build = (w, c) => {
+    for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
+      const n = w.getChunk(c.cx + ox, c.cz + oz);
+      if (!n || !n.lit) early.push(`${c.key} built before ${c.cx + ox},${c.cz + oz} was lit`);
+    }
+    build(w, c);
+  };
+  let frames = 0;
+  for (; frames < 3000 && world.readyAround(8, 8, 3) < 1; frames++) {
+    frame(world, 8, 8, 0);
+    if ([...world.chunks.values()].some((c) => !c.lit)) unlitSeen++;
+  }
+  assert.equal(world.readyAround(8, 8, 3), 1, `the chunks mesh in ${frames} frames`);
+  assert.ok(unlitSeen > 0, 'some frames hold loaded but unlit chunks');
+  assert.ok(meshes.count('build') > 0);
+  assert.deepEqual(early, []);
+});
+
 test('M6-2 lighting goes nearest first', () => {
   const { world } = create();
   const loaded = [];
@@ -199,6 +223,26 @@ test('M6-5 a block above lowers sky light, removal restores it, a stair passes n
   assert.equal(world.getSky(x, y, z), 0, 'the shaft below the stair is dark');
   assert.ok(world.setBlock(x, y + 1, z, B.AIR));
   assert.equal(world.getSky(x, y, z), 15, 'removing the stair restores 15');
+});
+
+test('M6-5 a leaf cell takes ATTEN: sky and block light lose 1 more when they enter it', () => {
+  const { world } = fresh();
+  const x = 8, z = 8, y = skyY(world, x, z);
+  // A shaft: walls on four sides and below, then leaves on top.
+  for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]]) world.setBlock(x + dx, y + dy, z + dz, B.STONE);
+  assert.ok(world.setBlock(x, y + 1, z, B.LEAVES));
+  assert.equal(world.getSky(x, y + 1, z), 13, 'sky 15 enters the leaf cell: 15 - 1 - ATTEN 1');
+  assert.equal(world.getSky(x, y, z), 12, 'the shaft below the leaves');
+  assert.ok(world.setBlock(x, y + 1, z, B.AIR));
+  assert.equal(world.getSky(x, y, z), 15, 'removing the leaves restores 15');
+  // Block light: a torch beside a leaf cell in open air.
+  const tx = 24, ty = skyY(world, tx, z, 3);
+  assert.ok(world.setBlock(tx + 1, ty, z, B.LEAVES));
+  assert.ok(world.setBlock(tx, ty, z, B.TORCH));
+  assert.equal(world.getBlk(tx + 1, ty, z), 13, 'torch 15 enters the leaf cell: 15 - 1 - ATTEN 1');
+  assert.equal(world.getBlk(tx - 1, ty, z), 14, 'air beside the torch: 15 - 1');
+  assert.ok(world.setBlock(tx, ty, z, B.AIR));
+  assert.equal(world.getBlk(tx + 1, ty, z), 0, 'removal clears the leaf cell');
 });
 
 test('M6-6 setBlock refuses y -1, y H, a locked cell, an unloaded cell, an unlit chunk, and the same id', () => {
@@ -303,8 +347,9 @@ test('M6-9 a center move of RD+4 unloads and disposes the old chunks', () => {
   const far = before.filter((c) => Math.abs(c.cx - (RD + 4)) > RD + 3), kept = before.filter((c) => Math.abs(c.cx - (RD + 4)) <= RD + 3);
   assert.ok(far.length > 0 && kept.length > 0);
   frame(world, 8 + 16 * (RD + 4), 8);
-  for (const c of far) assert.equal(world.getChunk(c.cx, c.cz), undefined, `chunk ${c.key} unloads`);
-  for (const c of kept) assert.equal(world.getChunk(c.cx, c.cz), c, `chunk ${c.key} stays`);
+  // Boolean asserts: a failing assert on a Chunk inspects its typed arrays and the runner dies (exit 137).
+  for (const c of far) assert.equal(world.chunks.has(c.key), false, `chunk ${c.key} unloads`);
+  for (const c of kept) assert.equal(world.getChunk(c.cx, c.cz) === c, true, `chunk ${c.key} stays`);
   const disposed = meshes.log.filter((e) => e[0] === 'dispose').map((e) => e[1]).sort();
   assert.deepEqual(disposed, far.map((c) => c.key).sort(), 'exactly the unloaded chunks dispose, once each');
 });
