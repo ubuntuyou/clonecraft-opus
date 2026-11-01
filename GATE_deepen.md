@@ -46,7 +46,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] QA: K7 fix gives one reload, a fresh world, the notice, `persist.blocked` false, the `.rejected.` key, and no `clonecraft.bootNotice` left in `localStorage`. Note: seed 791006, 2 document requests, no reload loop (`/tmp/deepen-clonecraft/w1-qa.md` D).
 - [x] QA: 0 game console errors; throwaway keys removed; `lastSeed` restored; snapshots deleted. Note: 0 errors; storage cleared on every QA origin (ports 8786..8789, not Joe's origin, so no `lastSeed` to restore); boot shots deleted (`/tmp/deepen-clonecraft/w1-qa.md`).
 - [x] Docs: `ARCHITECTURE.md` (save-format Seams row names `openSave`, drops `validSlice`); `DISCOVERY_save-format.md` (boot reads only through `openSave`; the K7 carrier); living headers of `boot.js` and `save-format.js`; `CHANGELOG.md` `[Unreleased]` (Changed M4, Fixed K7, Removed K10). Note: fce403d (the `boot.js` header came with the S1 merge).
-- [ ] **(owner)** Joe reviews the S1 diff.
+- [x] **(owner)** Joe reviews the S1 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; task worktrees and branches removed. Note: 5e07936; worktrees d1, d1a..d1c and their branches removed.
 
 ### S2: face kind (M5) — `step/deepen-2-face-kind`
@@ -73,7 +73,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] QA: screenshot pairs (overworld day: leaves, water, torch; ember: lava; crystal: crystal, portal) are identical, or each difference is explained here. Note: 0 differing pixels in all 4 scenes, overworld night too (`/tmp/deepen-clonecraft/w1-qa.md` B; PNGs in `/tmp/deepen-clonecraft/qa-w1/`).
 - [x] QA: no GLSL compile error; 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w1-qa.md` A and Notes.
 - [x] Docs: `ARCHITECTURE.md` (the face-kind seam, `:30-31`); new `DISCOVERY_face-kind.md`; `DISCOVERY_engine.md` drops the obsolete byte-window gotcha; living headers of `face-kind.js` and `order.js`; `CHANGELOG.md` (Changed M5). Note: 59b1ec4 (D55 and the face kind Seams row); headers came with the S2 merge (4b079ca).
-- [ ] **(owner)** Joe reviews the S2 diff.
+- [x] **(owner)** Joe reviews the S2 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: e970ebd; worktrees d2, d2a..d2c and their branches removed.
 
 ### S3: atlas checks (K3, K4) — `step/deepen-3-atlas-checks`
@@ -93,7 +93,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Structure: the only new export is `ATLAS_TILES`; no other file changed. Note: `/tmp/deepen-clonecraft/w1-integrate.md`.
 - [x] QA: boot with 0 console errors; hotbar and terrain look unchanged. Note: 0 errors; 0 differing pixels in whole frames with the HUD (`/tmp/deepen-clonecraft/w1-qa.md` A, B).
 - [x] Docs: `DISCOVERY_engine.md` (the 256-tile limit, 147 free); `atlas.js` header; `CHANGELOG.md` (Fixed K3, K4). Note: 70e8073 (also D56 in `ARCHITECTURE.md`).
-- [ ] **(owner)** Joe reviews the S3 diff.
+- [x] **(owner)** Joe reviews the S3 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: 1bb34ac; worktrees d3, d3a, d3b and their branches removed.
 
 ### S4: realm look (M7, K2) — `step/deepen-4-realm-look`
@@ -116,7 +116,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] QA: terrain uniforms equal per realm, wave base versus step; screenshot pairs identical or explained. Note: 21 uniforms equal in 4 states; 0 differing pixels (`/tmp/deepen-clonecraft/w1-qa.md` B).
 - [x] QA: 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w1-qa.md` A and Notes.
 - [x] Docs: `ARCHITECTURE.md` D48 (the look in the row); `DISCOVERY_engine.md:21-22`; `sky.js` header; `CHANGELOG.md` (Changed M7, Fixed K2). Note: 01f838e (the look note sits at the end of D47; D48 names `look.ambientTint`).
-- [ ] **(owner)** Joe reviews the S4 diff.
+- [x] **(owner)** Joe reviews the S4 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: 14a147a; worktrees d4, d4a..d4c and their branches removed.
 
 ### W1 close
@@ -145,7 +145,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] QA: M2-2 Note: 133 saved key paths match the wave base; only the intended key order differs (`/tmp/deepen-clonecraft/w2-qa.md` B).
 - [x] QA: 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w2-qa.md` A and the setup line.
 - [x] Docs: `ARCHITECTURE.md` Seams row (K8); `DISCOVERY_engine.md` ("a new scoped field adds one `SCOPED` entry"); `realms.js` header; `CHANGELOG.md` (Changed M1, M2; Fixed K8). Note: 65a2099 (also the save row, D47, and `DISCOVERY_save-format.md`); the `realms.js` header came with T5.1.
-- [ ] **(owner)** Joe reviews the S5 diff.
+- [x] **(owner)** Joe reviews the S5 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: 4d32132; worktrees d5, d5a..d5c and their branches removed.
 
 ### S6: world seam, light curve, batched (M6, K1, K9) — `step/deepen-6-world-seam`
@@ -188,7 +188,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [ ] **(owner)** Joe looks at the K1 screenshots and the level table, and accepts the darker entities. Note by rsh: the pairs are `/tmp/deepen-clonecraft/qa-w2/k1-*`; the table is in the QA box above.
 - [x] QA: 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w2-qa.md` A and the setup line.
 - [x] Docs: `ARCHITECTURE.md` (Seams row world to mesh adapter; D31 `world.extraLight`; D6 lists `travel` and `victory` (K9); D48 `lightCurve`); `DISCOVERY_engine.md` (World is Node-testable; `batched`); headers of `world.js`, `mesher.js`, `engine.js` (K9); `CHANGELOG.md` (Changed M6; Fixed K1 with the darker-entity note, K9). Note: 9764104 (the mesh adapter is the new D57 and the "world to meshes" Seams row; D3 and the block-edits row name `batched`; D4 and the light-queries row name the one curve source); the `engine.js` K9 header came with T6.3 ac2e489.
-- [ ] **(owner)** Joe reviews the S6 diff.
+- [x] **(owner)** Joe reviews the S6 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: 9e0639b; worktrees d6, d6a..d6c, dw2qa and their branches (and `qa/deepen-w2`) removed.
 
 ### W2 close
@@ -218,7 +218,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] QA: K5 fix: the chest key is gone, chest and item drop within 3 blocks, `torches` lacks the key. Note: both keys gone; ruby, chest, and torch drop at (0.5, 97.5, 0.5), (0.5, 97.3, 0.5), (1.5, 97.3, 0.5) ((`/tmp/deepen-clonecraft/w3-qa-r1.md` D; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3)).
 - [x] QA: 0 game console errors; cleanup done. Note: (`/tmp/deepen-clonecraft/w3-qa-r1.md` A and Cleanup; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3).
 - [x] Docs: `ARCHITECTURE.md` D49/D52/D53 (the lock lives in `boss`); `DISCOVERY_engine.md` (`:122`, `:142`, and the K11 invariant); headers of `boss.js` and `portals.js`; `CHANGELOG.md` (Changed M3; Fixed K5). Note: 6b41233 (also the "block edits to portals" Seams row); the headers came with T7.1 (`portals.js` names `boss.locks`, `boss.js` names `boss.defeated`).
-- [ ] **(owner)** Joe reviews the S7 diff.
+- [x] **(owner)** Joe reviews the S7 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main` before S8; worktrees and branches removed. Note: ae314a7; worktrees d7, d7a, d7b and their branches removed (each merged into `main` first).
 
 ### S8: batched sites (M8) — `step/deepen-8-batched`
@@ -233,7 +233,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] Structure: grep of `src/` and `tools/` shows no `beginBatch`, `endBatch`, or `world.batch` read outside `world.js`; farming's local `batched` is gone. Amended by Joe, 2026-11-01 12:51 CT (was: grep excluding `.claude/`; the S6 `batched` tests in `tests/world.test.js` must read `world.batch`). Note: rsh, on main 02fdd6f: 0 hits in `src/` and `tools/`; farming calls `world.batched` at :55, :82, :101.
 - [x] QA: a TNT blast, a door toggle, and a portal light each remesh once, with no hole; 0 console errors; cleanup done. Note: max 1 build per chunk for tnt, doorOpen, doorClose, and portalLight on seeds 794002 and 794003; 0 stale chunks after a fresh build; mesh hashes equal to the base (`/tmp/deepen-clonecraft/w3-qa-r2.md` A, B, Cleanup; QA build = S8 tip 5142a58, merged in b38f904).
 - [x] Docs: `ARCHITECTURE.md:24`; `DISCOVERY_engine.md:10`; `world.js` header; `CHANGELOG.md` (Changed M8). Note: a7ef82e (also `ARCHITECTURE.md:364`, the SPEC M8 `grass.js` sentence, and the CHANGELOG M3 "pure function" fix).
-- [ ] **(owner)** Joe reviews the S8 diff.
+- [x] **(owner)** Joe reviews the S8 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: b38f904; worktrees d8, d8a, d8b and their branches removed (each merged into `main` first).
 
 ### S9: precipitation and draw order (M9, M10) — `step/deepen-9-precip-order`
@@ -257,7 +257,7 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 - [x] QA: rain and snow by kind across y 159, in snowy plains, and in a desert; rain over water draws in front of it. Note: plains t 157 rain 1820, t 158 rain 0; snowy plains rain 0, snow 770; desert rain 0, snow 0; equal to the base; rain renderOrder 3 over water, streaks over the lake (`/tmp/deepen-clonecraft/w3-qa-r1.md` F; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3).
 - [x] QA: 0 game console errors; cleanup done. Note: (`/tmp/deepen-clonecraft/w3-qa-r1.md` A and Cleanup; QA build dw3qa = `main` 7c3d7f6 + S7 c063c0d + S9 a7802b3).
 - [x] Docs: `ARCHITECTURE.md` (weather paragraph; draw order); `DISCOVERY_engine.md:54-59`; headers of `weather.js`, `precip.js`, `order.js`; `CHANGELOG.md` (Changed M9, M10). Note: e96dfb5 (D29, D8, the weather Seams row; `DISCOVERY_engine.md:55-57`). No `DISCOVERY_precip.md`: four short pure functions; one `DISCOVERY_engine.md` bullet holds the gotchas.
-- [ ] **(owner)** Joe reviews the S9 diff.
+- [x] **(owner)** Joe reviews the S9 diff. Approved by Joe, 2026-11-01 14:00 CT: "spec and diff approved", then "yes" to S1..S9.
 - [x] Merged to `main`; worktrees and branches removed. Note: 3f227c7; worktrees d9, d9a, d9b and their branches removed (each merged into `main` first).
 
 ### W3 close
