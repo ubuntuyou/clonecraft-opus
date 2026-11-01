@@ -31,3 +31,11 @@ test('readonly: a module writes an imported name', () => fires(planted((e) => e(
 test('free: a name that is neither defined nor imported', () => fires(planted((e) => e('hud', (t) => t + '\nfunction f() { return notDefinedAnywhere; }\n')), 'free'));
 test('worker: worldgen.js imports something', () => fires(planted((e) => e('worldgen', (t) => "import { CS } from './config.js';\n" + t)), 'worker'));
 test('pure: a pure module reaches order.js', () => fires(planted((e) => e('crafting', (t) => "import { mobs } from './order.js';\n" + t)), 'pure'));
+
+// SPEC_hardening H3: save-format is pure. The plant must change the text, or the test proves nothing.
+test('pure: save-format reaches order.js', () => {
+  let changed = false;
+  const errors = planted((e) => e('save-format', (t) => { const out = "import { mobs } from './order.js';\n" + t; changed = out !== t; return out; }));
+  assert.ok(changed, 'the plant did not change save-format.js');
+  assert.ok(errors.includes('pure: save-format.js reaches order.js'), `expected the save-format pure error, got: ${errors.join(' | ') || 'none'}`);
+});

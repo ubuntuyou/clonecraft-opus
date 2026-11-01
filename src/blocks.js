@@ -403,6 +403,11 @@ defItem(I.BOW, { name: 'Bow', kind: 'bow', maxStack: 1, maxDur: 384 });
 defItem(I.MAGMA_CORE, { name: 'Magma Core' });
 defItem(I.BOAT, { name: 'Boat', kind: 'vehicle', vehicle: 'boat', maxStack: 1 });
 defItem(I.MINECART, { name: 'Minecart', kind: 'vehicle', vehicle: 'cart', maxStack: 1 });
+// The vehicle kinds (vehicles.js). The save checks read the keys, so the table lives beside its items.
+const VEHICLE_KINDS = {
+  boat: { item: I.BOAT, w: 1.375, h: 0.6, stepH: 0.45, eye: 1.1, sound: 'wood' },
+  cart: { item: I.MINECART, w: 0.98, h: 0.7, stepH: 0, eye: 1.25, sound: 'stone' },
+};
 defItem(I.COMPASS, { name: 'Compass', maxStack: 1 });
 // Armor: id = 300 + 4 * tier + piece. `pts` lists the points per piece (helmet, chest, legs, boots).
 const ARMOR_TIERS = [
@@ -539,5 +544,5 @@ export {
   IS_STAIR, IS_WATER, ITEMS, LEAF_COLOR, LEAF_DECAYS, LEAF_NATURAL, LIGHT_STOP, LIQ_KIND, LIQ_LEVEL, liquidId,
   migrateIds, NEEDS_SUPPORT, OPAQUE, pickaxeFor, RAIL_ENDS, railShapeFor, railUp, REPLACEABLE, restack, ROMAN,
   setEnchantSeed, SHAPE, SHAPE_OF, SKY_FREE, SMELT, SMELT_TIME, SOLID, STAIR_BOXES, STAIR_SIDE, stairKey,
-  stairV, STORAGE_DEFS, TARGETABLE, TIERS, TOOL_KINDS, toolId, validEnch, wears,
+  stairV, STORAGE_DEFS, TARGETABLE, TIERS, TOOL_KINDS, toolId, validEnch, VEHICLE_KINDS, wears,
 };

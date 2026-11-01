@@ -19,11 +19,11 @@
  * no clouds. The day clock keeps running.
  * ===================================================================================== */
 import { THREE } from './three.js';
-import { clamp, CONFIG, CS, glowGain, lerp, mulberry32 } from './config.js';
+import { clamp, CONFIG, CS, glowGain, lerp, mulberry32, REALMS } from './config.js';
 import { CLOUD_GLSL, CLOUD_Y, clouds as cloudField, cloudUniforms as fieldUniforms } from './clouds.js';
 import { terrainUniforms } from './terrain-material.js';
 import { camera, game, player, renderer, scene } from './engine.js';
-import { realm, REALMS } from './realms.js';
+import { realm } from './realms.js';
 import { weather } from './order.js';
 
 const sky = (() => {

@@ -19,7 +19,7 @@
  * Save: the top-level slice fields hold the overworld. `realms.ember` and `realms.crystal` hold
  * the other slices. `realm` names the realm of player.pos. persist.js calls slice() and load().
  * ===================================================================================== */
-import { CONFIG, CS, H, UNLOADED, VOID_Y } from './config.js';
+import { CONFIG, H, REALMS, UNLOADED, VOID_Y } from './config.js';
 import { B, baseOf, IS_LEAF, LIQ_KIND, SOLID } from './blocks.js';
 import { canvas, game, player, scene, world } from './engine.js';
 import { resumeEl } from './player.js';
@@ -41,38 +41,9 @@ import { persist } from './persist.js';
 import { closeHomes, homes, setHomes } from './homes.js';
 import { weather } from './order.js';
 import { WG } from './gen-service.js';
+import { editsOf, mapsOf, SLICE_FIELDS } from './save-format.js';
 
-// ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
-// { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
-const REALMS = {
-  overworld: { name: 'overworld', label: 'the Overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
-  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
-  crystal: { name: 'crystal', label: 'the Crystal Realm', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
-};
-const SLICE_FIELDS = ['edits', 'te', 'homes', 'liquids', 'leaves', 'farm', 'vehicles', 'looted'];
 const VOID_DAMAGE = 4, VOID_TICK = 0.5;
-
-// ---- edits: the save form (flat [chunk key, [index, id, ...]]) and the live maps ----------
-function editsOf(byChunk) {
-  const edits = [];
-  for (const [k, m] of byChunk) { const flat = []; for (const [i, id] of m) flat.push(i, id); edits.push([k, flat]); }
-  return edits;
-}
-function mapsOf(edits) {
-  const overrides = new Map(), overridesByChunk = new Map();
-  for (const [k, flat] of edits || []) {
-    const m = new Map(), cx = Math.floor(k / 65536) - 32768, cz = (k % 65536) - 32768;
-    for (let j = 0; j < flat.length; j += 2) {
-      const i = flat[j];
-      let id = flat[j + 1];
-      if (id === B.LEAVES) id = B.LEAVES_PLACED;   // saves before leaf decay: every leaf edit was a placed leaf
-      m.set(i, id);
-      overrides.set(`${cx * CS + (i & 15)},${i >> 8},${cz * CS + ((i >> 4) & 15)}`, id);
-    }
-    overridesByChunk.set(k, m);
-  }
-  return { overrides, overridesByChunk };
-}
 
 // A stash: { overrides, overridesByChunk, slice: { te, homes, liquids, leaves, farm, vehicles, looted }, drops }.
 function stashOf(slice) {
@@ -235,4 +206,4 @@ function defaultTarget(name) {
 
 const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('travelBar').firstChild;
 
-export { defaultTarget, realm, REALMS, standNear };
+export { defaultTarget, realm, standNear };

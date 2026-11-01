@@ -2,7 +2,7 @@
  * CLONECRAFT — living header (src/order.js)
  * -------------------------------------------------------------------------------------
  * An infinite, Minecraft-style voxel sandbox. Three.js comes from a CDN. Everything else
- * (noise, textures, sounds, models) is generated at runtime. The source is the 50 modules
+ * (noise, textures, sounds, models) is generated at runtime. The source is the 51 modules
  * in src/. `npm run build` writes them into the one root index.html, in this load order.
  *
  * Module layout:
@@ -15,13 +15,14 @@
  *    owner's setter (setTarget, setHomes, ...).
  *  - worldgen.js has no imports. The worker runs WorldGenModule.toString() alone.
  *  - three, config, blocks, portal-frame, biomes, atlas, worldgen, gen-service, clouds, terrain-material,
- *    and crafting never reach this file. Node tests import them.
+ *    crafting, and save-format never reach this file. Node tests import them.
  *  - tools/depcheck.js enforces these rules. `npm run check` runs it.
  *
  * Section map (search for "=== N."; the modules of each section follow it):
  *   1. Constants and configuration: config
  *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
- *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan)
+ *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan);
+ *      save-format (the save shape checks and the edits codec; pure)
  *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
  *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
  *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
@@ -89,6 +90,7 @@ import './three.js';
 import './config.js';
 import './blocks.js';
 import './portal-frame.js';
+import './save-format.js';
 import './biomes.js';
 import './atlas.js';
 import './worldgen.js';
@@ -124,7 +126,7 @@ export { hud } from './hud.js';
 export { clockText, fadeIn, setState, showPause } from './menus.js';
 export { persist } from './persist.js';
 export { homes, homesEl, homesKey, openHomes, setHomes } from './homes.js';
-export { realm, REALMS } from './realms.js';
+export { realm } from './realms.js';
 export { portals } from './portals.js';
 import './boss.js';
 import './sky.js';

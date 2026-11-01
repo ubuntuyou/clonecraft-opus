@@ -10,7 +10,7 @@
 // Weather falls only in a realm with `weather: true` (the overworld). The kind and its timer keep
 // counting in every realm; elsewhere k and storm target 0. snap() sets them at once (realm travel).
 import { THREE } from './three.js';
-import { clamp, CS, H, lidx, randRange } from './config.js';
+import { clamp, CS, H, lidx, randRange, REALMS, WEATHER_KINDS } from './config.js';
 import { B } from './blocks.js';
 import { BIOME } from './biomes.js';
 import { WG } from './gen-service.js';
@@ -18,12 +18,12 @@ import { camera, game, player, scene, world } from './engine.js';
 import { damagePlayer } from './player.js';
 import { mobs } from './mobs.js';
 import { audio } from './audio.js';
-import { realm, REALMS } from './realms.js';
+import { realm } from './realms.js';
 
 const weather = (() => {
   const RADIUS = 24, FADE = 6, BOLT_RANGE = 64, THUNDER_SPEED = 34, NRAIN = 2600, NSNOW = 1100, STREAK = 1.3;
   let kind = 'clear', left = randRange(300, 900), k = 0, storm = 0, boltT = randRange(5, 20), flash = 0;
-  const KINDS = ['clear', 'rain', 'storm'];
+  const KINDS = WEATHER_KINDS;
   // Column queries against the loaded chunks. top: the highest non-air block, or -1 when unloaded.
   function top(x, z) {
     const c = world.chunkAt(x, z);

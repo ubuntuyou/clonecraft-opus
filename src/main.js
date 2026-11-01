@@ -1,6 +1,6 @@
 import './order.js';
 import { THREE } from './three.js';
-import { CONFIG, SAVE_KEY } from './config.js';
+import { CONFIG, REALMS, SAVE_KEY } from './config.js';
 import {
   altarOffers, ARMOR_TIERS, armorId, B, blockDrop, BLOCKS, breakTime, ENCH, enchantSeed, FUEL, I, IS_RAIL,
   ITEMS, LIQ_KIND, LIQ_LEVEL, RAIL_ENDS, SMELT, TIERS, toolId, validEnch,
@@ -37,9 +37,10 @@ import { particles } from './particles.js';
 import { audio } from './audio.js';
 import { hud } from './hud.js';
 import { setState, showPause } from './menus.js';
-import { persist, validSave } from './persist.js';
+import { persist } from './persist.js';
+import { validSave } from './save-format.js';
 import { closeHomes, goHome, homes, openHomes, setHome } from './homes.js';
-import { defaultTarget, realm, REALMS, standNear } from './realms.js';
+import { defaultTarget, realm, standNear } from './realms.js';
 import { portals } from './portals.js';
 import { boss } from './boss.js';
 import { sky } from './sky.js';

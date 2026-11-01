@@ -28,6 +28,17 @@ function emberMobType(r, inFortress) {
   for (const [t, k] of w) if ((x -= k) < 0) return t;
   return w[w.length - 1][0];
 }
+// The realm table (SPEC_realms). realms.js owns the realm logic; the table lives here, because the
+// save checks (save-format.js) read it and must stay pure.
+// ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
+// { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
+const REALMS = {
+  overworld: { name: 'overworld', label: 'the Overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
+  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
+  crystal: { name: 'crystal', label: 'the Crystal Realm', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
+};
+// The weather kinds (weather.js). The save checks read them too.
+const WEATHER_KINDS = ['clear', 'rain', 'storm'];
 let glowGain = 1;               // HDR gain of emissive sources (sun, moon, flames, water glint); `post` sets it
 
 function hashString(s) {
@@ -108,6 +119,6 @@ function setGlowGain(v) { glowGain = v; }
 export {
   BOB_RATE, ckey, clamp, CLIMB_V, CONFIG, CS, EMBER_SPAWN_LIGHT, EMBER_WEIGHTS, emberMobType, EYE, FLY_SPEED, FLY_V, glowGain, GRAVITY, H, hashString, JUMP_V,
   LEAF_CATCH_V, LEAF_SPEED, ASH_SPEED, lerp, lidx, MAX_ANIMALS_PER_CHUNK, MAX_HOSTILE, MAX_PASSIVE, mulberry32, PLAYER_H,
-  PLAYER_W, randInt, randRange, REACH, SAVE, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
-  storage, UNLOADED, VOID_Y, VOL, WALK_SPEED,
+  PLAYER_W, randInt, randRange, REACH, REALMS, SAVE, SAVE_KEY, saveSettings, SEA, SEED, setGlowGain, SPRINT_MULT,
+  storage, UNLOADED, VOID_Y, VOL, WALK_SPEED, WEATHER_KINDS,
 };

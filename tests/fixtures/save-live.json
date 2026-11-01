@@ -1,0 +1,647 @@
+{
+ "v": 1,
+ "ids": 2,
+ "seed": 777001,
+ "dayTime": 0.020092555555555558,
+ "clock": 0.08330000000000291,
+ "player": {
+  "pos": [
+   0.5,
+   97,
+   36.5
+  ],
+  "spawn": [
+   12.5,
+   130,
+   21.5
+  ],
+  "yaw": 3.5342917352885173,
+  "pitch": 0,
+  "health": 17,
+  "flying": false
+ },
+ "inv": {
+  "slots": [
+   {
+    "id": 204,
+    "count": 1,
+    "dur": 393,
+    "ench": {
+     "efficiency": 2
+    }
+   },
+   {
+    "id": 101,
+    "count": 12
+   },
+   {
+    "id": 10,
+    "count": 40
+   },
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "sel": 2,
+  "loose": [
+   {
+    "id": 101,
+    "count": 2
+   }
+  ]
+ },
+ "armor": [
+  {
+   "id": 308,
+   "count": 1,
+   "dur": 165
+  },
+  null,
+  null,
+  null
+ ],
+ "edits": [
+  [
+   2147516417,
+   [
+    34191,
+    32,
+    35007,
+    11
+   ]
+  ],
+  [
+   2147581953,
+   [
+    34176,
+    36,
+    34178,
+    8,
+    34181,
+    63,
+    34992,
+    0,
+    34225,
+    146
+   ]
+  ]
+ ],
+ "te": [
+  {
+   "type": "furnace",
+   "x": 15,
+   "y": 133,
+   "z": 24,
+   "slots": [
+    {
+     "id": 102,
+     "count": 3
+    },
+    {
+     "id": 101,
+     "count": 1
+    },
+    null
+   ],
+   "burn": 39,
+   "burnMax": 40,
+   "cook": 2
+  },
+  {
+   "type": "chest",
+   "x": 16,
+   "y": 133,
+   "z": 24,
+   "slots": [
+    null,
+    null,
+    null,
+    null,
+    {
+     "id": 170,
+     "count": 5
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  },
+  {
+   "type": "chest",
+   "x": 24,
+   "y": 62,
+   "z": -17,
+   "slots": [
+    null,
+    null,
+    {
+     "id": 157,
+     "count": 7
+    },
+    {
+     "id": 102,
+     "count": 3
+    },
+    null,
+    {
+     "id": 236,
+     "count": 1,
+     "dur": 900,
+     "ench": {
+      "unbreaking": 2
+     }
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+     "id": 14,
+     "count": 6
+    },
+    null,
+    {
+     "id": 101,
+     "count": 10
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  }
+ ],
+ "homes": [
+  {
+   "name": "Fixture overworld",
+   "x": 12.5,
+   "y": 130,
+   "z": 21.5,
+   "yaw": 3.534
+  }
+ ],
+ "liquids": [
+  [
+   [
+    18,
+    133,
+    24
+   ]
+  ],
+  [
+   [
+    21,
+    133,
+    24
+   ]
+  ]
+ ],
+ "leaves": [
+  [
+   15,
+   136,
+   27
+  ]
+ ],
+ "farm": [
+  [
+   17,
+   133,
+   27,
+   36.04677146006831,
+   0
+  ]
+ ],
+ "vehicles": [
+  {
+   "kind": "boat",
+   "x": 15.5,
+   "y": 134,
+   "z": 30.5,
+   "yaw": 0.5
+  },
+  {
+   "kind": "cart",
+   "x": 18.5,
+   "y": 134,
+   "z": 30.5,
+   "yaw": 1.25
+  }
+ ],
+ "looted": [
+  "24,62,-17"
+ ],
+ "enchantSeed": 1551198619,
+ "weather": {
+  "kind": "rain",
+  "left": 199.9167
+ },
+ "realm": "crystal",
+ "realms": {
+  "ember": {
+   "edits": [
+    [
+     2147516416,
+     [
+      16980,
+      32,
+      16981,
+      36,
+      16983,
+      8,
+      16986,
+      63,
+      17796,
+      11,
+      17797,
+      0,
+      17030,
+      146
+     ]
+    ]
+   ],
+   "te": [
+    {
+     "type": "furnace",
+     "x": 4,
+     "y": 66,
+     "z": 5,
+     "slots": [
+      {
+       "id": 102,
+       "count": 3
+      },
+      {
+       "id": 101,
+       "count": 1
+      },
+      null
+     ],
+     "burn": 39,
+     "burnMax": 40,
+     "cook": 2
+    },
+    {
+     "type": "chest",
+     "x": 5,
+     "y": 66,
+     "z": 5,
+     "slots": [
+      null,
+      null,
+      null,
+      null,
+      {
+       "id": 170,
+       "count": 5
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "type": "chest",
+     "x": 40,
+     "y": 45,
+     "z": -6,
+     "slots": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+       "id": 256,
+       "count": 1
+      },
+      null,
+      {
+       "id": 174,
+       "count": 2
+      },
+      {
+       "id": 259,
+       "count": 4
+      },
+      null,
+      {
+       "id": 174,
+       "count": 1
+      },
+      null,
+      {
+       "id": 229,
+       "count": 1
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    }
+   ],
+   "homes": [
+    {
+     "name": "Fixture ember",
+     "x": 1.5,
+     "y": 63,
+     "z": 2.5,
+     "yaw": 3.534
+    }
+   ],
+   "liquids": [
+    [
+     [
+      7,
+      66,
+      5
+     ]
+    ],
+    [
+     [
+      10,
+      66,
+      5
+     ]
+    ]
+   ],
+   "leaves": [
+    [
+     4,
+     69,
+     8
+    ]
+   ],
+   "farm": [
+    [
+     6,
+     66,
+     8,
+     52.74472231633623,
+     0
+    ]
+   ],
+   "vehicles": [
+    {
+     "kind": "boat",
+     "x": 4.5,
+     "y": 67,
+     "z": 11.5,
+     "yaw": 0.5
+    },
+    {
+     "kind": "cart",
+     "x": 7.5,
+     "y": 67,
+     "z": 11.5,
+     "yaw": 1.25
+    }
+   ],
+   "looted": [
+    "40,45,-6"
+   ]
+  },
+  "crystal": {
+   "edits": [
+    [
+     2147516418,
+     [
+      25715,
+      32,
+      25716,
+      36,
+      25718,
+      8,
+      25721,
+      63,
+      26531,
+      11,
+      26532,
+      0,
+      25765,
+      146
+     ]
+    ]
+   ],
+   "te": [
+    {
+     "type": "furnace",
+     "x": 3,
+     "y": 100,
+     "z": 39,
+     "slots": [
+      {
+       "id": 102,
+       "count": 3
+      },
+      {
+       "id": 101,
+       "count": 1
+      },
+      null
+     ],
+     "burn": 39,
+     "burnMax": 40,
+     "cook": 2
+    },
+    {
+     "type": "chest",
+     "x": 4,
+     "y": 100,
+     "z": 39,
+     "slots": [
+      null,
+      null,
+      null,
+      null,
+      {
+       "id": 170,
+       "count": 5
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    }
+   ],
+   "homes": [
+    {
+     "name": "Fixture crystal",
+     "x": 0.5,
+     "y": 97,
+     "z": 36.5,
+     "yaw": 3.534
+    }
+   ],
+   "liquids": [
+    [
+     [
+      6,
+      100,
+      39
+     ]
+    ],
+    [
+     [
+      9,
+      100,
+      39
+     ]
+    ]
+   ],
+   "leaves": [
+    [
+     3,
+     103,
+     42
+    ]
+   ],
+   "farm": [
+    [
+     5,
+     100,
+     42,
+     42.74632721712444,
+     0
+    ]
+   ],
+   "vehicles": [
+    {
+     "kind": "boat",
+     "x": 3.5,
+     "y": 101,
+     "z": 45.5,
+     "yaw": 0.5
+    },
+    {
+     "kind": "cart",
+     "x": 6.5,
+     "y": 101,
+     "z": 45.5,
+     "yaw": 1.25
+    }
+   ],
+   "looted": [
+    "9,97,45"
+   ]
+  }
+ },
+ "portals": {
+  "crystalBack": [
+   12.5,
+   130,
+   21.5
+  ]
+ },
+ "boss": {
+  "defeated": true
+ }
+}

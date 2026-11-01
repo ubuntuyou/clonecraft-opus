@@ -6,7 +6,7 @@
 // `updatePlayer`, which seats the rider.
 import { THREE } from './three.js';
 import { clamp, EYE, GRAVITY, randRange, REACH, UNLOADED } from './config.js';
-import { B, DIR4, I, IS_LAVA, IS_RAIL, IS_WATER, LIQ_KIND, RAIL_ENDS, railUp, SOLID } from './blocks.js';
+import { B, DIR4, IS_LAVA, IS_RAIL, IS_WATER, LIQ_KIND, RAIL_ENDS, railUp, SOLID, VEHICLE_KINDS } from './blocks.js';
 import { camera, game, input, player, scene, world } from './engine.js';
 import { keyDown, setFlying } from './player.js';
 import { moveEntity } from './collision.js';
@@ -14,10 +14,6 @@ import { _dir, railLink, rayBox, raycast, resetMining, target } from './interact
 import { spawnDrop } from './drops.js';
 import { particles, audio, hud } from './order.js';
 
-const VEHICLE_KINDS = {
-  boat: { item: I.BOAT, w: 1.375, h: 0.6, stepH: 0.45, eye: 1.1, sound: 'wood' },
-  cart: { item: I.MINECART, w: 0.98, h: 0.7, stepH: 0, eye: 1.25, sound: 'stone' },
-};
 const BOAT_WATER_SPEED = 6, BOAT_LAND_SPEED = 1, BOAT_TURN = 2, CART_MAX = 8;
 const vehicles = (() => {
   const list = [];
@@ -265,4 +261,4 @@ const vehicles = (() => {
   return { list, spawn, remove, clear, update, ray, hit, mount, seat, exitSpot, dismount, placeHeld, data, load, railSeg };
 })();
 
-export { VEHICLE_KINDS, vehicles };
+export { vehicles };
