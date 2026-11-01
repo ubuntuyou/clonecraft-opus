@@ -7,12 +7,14 @@
 // The save checks live in save-format.js (validSave, readSave). A new save field needs a check there.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
 // play, on pause, and when the page hides or closes. An import sets `blocked`, so the
-// page-hide save cannot overwrite the imported save before the reload.
+// page-hide save cannot overwrite the imported save before the reload. A loose stack that does not
+// fit the 36 slots on load waits in `leftover`; boot drops it at the player once the chunks are meshed.
 import { THREE } from './three.js';
 import { REALMS, SAVE_KEY, SEED, storage } from './config.js';
 import { enchantSeed, IDS_VERSION, migrateIds, setEnchantSeed } from './blocks.js';
 import { game, player } from './engine.js';
 import { inv } from './inventory.js';
+import { spawnDrop } from './drops.js';
 import { validSave } from './save-format.js';
 import { vehicles } from './vehicles.js';
 import { $, hud } from './hud.js';
@@ -20,6 +22,7 @@ import { realm, weather } from './order.js';
 
 const persist = {
   timer: 0, savedAt: 0, warned: false, blocked: false,
+  leftover: [],   // {id, count, dur, ench} of each loose stack that did not fit on load
   savedAgo() { return this.savedAt ? `${Math.round((performance.now() - this.savedAt) / 1000)} s ago` : 'never'; },
   data() {
     const p = player, place = realm.place();
@@ -57,11 +60,25 @@ const persist = {
     for (let i = 0; i < 36; i++) inv.slots[i] = d.inv.slots[i] || null;
     inv.sel = d.inv.sel | 0;
     for (let i = 0; i < 4; i++) inv.armor[i] = (d.armor || [])[i] || null;
-    for (const s of d.inv.loose || []) inv.add(s.id, s.count, s.dur, s.ench);
+    const left = [];
+    for (const s of d.inv.loose || []) {
+      const n = inv.add(s.id, s.count, s.dur, s.ench);
+      if (n > 0) left.push({ id: s.id, count: n, dur: s.dur, ench: s.ench });
+    }
     realm.load(d);   // every realm slice: edits, chests, homes, liquids, leaves, farming, vehicles, looted
     if (Number.isInteger(d.enchantSeed)) setEnchantSeed(d.enchantSeed);
     weather.load(d.weather);
+    this.leftover = left;   // set last: an apply that throws leaves no drop for the fresh world
     this.savedAt = performance.now();
+  },
+  // Drops the leftover of apply at the player. Boot calls it once, after the chunks around the
+  // player are meshed, so the drops do not fall through unloaded terrain.
+  dropLeftover() {
+    const p = player;
+    for (const s of this.leftover) {
+      spawnDrop(s.id, s.count, p.pos.x, p.pos.y + 1, p.pos.z, null, 1.5, s.dur, s.ench).thrown = true;
+    }
+    this.leftover = [];
   },
 };
 addEventListener('pagehide', () => persist.save());
