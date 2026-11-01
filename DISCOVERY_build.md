@@ -12,6 +12,7 @@ Gotchas, pointers, and invariants for the module source in `src/` and the build.
 - `src/worldgen.js` has no imports. The worker runs `WorldGenModule.toString()` alone.
 - The pure modules (`PURE` in `tools/depcheck.js`) never reach `order.js`. Node tests import them without a browser.
 - `tools/depcheck.js` enforces all of these. Each error starts with its rule id: `order`, `main`, `downward`, `upward`, `readonly`, `free`, `worker`, or `pure`.
+- An immediately-invoked function runs at load time. The `upward` rule treats its body as load time, so a later-module name inside `(() => …)()` is an error. A plain function body still defers the read. The `planted` test helper asserts that each plant changes its file.
 
 ## Gotchas
 

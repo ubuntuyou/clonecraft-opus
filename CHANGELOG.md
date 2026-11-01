@@ -14,6 +14,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The
   - A save now holds `ids: 2`. An older save or export loads and imports with every armor piece intact: worn, in the inventory, in a chest, or held on the cursor.
   - An import rejects a save with an unknown `ids` value.
 
+### Fixed
+
+- A portal platform built in water no longer loses its panes (SPEC_hardening H4). The platform first turns every water or lava cell next to the portal into obsidian. Before, water flowed into the panes within a second, and the portal vanished.
+- `?rd=2` no longer hangs on the loading screen (SPEC_hardening H6). The render distance range is 3–16. The URL parameter, the saved setting, and the slider are held to that range.
+- The exit portal can no longer be broken after the boss kill (SPEC_hardening H7). Mining, TNT, and placement leave its frame and its panes whole. Nothing rebuilt it before.
+- A load no longer deletes the stacks that do not fit the inventory (SPEC_hardening H8). Stacks from the crafting grid, the altar, or the cursor that find no slot drop at the player.
+- The depcheck `upward` rule now catches a later-module name inside an immediately-invoked function (SPEC_hardening H9). Such a function runs at load time.
+
 ### Added
 
 - Save tests (SPEC_hardening H1–H3): a live fixture written by the game, a save-sweep mutation test with a ratchet baseline, a save-reader rule (only `save-format.js` parses save text), and planted fail proofs for each rule.
