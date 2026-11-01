@@ -50,3 +50,48 @@ async function loadAtlas(edit = {}) {
     return await import(pathToFileURL(join(dir, 'atlas.js')).href);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
+
+// Plants N extra tiles in atlas.js, just before the FACE_TILE table, so tileCount is 109 + N.
+const plantTiles = (n) => ({
+  atlas: (src) => src.replace('const FACE_TILE = new Int16Array', `for (let i = 0; i < ${n}; i++) paintTile('planted_' + i, () => {});\nconst FACE_TILE = new Int16Array`),
+});
+
+test('K3/4-1 the real atlas loads and fits', async () => {
+  const atlas = await loadAtlas();
+  assert.equal(atlas.ATLAS_TILES, 256);
+  assert.equal(atlas.tileCount, 109);
+  assert.ok(atlas.tileCount <= atlas.ATLAS_TILES);
+});
+
+test('K3/4-2 every block with tex has a tile on all six faces', async () => {
+  const [atlas, { BLOCKS }] = [await loadAtlas(), await import('../src/blocks.js')];
+  let checked = 0;
+  for (const def of BLOCKS) {
+    if (!def || !def.tex) continue;
+    checked++;
+    for (let face = 0; face < 6; face++) {
+      const tile = atlas.FACE_TILE[def.id * 6 + face];
+      assert.ok(tile >= 0 && tile < atlas.tileCount, `${def.name} (id ${def.id}) face ${face} has tile ${tile}`);
+    }
+  }
+  assert.ok(checked > 50, `only ${checked} blocks with tex`);
+});
+
+test('K3/4-3 K4 boundary: 147 planted tiles fill the atlas and load', async () => {
+  const atlas = await loadAtlas(plantTiles(147));
+  assert.equal(atlas.tileCount, atlas.ATLAS_TILES);
+});
+
+test('K3/4-4 K4: 148 planted tiles do not fit and the load rejects', async () => {
+  await assert.rejects(loadAtlas(plantTiles(148)), /does not fit/);
+});
+
+test('K3/4-5 K3: a misspelled tex name rejects and names the block', async () => {
+  const edit = { blocks: (src) => src.replace("tex: all('dirt')", "tex: all('drit')") };
+  await assert.rejects(loadAtlas(edit), (err) => /names no tile/.test(err.message) && /Dirt/.test(err.message) && /drit/.test(err.message));
+});
+
+test('K3/4-6 K3: a misspelled front name rejects, and the message names the front key', async () => {
+  const edit = { blocks: (src) => src.replace("front: 'table_front' }", "front: 'table_frnot' }") };
+  await assert.rejects(loadAtlas(edit), (err) => /names no tile/.test(err.message) && /Crafting Table/.test(err.message) && /tex\.front/.test(err.message));
+});
