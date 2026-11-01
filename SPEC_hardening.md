@@ -28,8 +28,8 @@ This spec fixes the save, portal, boss, and loading defects that the review foun
 - Chromium shows 0 game console errors. The python static server's `favicon.ico` 404 does not count.
 - Saves stay compatible. Every save that the current game writes loads after this spec, with no loss. `IDS_VERSION` does not change.
 - The boot fallback (H1) never deletes a rejected save. It copies the text to a backup key first.
-- Joe's seed 1234 world is in the Playwright browser's local storage. Back up its save text to the session scratchpad before the first QA run of Step 1. Do not commit it.
-- Use a throwaway seed for every QA run. After QA, set `persist.blocked = true`, remove the throwaway save key, and open `?seed=1234` so `lastSeed` returns to 1234.
+- Joe's world is seed 1379819663, in his own browser's local storage (`file://` origin). Joe exports it; rsh keeps the export in the session scratchpad. Do not commit it. Amended by Joe, 2026-11-01 16:25 CT: his world is seed 1379819663; seed 1234 was a test seed ("I exported the one I play").
+- Use a throwaway seed for every QA run. After QA, set `persist.blocked = true`, remove the throwaway save key, and restore `clonecraft.lastSeed` to its value before QA.
 - Reproduce a P finding before you fix it. H4 is the only P finding. If H4 does not reproduce, record the result in the gate file and leave the code unpatched.
 - A wave task runs `npm run check` in its worktree, but it does not commit `index.html`. The step close rebuilds `index.html` once on the merged branch and commits it. Parallel tasks would otherwise conflict on the 700 KB generated file.
 - Every new rule obeys `code.md ## Static checks`. It runs behind `npm run check`. It is deterministic. A scratch violation proves that it can fail.
@@ -176,7 +176,7 @@ Step 1 writes these names. Later tasks use them as the contract.
 ### Build order
 
 **Step 1 (one task, Opus): the save module.** Codes H3, then H2, then H1, in that order. Each code gets its own commit.
-1. Back up Joe's seed 1234 save text to the scratchpad.
+1. Back up Joe's seed 1379819663 save text to the scratchpad.
 2. Export a live fixture from a throwaway seed. Populate every slice field in the overworld, the Ember slice, and the Crystal slice: furnace and chest, home, liquid queue, leaf queue, farm cell, boat and cart, looted chest, `crystalBack`, and `boss`. Save the text as `tests/fixtures/save-live.json`.
 3. Build H3. Assert that the fixture passes the moved `validSave`, unchanged.
 4. Build H2 and the save-sweep rule.
@@ -201,7 +201,7 @@ Each step closes with these actions: merge, rebuild `index.html`, run `npm run c
   - In Playwright with a throwaway seed:
     - A corrupt save in `SAVE_KEY` gives a fresh world, a toast, and a backup key that holds the exact text.
     - A save that passes `readSave` but throws in apply gives the same result after one reload. Inject the throw with a scratch-only patch, then revert the patch.
-  - Seed 1234 opens with Continue, at the same position, with the boss still defeated.
+  - Seed 1379819663 opens with Continue, at the same position, with the boss still defeated.
 - **H2**
   - The live fixture passes `validSave`.
   - The save-sweep passes, and its fail proof fails as described.
@@ -229,6 +229,6 @@ Each step closes with these actions: merge, rebuild `index.html`, run `npm run c
 - Each step closes when all of its gate boxes are checked and `npm run check` passes on the merged branch.
 - These gates need owner review. They cannot be automated, and rsh does not declare them done:
   - Joe reviews the boot fallback's toast text and the backup key policy.
-  - Joe confirms that his seed 1234 world is intact after Step 1.
+  - Joe confirms that his seed 1379819663 world is intact after Step 1.
   - Joe approves each step merge.
   - Joe approves the release tag.

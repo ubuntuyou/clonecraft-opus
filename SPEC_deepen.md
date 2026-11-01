@@ -56,7 +56,7 @@ This spec deepens ten modules and fixes the bugs that the scan found on the way.
 - **P bugs reproduce first.** K4, K5, and K7 reproduce before the fix. A P bug that does not reproduce is recorded and left unpatched. K6 did not reproduce.
 - **Tests.** The 109 existing tests pass unchanged. In an existing test file, `git diff` shows added lines only. Test tasks follow the test-writing rules of `~/.claude/standards/advanced/orchestration.md`.
 - **Commits.** Conventional Commits, author `ubuntuyou`, no co-author trailer: `refactor(<scope>)` for M, `fix(<scope>)` for K, `test(<scope>)`, `docs(<scope>)`. A task never commits `index.html`.
-- **QA.** Throwaway seeds only. Never open seed 1234 or write its key. Record `clonecraft.lastSeed` before QA and restore it after.
+- **QA.** Throwaway seeds only. Never open Joe's seed 1379819663 or write its key (seed 1234 was a test seed; Joe, 2026-11-01 16:25 CT). Record `clonecraft.lastSeed` before QA and restore it after.
 
 ### Non-goals
 
