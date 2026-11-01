@@ -13,6 +13,7 @@ import {
 import { BIOME, BIOME_FOLIAGE, BIOME_GRASS, TINT_ALPHA } from './biomes.js';
 
 const ATLAS_SIZE = 256;
+const ATLAS_TILES = (ATLAS_SIZE / 16) ** 2;   // 16x16-pixel tiles; paintTile allows no more
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = atlasCanvas.height = ATLAS_SIZE;
 const actx = atlasCanvas.getContext('2d');
@@ -56,6 +57,7 @@ function tileVoronoi(rng, n) {
   return { cell, edge, rel, pts };
 }
 
+// TODO K4 (T3.1): throw `atlas: tile '<name>' does not fit; the atlas holds 256 tiles` when tileCount >= ATLAS_TILES.
 function paintTile(name, painter) {
   const index = tileCount++;
   TILE[name] = index;
@@ -797,11 +799,14 @@ atlasTexture.colorSpace = THREE.NoColorSpace;
 // Tile index for each block face: faceTiles[id*6 + face], face order +X,-X,+Y,-Y,+Z,-Z.
 // A facing block (furnace, chest) puts its front on one face; the table shows it on +Z and -Z.
 const FACE_TILE = new Int16Array(256 * 6).fill(-1);
+// The tile index that def.tex[key] names (key: side, top, bottom, or front).
+// TODO K3 (T3.1): throw `atlas: block <name> tex.<key> names no tile: <n>` when TILE lacks the name.
+function tileOf(def, key) { return TILE[def.tex[key]]; }
 for (const def of BLOCKS) {
   if (!def || !def.tex) continue;
   const t = def.tex;
-  const side = TILE[t.side], front = t.front ? TILE[t.front] : side;
-  const tiles = [side, side, TILE[t.top], TILE[t.bottom], front, front];
+  const side = tileOf(def, 'side'), front = t.front ? tileOf(def, 'front') : side;
+  const tiles = [side, side, tileOf(def, 'top'), tileOf(def, 'bottom'), front, front];
   if (def.facing >= 0) { tiles[4] = tiles[5] = side; tiles[DIR_FACE[def.facing]] = front; }
   FACE_TILE.set(tiles, def.id * 6);
 }
@@ -1233,6 +1238,6 @@ function mobTexture(base, variance, painter, w = 16, h = 16) {
 }
 
 export {
-  actx, ARMOR_URL, ATLAS_SIZE, atlasTexture, FACE_TILE, HANDLE, HEART_URL, ICON_URL, ITEM_PIX, MAT_COL,
+  actx, ARMOR_URL, ATLAS_SIZE, ATLAS_TILES, atlasTexture, FACE_TILE, HANDLE, HEART_URL, ICON_URL, ITEM_PIX, MAT_COL,
   mobTexture, TILE, tileCount, tintedPixels,
 };
