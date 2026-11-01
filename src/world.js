@@ -9,7 +9,7 @@
  * therefore still sees the old realm. `voidBelow` makes cells below y 0 read as air. `ambient`
  * is the realm's light floor: brightnessAt never reads below it (the shader uses uAmbient).
  * ===================================================================================== */
-import { ckey, CONFIG, CS, H, lidx, UNLOADED, VOL } from './config.js';
+import { ckey, CONFIG, CS, H, LIGHT_BLK, LIGHT_SKY, lidx, lightCurve, UNLOADED, VOL } from './config.js';
 import { ATTEN, B, EMIT, EMIT_CRY, LIGHT_STOP, OPAQUE, SKY_FREE, SOLID } from './blocks.js';
 import { GenService } from './gen-service.js';
 
@@ -130,10 +130,10 @@ class World {
   }
   // Brightness 0..1 of a cell (used to shade mobs, items, the held item).
   brightnessAt(x, y, z, daylight) {
-    // TODO(T6.1, K1): lightCurve(s, LIGHT_SKY) and lightCurve(b, LIGHT_BLK) with the 0.04 floor.
+    // The same normalized curves as the terrain shader (SPEC_deepen K1): sky light on curve, block light on curveB.
     const extra = this.extraLight ? this.extraLight(x, y, z) : 0;
     const s = this.getSky(x, y, z) * daylight, b = Math.max(this.getBlk(x, y, z), this.getCry(x, y, z), extra, this.ambient);
-    return Math.max(0.04, Math.pow(0.83, 15 - s), Math.pow(0.85, 15 - b));   // block light falls off slower (shader curveB)
+    return Math.max(0.04, lightCurve(s, LIGHT_SKY), lightCurve(b, LIGHT_BLK));
   }
   surfaceY(x, z) {                       // highest solid block, or -1 if unloaded
     const c = this.chunkAt(x, z);
