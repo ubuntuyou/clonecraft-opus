@@ -321,8 +321,13 @@ const SEED = (() => {
 storage.set('clonecraft.lastSeed', String(SEED));
 const SAVE_KEY = `clonecraft.world.${SEED}`;
 
+// Render distance limits (SPEC_hardening H6). The mesh radius is (RD + 0.5) chunks, and loading waits for
+// readyAround(..., READY_RADIUS). RD_MIN must keep (RD_MIN + 0.5) >= READY_RADIUS, or loading never ends.
+const RD_MIN = 3, RD_MAX = 16, RD_DEFAULT = 8, READY_RADIUS = 3;
+const clampRenderDistance = (n) => (Number.isFinite(n) ? Math.max(RD_MIN, Math.min(RD_MAX, Math.round(n))) : RD_DEFAULT);
+
 const CONFIG = {
-  renderDistance: 8, fov: 75, sensitivity: 1, volume: 0.6,
+  renderDistance: RD_DEFAULT, fov: 75, sensitivity: 1, volume: 0.6,
   shadows: true,               // sun and moon shadows (settings "Shadows: On")
   softShadows: true,           // a soft shadow edge (4 reads); false gives a hard edge (settings "Shadows: Soft edges")
   bloom: true,                 // bloom and light shafts (pause menu "Bloom + shafts")
@@ -339,11 +344,12 @@ try {
   for (const k of ['renderDistance', 'fov', 'sensitivity', 'volume']) if (typeof saved[k] === 'number') CONFIG[k] = saved[k];
   for (const k of ['freezeTime', 'shadows', 'softShadows', 'bloom']) if (typeof saved[k] === 'boolean') CONFIG[k] = saved[k];
   if (typeof saved.renderScale === 'number' && saved.renderScale >= 0.5 && saved.renderScale <= 1) CONFIG.renderScale = saved.renderScale;
+  CONFIG.renderDistance = clampRenderDistance(CONFIG.renderDistance);
   if ([0, 1, 2, 4, 8].includes(saved.aa)) CONFIG.aa = saved.aa;
   if (typeof saved.effects === 'number' && typeof saved.shadows !== 'boolean') CONFIG.shadows = CONFIG.bloom = saved.effects > 0;   // old 0-2 slider
 } catch (e) { /* storage blocked: keep defaults */ }
 if (urlParams.has('fx')) { const fx = parseInt(urlParams.get('fx'), 10) || 0; CONFIG.shadows = !!(fx & 1); CONFIG.bloom = !!(fx & 2); }   // 1 shadows, 2 bloom + shafts, 3 both
-if (urlParams.has('rd')) CONFIG.renderDistance = Math.max(2, Math.min(16, parseInt(urlParams.get('rd'), 10) || 8));
+if (urlParams.has('rd')) CONFIG.renderDistance = clampRenderDistance(parseInt(urlParams.get('rd'), 10));
 function saveSettings() {
   try { localStorage.setItem('clonecraft.settings', JSON.stringify({
     renderDistance: CONFIG.renderDistance, fov: CONFIG.fov, sensitivity: CONFIG.sensitivity, volume: CONFIG.volume,
@@ -922,7 +928,8 @@ function setEnchantSeed(v) { enchantSeed = v; }
  * SITE_R blocks horizontally of the target: a full solid floor, air (or a replaceable non-liquid)
  * for the frame, one clear side to step out, and no lava near it. Without a site, the plan is the
  * fallback platform: 4 x 3 obsidian at the frame's bottom row, air cleared above it, and every
- * lava cell next to the structure turned to obsidian. Either way, the portal never touches lava.
+ * liquid cell (water or lava) next to the structure turned to obsidian. Either way, the portal never
+ * touches lava, and no liquid can flow into the panes.
  * ===================================================================================== */
 
 const MIN_W = 2, MAX_W = 4, MIN_H = 3, MAX_H = 5;
@@ -1033,13 +1040,13 @@ function buildPlan(get, tx, ty, tz) {
   const put = (c, id) => { const k = c.join(','); if (!seen.has(k)) { seen.add(k); edits.push([c[0], c[1], c[2], id]); } };
   const cell = (u, v, d) => cellOf(axis, fx, fy, fz, u, v, d);
   if (platform) {
-    // lava next to the structure (platform row, cleared air, frame) turns to obsidian first
+    // liquid (water or lava) next to the structure (platform row, cleared air, frame) turns to obsidian first
     const inBox = (u, v, d) => u >= 0 && u < 4 && v >= 0 && v < 5 && d >= -1 && d <= 1;
     for (let d = -2; d <= 2; d++) for (let v = -1; v <= 5; v++) for (let u = -1; u <= 4; u++) {
       if (inBox(u, v, d)) continue;
       const touches = inBox(u + 1, v, d) || inBox(u - 1, v, d) || inBox(u, v + 1, d) || inBox(u, v - 1, d) || inBox(u, v, d + 1) || inBox(u, v, d - 1);
       const c = cell(u, v, d);
-      if (touches && LIQ_KIND[get(...c)] === 2) put(c, B.OBSIDIAN);
+      if (touches && LIQ_KIND[get(...c)]) put(c, B.OBSIDIAN);
     }
     for (let d = -1; d <= 1; d++) for (let u = 0; u < 4; u++) {
       put(cell(u, 0, d), B.OBSIDIAN);
@@ -9917,16 +9924,16 @@ addEventListener('keydown', (e) => {
   if (!e.repeat) showSettings(false);
 }, true);
 
-function bindSetting(id, valId, key, fmt, apply) {
+function bindSetting(id, valId, key, fmt, apply, norm) {
   const el = $(id), val = $(valId);
   el.value = CONFIG[key]; val.textContent = fmt(CONFIG[key]);
   el.addEventListener('input', () => {
-    CONFIG[key] = +el.value; val.textContent = fmt(CONFIG[key]);
+    CONFIG[key] = norm ? norm(+el.value) : +el.value; val.textContent = fmt(CONFIG[key]);
     if (apply) apply(CONFIG[key]);
     saveSettings();
   });
 }
-bindSetting('setRd', 'valRd', 'renderDistance', (v) => `${v} chunks`);
+bindSetting('setRd', 'valRd', 'renderDistance', (v) => `${v} chunks`, null, clampRenderDistance);
 bindSetting('setFov', 'valFov', 'fov', (v) => `${v}°`);
 bindSetting('setSens', 'valSens', 'sensitivity', (v) => `${(+v).toFixed(2)}×`);
 bindSetting('setVol', 'valVol', 'volume', (v) => `${Math.round(v * 100)}%`, (v) => audio.setVolume(v));
@@ -9985,10 +9992,12 @@ freezeEl.addEventListener('change', () => {
 // The save checks live in save-format.js (validSave, readSave). A new save field needs a check there.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
 // play, on pause, and when the page hides or closes. An import sets `blocked`, so the
-// page-hide save cannot overwrite the imported save before the reload.
+// page-hide save cannot overwrite the imported save before the reload. A loose stack that does not
+// fit the 36 slots on load waits in `leftover`; boot drops it at the player once the chunks are meshed.
 
 const persist = {
   timer: 0, savedAt: 0, warned: false, blocked: false,
+  leftover: [],   // {id, count, dur, ench} of each loose stack that did not fit on load
   savedAgo() { return this.savedAt ? `${Math.round((performance.now() - this.savedAt) / 1000)} s ago` : 'never'; },
   data() {
     const p = player, place = realm.place();
@@ -10026,11 +10035,25 @@ const persist = {
     for (let i = 0; i < 36; i++) inv.slots[i] = d.inv.slots[i] || null;
     inv.sel = d.inv.sel | 0;
     for (let i = 0; i < 4; i++) inv.armor[i] = (d.armor || [])[i] || null;
-    for (const s of d.inv.loose || []) inv.add(s.id, s.count, s.dur, s.ench);
+    const left = [];
+    for (const s of d.inv.loose || []) {
+      const n = inv.add(s.id, s.count, s.dur, s.ench);
+      if (n > 0) left.push({ id: s.id, count: n, dur: s.dur, ench: s.ench });
+    }
     realm.load(d);   // every realm slice: edits, chests, homes, liquids, leaves, farming, vehicles, looted
     if (Number.isInteger(d.enchantSeed)) setEnchantSeed(d.enchantSeed);
     weather.load(d.weather);
+    this.leftover = left;   // set last: an apply that throws leaves no drop for the fresh world
     this.savedAt = performance.now();
+  },
+  // Drops the leftover of apply at the player. Boot calls it once, after the chunks around the
+  // player are meshed, so the drops do not fall through unloaded terrain.
+  dropLeftover() {
+    const p = player;
+    for (const s of this.leftover) {
+      spawnDrop(s.id, s.count, p.pos.x, p.pos.y + 1, p.pos.z, null, 1.5, s.dur, s.ench).thrown = true;
+    }
+    this.leftover = [];
   },
 };
 addEventListener('pagehide', () => persist.save());
@@ -10280,7 +10303,7 @@ const realm = {
   updateTravel() {
     const t = this.travelling;
     if (!t) return;
-    const r = world.readyAround(t.to[0], t.to[2], 3);
+    const r = world.readyAround(t.to[0], t.to[2], READY_RADIUS);
     travelBar.style.width = `${Math.round(r * 100)}%`;
     if (r < 1) return;
     const p = t.arrive(t.to) || t.to;
@@ -10361,7 +10384,8 @@ const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('trave
  * to the crystalBack portal when a crystal pane still stands there, else to the player's spawn.
  *
  * The arrival portal is generated terrain, not edits (ARCHITECTURE D52). world.locked refuses every
- * edit to its frame and opening, so it is always lit and the player can never be stranded.
+ * edit to its frame and opening, so it is always lit and the player can never be stranded. After
+ * the boss kill (realm.boss.defeated), world.locked also refuses every edit to the exit portal box.
  *
  * `cells` maps "x,y,z" to the pane id of every pane cell in the loaded realm (the overrides, plus
  * the arrival panes in the Crystal Realm), for the sparks and the hum. It rebuilds when
@@ -10384,13 +10408,16 @@ const A = WG.CRYSTAL_ARRIVAL;
 // The arrival portal: its stand point (the middle of the opening's floor) and its locked box.
 const ARRIVAL_STAND = [A.x0 + (A.w >> 1) + 0.5, A.y0, A.z0 + 0.5];
 const inArrival = (x, y, z) => z === A.z0 && x >= A.x0 - 1 && x <= A.x0 + A.w && y >= A.y0 - 1 && y <= A.y0 + A.h;
+// The exit portal (boss.EXIT). boss.js loads after this module, so inExit reads EXIT only inside the
+// function. Its locked box is the frame ring around the panes.
+const inExit = (x, y, z) => { const E = boss.EXIT; return z === E.z && x >= E.x0 - 1 && x <= E.x0 + E.w && y >= E.y0 - 1 && y <= E.y0 + E.h; };
 
 const portals = (() => {
   const cells = new Map();          // "x,y,z" -> pane id of every pane cell in the loaded realm
   let known = null;                 // the override map that `cells` mirrors
   let t = 0, armed = false, warned = false, removing = false, kind = PE;
   const get = (x, y, z) => world.getBlock(x, y, z);
-  world.locked = (x, y, z) => world.realm === 'crystal' && inArrival(x, y, z);
+  world.locked = (x, y, z) => world.realm === 'crystal' && (inArrival(x, y, z) || (realm.boss.defeated && inExit(x, y, z)));
 
   function sync() {
     if (known === world.overrides) return;
@@ -11833,6 +11860,7 @@ function onLoaded() {
     player.spawn.copy(player.pos);
     player.yaw = openYaw(player.pos);
   }
+  persist.dropLeftover();            // loose stacks that did not fit the inventory; the chunks are meshed
   setState('menu');
   playBtn.disabled = false; playBtn.textContent = restored ? 'Continue' : 'Play';
   $('loadbar').style.display = 'none';
@@ -12360,7 +12388,7 @@ function frame(now) {
   world.update(player.pos.x, player.pos.z, camDir, game.state === 'loading' || game.state === 'travel' ? 40 : 7);
 
   if (game.state === 'loading') {
-    const r = world.readyAround(player.pos.x, player.pos.z, 3);
+    const r = world.readyAround(player.pos.x, player.pos.z, READY_RADIUS);
     loadBar.style.width = `${Math.round(r * 100)}%`;
     loadText.textContent = `Generating terrain… ${world.chunks.size} chunks`;
     if (r >= 1) onLoaded();
