@@ -23,7 +23,8 @@
  *   2. Block and item definitions: blocks (ENCH: enchantments; restack() copies a stack with
  *      dur and ench); portal-frame (the pure Ember portal geometry: frame check, build plan);
  *      save-format (the save checks, the edits codec, and the boot reader readSave; pure)
- *   3. Procedural texture atlas: biomes, atlas (blocks, cracks, item icons, mob skins)
+ *   3. Procedural texture atlas: biomes, precip (the pure precipitation rule), atlas (blocks,
+ *      cracks, item icons, mob skins)
  *   4. Noise functions + 5. World generation: worldgen. WorldGenModule() is a pure function
  *      that gen-service serializes into Web Workers. Chunk data = f(seed, cx, cz).
  *      Structures (dungeon, temple, tower, mineshaft) stamp only cells of their own chunk and

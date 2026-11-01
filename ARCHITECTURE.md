@@ -51,6 +51,7 @@ Loading and every travel wait for `readyAround(..., READY_RADIUS)`, with `READY_
 
 The loop calls `post.render()` for the world, clears depth, then renders the held item (`vmScene`, `vmCamera`). The held item never clips into walls. It also never blooms, catches light shafts, or gets anti-aliasing.
 `renderer.info.autoReset` is off, so the debug screen counts all passes.
+The draw order of the world pass is one table: `DRAW_ORDER` in `config.js` (SPEC_deepen M10). Every `renderOrder` value comes from it: the dome (-10), the sun, the moon, and the halo (-9), the terrain (0), the water (1), the stars (1.5), the clouds and the crack overlay (2), and the transparent effects (3). The mesher gets the terrain and water values as arguments. The effects (rain, snow, ash, fireflies, and particles) draw after the water, so they show in front of it. A new drawn layer adds one key, and test M10-1 checks the order.
 
 ### D13. Post-processing is one module with one entry point
 
@@ -182,6 +183,7 @@ A stamp reports each chest and spawner as a chunk feature `{kind, x, y, z, type}
 
 `weather` holds one global state: a kind (`clear`, `rain`, or `storm`) and the time left. Two fade values, `k` (wet) and `storm`, move toward the kind over 6 s. Every consumer reads the fade values, not the kind, so no consumer jumps at a change.
 The biome and the height decide what falls. `zone(x, z)` reads the chunk biome: a desert gives nothing, and a snowy biome gives snow at every height. Elsewhere the drop's height decides: snow at or above `SNOW_LINE` + 1, rain below it. The rule once read the column's top block instead. That speckled slopes and treetops near the line with snow amid rain (Joe, 2026-10-01). A height rule gives one clean line. The biome map and the block grid already exist, so weather adds no world data.
+The rule lives in the pure module `precip.js` (SPEC_deepen M9). `zoneOf(biome)` gives the zone: 0 dry, 1 by height, 2 always snow. `precipKind(zone, top, melt)` gives the kind: 0 none, 1 rain, 2 snow. `snowFloor` and `rainFloor` give the floor of a drop, or -1. `melt` is a parameter, so `precip.js` imports only `biomes.js`, and Node tests run the rule with no world. `weather.js` keeps `precip`, `zone`, `melt`, `top`, and `wetAt` on its handle; `precip`, `zone`, and its `snowFloor` wrap the module for one column.
 Drops live in two fixed pools around the camera. A drop takes the top block of its column as its floor, so it never falls through a roof or into a cave. A snow flake in a by-height zone takes the higher of the top block and the snow line as its floor. A snow flake that sways into another column re-reads that column. The pools cost no lighting work and no mesh rebuild.
 The sky keeps its own clock. `game.clearDaylight` is the daylight without weather. `game.daylight` multiplies in `weather.dim` and the lightning flash, so terrain, mobs, and fog darken with no change of their own. Mob burning reads `clearDaylight` and `wetAt()`, so rain stops the burn and a dark storm alone does not.
 Only the kind and the time left go into the save. The fade values restart at their end values on load.
@@ -378,7 +380,7 @@ The realm sounds follow the same rule. `audio.js` holds the one-shot sounds: the
 | vehicles | `vehicles.update(dt)` runs once per frame before `updatePlayer`. `vehicles.mount(v)`, `dismount()`, and `placeHeld(item)` are the entry points (D27). |
 | structure loot | `lootChest(x, y, z)` returns the filled tile entity of an unfilled generated chest, or null. `tileEntity()` and the chest spill call it (D28). |
 | spawners | `spawners.update(dt)` runs once per frame. It reads `chunk.features` and counts against `MAX_HOSTILE` (D28). In the Ember Realm, `spawnHostiles` picks the type with `emberType`, which asks `WG.inFortress` (D50). |
-| weather | `weather.update(dt)` runs once per frame before `sky.update`. The sky reads `weather.k`, `storm`, `dim`, and `flash`. Mobs read `weather.wetAt(x, z)`. `set(kind, seconds)` and `strike(x, z)` are the entry points (D29). |
+| weather | `weather.update(dt)` runs once per frame before `sky.update`. The sky reads `weather.k`, `storm`, `dim`, and `flash`. Mobs read `weather.wetAt(x, z)`. `set(kind, seconds)` and `strike(x, z)` are the entry points. `weather.js` asks `precip.js` what falls; `precip.js` hides the zone table and the height rule (D29). |
 | clouds | `clouds.advance(dt, weather.k, weather.storm)` runs once per frame from `sky.update`. Shaders spread `cloudUniforms` and include `CLOUD_GLSL`; `clouds.densityAt(x, z)` gives the same density on the CPU (D44). |
 | screens | `setState(s)`. |
 | rendering | `heldLight.update()`, then `shadows.render()`, then `post.render()` draw the world each frame. `post.resize()` follows the window. `terrainUniforms` carries the shadow map, the held-light texture, and `uWet` (D30, D31, D32). |

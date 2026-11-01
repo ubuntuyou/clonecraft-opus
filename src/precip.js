@@ -4,7 +4,7 @@
  * The precipitation rule, pure. Terms: a biome's **zone** (0 dry, 1 height rule, 2 always snow);
  * a column's **kind** (0 none, 1 rain, 2 snow) from its zone, its top block `top`, and the snow
  * line `melt`; a **floor** is the y where a drop lands, or -1. weather.js wraps these per column.
- * Imports only biomes.js; never reaches order.js. Rules: DISCOVERY_engine.md (weather).
+ * Imports only biomes.js; never reaches order.js. Why: ARCHITECTURE.md D29. Gotchas: DISCOVERY_engine.md.
  * ===================================================================================== */
 import { BIOME } from './biomes.js';
 

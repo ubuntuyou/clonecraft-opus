@@ -4,8 +4,10 @@
 // daylight to 0.75x in rain and 0.55x in a storm, greys the sky and clouds, and pulls the fog 30% in.
 // The precipitation depends on the biome and the height: none in a desert, snow at every height in
 // snowy biomes. Elsewhere the drop's height decides: snow at or above MELT (SNOW_LINE + 1), rain below
-// it, so a slope or a treetop never mixes the two. A drop never falls below the top non-air block of
-// its column, so roofs, trees, and caves stay dry. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
+// it, so a slope or a treetop never mixes the two. precip.js holds this rule (pure; SPEC_deepen M9);
+// zone, precip, and snowFloor here wrap it for one column. A drop never falls below the top non-air
+// block of its column, so roofs, trees, and caves stay dry. The pools draw at DRAW_ORDER.EFFECTS,
+// after the water. In a storm a bolt strikes every 5..20 s within 64 blocks. It deals 5 to
 // the player and mobs within 3 blocks and lights nothing. Thunder follows at THUNDER_SPEED blocks/s.
 // Weather falls only in a realm with `weather: true` (the overworld). The kind and its timer keep
 // counting in every realm; elsewhere k and storm target 0. snap() sets them at once (realm travel).
