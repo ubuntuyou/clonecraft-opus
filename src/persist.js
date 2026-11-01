@@ -1,8 +1,8 @@
 // ---- save and load ------------------------------------------------------------------
 // One save per seed in localStorage (SAVE_KEY). It holds the block edits (overridesByChunk),
 // the player, the inventory, furnaces and chests, homes, queued liquid cells, and the time.
-// Realms: the top-level slice fields hold the overworld. `realm` names the realm of the player,
-// `realms` holds the ember and crystal slices, and `portals` and `boss` hold their state.
+// Realms: realm.data() (realms.js) owns the realm part of the save: the overworld slice at the top
+// level, `realm`, `realms`, `portals`, and `boss`. persist.data spreads it and adds the rest.
 // `ids` names the id plan of the save (IDS_VERSION). migrateIds upgrades an older save at boot and at import.
 // The save checks live in save-format.js (validSave, readSave). A new save field needs a check there.
 // Mobs and dropped items are not saved. Autosave: every CONFIG.autosaveEvery seconds of
@@ -10,7 +10,7 @@
 // page-hide save cannot overwrite the imported save before the reload. A loose stack that does not
 // fit the 36 slots on load waits in `leftover`; boot drops it at the player once the chunks are meshed.
 import { THREE } from './three.js';
-import { REALMS, SAVE_KEY, SEED, storage } from './config.js';
+import { SAVE_KEY, SEED, storage } from './config.js';
 import { enchantSeed, IDS_VERSION, migrateIds, setEnchantSeed } from './blocks.js';
 import { game, player } from './engine.js';
 import { inv } from './inventory.js';
@@ -30,15 +30,12 @@ const persist = {
     // During a travel load the player saves at the place before travel (realm.place).
     const out = p.vehicle && !p.dead ? vehicles.exitSpot(p.vehicle) : null;
     const pos = place.pos ? new THREE.Vector3().fromArray(place.pos) : p.dead ? p.spawn : out ? new THREE.Vector3(out.x, out.y, out.z) : p.pos;
-    const realms = {};
-    for (const name of Object.keys(REALMS)) if (name !== 'overworld') { const sl = realm.slice(name); if (sl) realms[name] = sl; }
     return {
       v: 1, ids: IDS_VERSION, seed: SEED, dayTime: game.dayTime, clock: game.clock,
       player: { pos: pos.toArray(), spawn: p.spawn.toArray(), yaw: p.yaw, pitch: p.pitch, health: p.dead ? p.maxHealth : p.health, flying: p.flying && !p.dead },
       inv: { slots: inv.slots, sel: inv.sel, loose: [...inv.craft, ...inv.altar, inv.cursor].filter(Boolean) },
       armor: inv.armor,
-      ...realm.slice('overworld'), enchantSeed, weather: weather.data(),
-      realm: place.name, realms, portals: { ...realm.portals }, boss: { ...realm.boss },
+      ...realm.data(), enchantSeed, weather: weather.data(),
     };
   },
   save() {
