@@ -17,7 +17,8 @@
  *    drops. A shockwave ring then runs out along the floor to SLAM_R (shockwave()). It hits a
  *    player on the floor as its edge passes, so a jump over the edge avoids it.
  *  - 'dying': it spins and cracks for DEATH_T s, then shatters, drops its loot, and builds the
- *    exit portal (built lit) at the arena center.
+ *    exit portal (built lit) at the arena center. A realm.leave() during the animation shatters
+ *    it at once (boss.finish), so a travel never loses the kill.
  * Sounds (audio.js): a roar when it wakes and when the phase rises (a deeper one into phase 3),
  * a shard ping per fan, a rising whine through the slam warning, a boom when the slam lands, and a
  * crystal shatter for each broken pylon and for the death.
@@ -277,11 +278,15 @@ class Titan extends Mob {
     return false;
   }
 
-  shatter() {
+  // The end of the kill: the loot, the exit portal, `defeated`, `victoryPending`, and a save.
+  // fx = false skips the burst and the sound (boss.finish: the player is leaving the realm).
+  shatter(fx = true) {
     const x = this.pos.x, y = this.pos.y + 2, z = this.pos.z;
-    particles.crystalBurst(x, y, z, 160, 10);
-    particles.explosion(x, y, z, 2);
-    audio.shatter(x, y, z, true);
+    if (fx) {
+      particles.crystalBurst(x, y, z, 160, 10);
+      particles.explosion(x, y, z, 2);
+      audio.shatter(x, y, z, true);
+    }
     for (const m of shardlings()) { m.dead = true; m.deathT = 0; }   // they fall and poof, with no drops
     // the loot lands in front of the exit portal (the arrival side, +z) when the boss dies near it
     const dz = Math.abs(x - 0.5) < 4 && Math.abs(z) < 3 ? 3.5 - z : 0;
@@ -321,6 +326,13 @@ const boss = {
   wasDead: false,
   HOME, PYLONS, EXIT, WAKE_R, SLEEP_R,
   get pylonsStanding() { return standingPylons().length; },
+
+  // realm.leave calls this first. A Titan in its death animation shatters at once, so the loot and
+  // the exit portal land in the crystal stash and the save holds the kill (H5).
+  finish() {
+    const t = this.titan;
+    if (t && t.state === 'dying' && mobs.includes(t)) t.shatter(false);
+  },
 
   update(dt) {
     const crystal = realm.current === 'crystal';

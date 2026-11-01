@@ -34,9 +34,9 @@ function emberMobType(r, inFortress) {
 // ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
 // { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
 const REALMS = {
-  overworld: { name: 'overworld', label: 'the Overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
-  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
-  crystal: { name: 'crystal', label: 'the Crystal Realm', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
+  overworld: { name: 'overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
+  ember: { name: 'ember', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
+  crystal: { name: 'crystal', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
 };
 // The weather kinds (weather.js). The save checks read them too.
 const WEATHER_KINDS = ['clear', 'rain', 'storm'];

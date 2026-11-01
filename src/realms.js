@@ -39,7 +39,7 @@ import { $, hud } from './hud.js';
 import { fadeIn, setState } from './menus.js';
 import { persist } from './persist.js';
 import { closeHomes, homes, setHomes } from './homes.js';
-import { weather } from './order.js';
+import { boss, weather } from './order.js';
 import { WG } from './gen-service.js';
 import { editsOf, mapsOf, SLICE_FIELDS } from './save-format.js';
 
@@ -93,8 +93,10 @@ const realm = {
     this.enter(stashOf(slices[this.current]));
   },
 
-  // Detaches the live realm-scoped state into a stash and clears the modules.
+  // Detaches the live realm-scoped state into a stash and clears the modules. A dying Titan
+  // shatters first, so its loot and exit portal join the stash.
   leave() {
+    boss.finish();
     const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
     for (const d of s.drops) scene.remove(d.mesh);
     tileEntities.clear(); looted.clear(); setHomes([]);
@@ -193,15 +195,18 @@ function standNear(to) {
   return [x0 + 0.5, y0, z0 + 0.5];
 }
 
+// The ember y of an overworld y: y - EMBER_DY, clamped to EMBER_Y_MIN..EMBER_Y_MAX.
+const EMBER_DY = 64, EMBER_Y_MIN = 33, EMBER_Y_MAX = 110;
+
 // The default target of a travel without `to`. Crystal: the arrival portal's stand point. Else the
-// player's point in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the
-// Ember Realm. An ember y is the overworld y - 64, clamped to 33..110.
+// player's point in overworld terms (from the Crystal Realm: crystalBack or the spawn). The Ember
+// Realm divides x and z by REALMS.ember.scale and maps y with EMBER_DY and the clamp.
 function defaultTarget(name) {
   if (name === 'crystal') { const a = WG.CRYSTAL_ARRIVAL; return [a.x0 + (a.w >> 1) + 0.5, a.y0, a.z0 + 0.5]; }
-  const p = player.pos;
+  const p = player.pos, k = REALMS.ember.scale;
   const o = realm.current === 'crystal' ? realm.portals.crystalBack || player.spawn.toArray()
-    : realm.current === 'ember' ? [p.x * 8, p.y + 64, p.z * 8] : p.toArray();
-  return name === 'ember' ? [o[0] / 8, Math.max(33, Math.min(110, o[1] - 64)), o[2] / 8] : o;
+    : realm.current === 'ember' ? [p.x * k, p.y + EMBER_DY, p.z * k] : p.toArray();
+  return name === 'ember' ? [o[0] / k, Math.max(EMBER_Y_MIN, Math.min(EMBER_Y_MAX, o[1] - EMBER_DY)), o[2] / k] : o;
 }
 
 const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('travelBar').firstChild;
