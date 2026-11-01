@@ -284,9 +284,9 @@ function emberMobType(r, inFortress) {
 // ambient: the block-light floor of unlit cells (Phase 2). fog: null follows the sky; else
 // { color, far } caps the fog distance. voidBelow: a cell below y 0 is air.
 const REALMS = {
-  overworld: { name: 'overworld', label: 'the Overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
-  ember: { name: 'ember', label: 'the Ember Realm', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
-  crystal: { name: 'crystal', label: 'the Crystal Realm', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
+  overworld: { name: 'overworld', scale: 1, sky: 'day', ambient: 0, fog: null, voidBelow: false, weather: true, enter: 'Returning to the Overworld…' },
+  ember: { name: 'ember', scale: 8, sky: 'ember', ambient: 9, fog: { color: 0x4a1409, far: 72 }, voidBelow: false, weather: false, enter: 'Entering the Ember Realm…' },
+  crystal: { name: 'crystal', scale: 1, sky: 'crystal', ambient: 0, fog: { color: 0x2a1446, far: Infinity }, voidBelow: true, weather: false, enter: 'Entering the Crystal Realm…' },
 };
 // The weather kinds (weather.js). The save checks read them too.
 const WEATHER_KINDS = ['clear', 'rain', 'storm'];
@@ -10244,8 +10244,10 @@ const realm = {
     this.enter(stashOf(slices[this.current]));
   },
 
-  // Detaches the live realm-scoped state into a stash and clears the modules.
+  // Detaches the live realm-scoped state into a stash and clears the modules. A dying Titan
+  // shatters first, so its loot and exit portal join the stash.
   leave() {
+    boss.finish();
     const s = { overrides: world.overrides, overridesByChunk: world.overridesByChunk, slice: this.slice(this.current), drops: drops.splice(0) };
     for (const d of s.drops) scene.remove(d.mesh);
     tileEntities.clear(); looted.clear(); setHomes([]);
@@ -10344,15 +10346,18 @@ function standNear(to) {
   return [x0 + 0.5, y0, z0 + 0.5];
 }
 
+// The ember y of an overworld y: y - EMBER_DY, clamped to EMBER_Y_MIN..EMBER_Y_MAX.
+const EMBER_DY = 64, EMBER_Y_MIN = 33, EMBER_Y_MAX = 110;
+
 // The default target of a travel without `to`. Crystal: the arrival portal's stand point. Else the
-// player's point in overworld terms (from the Crystal Realm: crystalBack or the spawn), at 1:8 for the
-// Ember Realm. An ember y is the overworld y - 64, clamped to 33..110.
+// player's point in overworld terms (from the Crystal Realm: crystalBack or the spawn). The Ember
+// Realm divides x and z by REALMS.ember.scale and maps y with EMBER_DY and the clamp.
 function defaultTarget(name) {
   if (name === 'crystal') { const a = WG.CRYSTAL_ARRIVAL; return [a.x0 + (a.w >> 1) + 0.5, a.y0, a.z0 + 0.5]; }
-  const p = player.pos;
+  const p = player.pos, k = REALMS.ember.scale;
   const o = realm.current === 'crystal' ? realm.portals.crystalBack || player.spawn.toArray()
-    : realm.current === 'ember' ? [p.x * 8, p.y + 64, p.z * 8] : p.toArray();
-  return name === 'ember' ? [o[0] / 8, Math.max(33, Math.min(110, o[1] - 64)), o[2] / 8] : o;
+    : realm.current === 'ember' ? [p.x * k, p.y + EMBER_DY, p.z * k] : p.toArray();
+  return name === 'ember' ? [o[0] / k, Math.max(EMBER_Y_MIN, Math.min(EMBER_Y_MAX, o[1] - EMBER_DY)), o[2] / k] : o;
 }
 
 const travelEl = $('travel'), travelText = $('travelText'), travelBar = $('travelBar').firstChild;
@@ -10611,7 +10616,8 @@ const portals = (() => {
  *    drops. A shockwave ring then runs out along the floor to SLAM_R (shockwave()). It hits a
  *    player on the floor as its edge passes, so a jump over the edge avoids it.
  *  - 'dying': it spins and cracks for DEATH_T s, then shatters, drops its loot, and builds the
- *    exit portal (built lit) at the arena center.
+ *    exit portal (built lit) at the arena center. A realm.leave() during the animation shatters
+ *    it at once (boss.finish), so a travel never loses the kill.
  * Sounds (audio.js): a roar when it wakes and when the phase rises (a deeper one into phase 3),
  * a shard ping per fan, a rising whine through the slam warning, a boom when the slam lands, and a
  * crystal shatter for each broken pylon and for the death.
@@ -10854,11 +10860,15 @@ class Titan extends Mob {
     return false;
   }
 
-  shatter() {
+  // The end of the kill: the loot, the exit portal, `defeated`, `victoryPending`, and a save.
+  // fx = false skips the burst and the sound (boss.finish: the player is leaving the realm).
+  shatter(fx = true) {
     const x = this.pos.x, y = this.pos.y + 2, z = this.pos.z;
-    particles.crystalBurst(x, y, z, 160, 10);
-    particles.explosion(x, y, z, 2);
-    audio.shatter(x, y, z, true);
+    if (fx) {
+      particles.crystalBurst(x, y, z, 160, 10);
+      particles.explosion(x, y, z, 2);
+      audio.shatter(x, y, z, true);
+    }
     for (const m of shardlings()) { m.dead = true; m.deathT = 0; }   // they fall and poof, with no drops
     // the loot lands in front of the exit portal (the arrival side, +z) when the boss dies near it
     const dz = Math.abs(x - 0.5) < 4 && Math.abs(z) < 3 ? 3.5 - z : 0;
@@ -10898,6 +10908,13 @@ const boss = {
   wasDead: false,
   HOME, PYLONS, EXIT, WAKE_R, SLEEP_R,
   get pylonsStanding() { return standingPylons().length; },
+
+  // realm.leave calls this first. A Titan in its death animation shatters at once, so the loot and
+  // the exit portal land in the crystal stash and the save holds the kill (H5).
+  finish() {
+    const t = this.titan;
+    if (t && t.state === 'dying' && mobs.includes(t)) t.shatter(false);
+  },
 
   update(dt) {
     const crystal = realm.current === 'crystal';

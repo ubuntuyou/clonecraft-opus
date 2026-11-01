@@ -48,40 +48,42 @@ Merged as 0e4a995 (2026-10-31). Toast deviation: the HUD is hidden on the menu, 
 
 ## Step 2: the wave (H4, H6, H7, H8, H9)
 
+Merged on main (4eaa7ba code, 40b6fef exit box from boss.EXIT, docs accc3b5), 2026-10-31. H4 reproduced in game on f4bc17e (seed 778001: 6 panes to 0 at +346 ms). After the fix: 52 samples over 10.5 s kept 6/6 panes, and travel back succeeded. Browser QA: 0 game console errors.
+
 ### H4: sealed platform (P finding: reproduce first)
-- [ ] The Node portal-seal test is red on the unfixed code (water case).
-- [ ] The Playwright repro shows the panes disappear within 2 s. If it does not reproduce, record the result here and skip the fix boxes.
-- [ ] The fix turns water and lava cells that touch the structure into obsidian.
-- [ ] The portal-seal test passes for both liquid kinds.
-- [ ] Playwright: a platform portal over the ocean still works after 10 s, and travel back succeeds.
+- [x] The Node portal-seal test is red on the unfixed code (water case).
+- [x] The Playwright repro shows the panes disappear within 2 s. If it does not reproduce, record the result here and skip the fix boxes.
+- [x] The fix turns water and lava cells that touch the structure into obsidian.
+- [x] The portal-seal test passes for both liquid kinds.
+- [x] Playwright: a platform portal over the ocean still works after 10 s, and travel back succeeds.
 
 ### H6: render distance
-- [ ] `RD_MIN`, `RD_MAX`, `READY_RADIUS`, and `clampRenderDistance` exist in `config.js`. `main.js` and `realms.js` use `READY_RADIUS`.
-- [ ] The rd-ready test passes.
-- [ ] Fail proof (rd-ready): a scratch `RD_MIN = 2` fails the test and names `rd-ready`. Reverted.
-- [ ] Playwright: `?rd=2` loads with render distance 3.
-- [ ] `README.md` says "3–16".
+- [x] `RD_MIN`, `RD_MAX`, `READY_RADIUS`, and `clampRenderDistance` exist in `config.js`. `main.js` and `realms.js` use `READY_RADIUS`.
+- [x] The rd-ready test passes.
+- [x] Fail proof (rd-ready): a scratch `RD_MIN = 2` fails the test and names `rd-ready`. Reverted.
+- [x] Playwright: `?rd=2` loads with render distance 3.
+- [x] `README.md` says "3–16".
 
 ### H7: locked exit portal
-- [ ] Playwright, boss defeated: mining an exit frame block does nothing.
-- [ ] Playwright, boss defeated: TNT next to the exit portal leaves it whole.
-- [ ] Before the kill, arena edits behave as before.
+- [x] Playwright, boss defeated: mining an exit frame block does nothing.
+- [x] Playwright, boss defeated: TNT next to the exit portal leaves it whole.
+- [x] Before the kill, arena edits behave as before.
 
 ### H8: loose stack leftover
-- [ ] Playwright: after the reload, the leftover lies as drops at the player, and the item counts match the counts before the reload.
+- [x] Playwright: after the reload, the leftover lies as drops at the player, and the item counts match the counts before the reload.
 
 ### H9: IIFE-aware upward
-- [ ] The planted IIFE test is red on the unfixed `depcheck.js`.
-- [ ] The planted IIFE test passes after the fix. The plant asserts that it changed the text.
-- [ ] `node tools/depcheck.js` passes on the live source with no baseline.
+- [x] The planted IIFE test is red on the unfixed `depcheck.js`.
+- [x] The planted IIFE test passes after the fix. The plant asserts that it changed the text.
+- [x] `node tools/depcheck.js` passes on the live source with no baseline.
 
 ### Step 2 close
-- [ ] All five branches are merged. `npm run build`, then `npm run check` passes. `index.html` is committed once.
-- [ ] 0 game console errors in Chromium.
-- [ ] `ARCHITECTURE.md`: D16 seed and render distance notes, D49 or D52 notes the exit lock, and D39 or D42 notes the IIFE rule.
-- [ ] `DISCOVERY_engine.md`: the exit lock and `READY_RADIUS` are recorded.
-- [ ] `CHANGELOG.md` `[Unreleased]` lists H4 and H6–H9.
-- [ ] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
+- [x] All five branches are merged. `npm run build`, then `npm run check` passes. `index.html` is committed once.
+- [x] 0 game console errors in Chromium.
+- [x] `ARCHITECTURE.md`: D16 seed and render distance notes, D49 or D52 notes the exit lock, and D39 or D42 notes the IIFE rule.
+- [x] `DISCOVERY_engine.md`: the exit lock and `READY_RADIUS` are recorded.
+- [x] `CHANGELOG.md` `[Unreleased]` lists H4 and H6–H9.
+- [x] QA cleanup: throwaway keys removed, `lastSeed` back to 1234, snapshots deleted.
 - [ ] **(owner)** Joe approves the Step 2 merge.
 
 ## Step 3: boss kill and travel ratio (H5, H10)
