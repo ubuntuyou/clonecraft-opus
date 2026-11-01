@@ -126,73 +126,73 @@ The step gate passes. The 109 existing tests pass, and `git diff main -- tests` 
 ## Wave 2
 
 ### S5: realm-scoped table and layout (M1, M2, K8) — `step/deepen-5-realm-scoped`
-- [ ] Contract commit (W2 contract agent, opus); rsh reviewed it.
-- [ ] Wave dispatched: T5.1 opus, T5.2 sonnet, T5.3 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: the "Every step" checks pass.
-- [ ] Unit: M1-1 (with its planted fail proof).
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: drop `looted` from `SCOPED` → M1-1 fails, and the guard throws at load.
-- [ ] Mutation: `editIndex.load` without `!(v & 8)` → M1-3 shows a timer on a top half.
-- [ ] Mutation: `homesSlice.clear` as `homes.length = 0` → M1-3 loses the stashed homes.
-- [ ] Mutation: `teSlice.clear` reassigns a new Map → M1-3 leak check fails through the handle.
-- [ ] Mutation: `realm.data` drops `portals` → M2-2 fails.
-- [ ] Structure: `realms.js` has no `tileEntities`, `looted`, `torches`, `doorTimers`, or `setHomes` reference; `persist.js` has no `REALMS` or `realm.slice`.
-- [ ] Structure: `git diff main -- src/liquids.js src/leaf-decay.js src/farming.js src/vehicles.js src/main.js` is empty (no renames; handle keys unchanged).
-- [ ] QA: M1-2 realm round trip, save, reload; `persist.data()` deep-equal modulo clock.
-- [ ] QA: M1-3 leak check, torch and door-timer keys, door closes.
-- [ ] QA: M2-1
-- [ ] QA: M2-2
-- [ ] QA: 0 game console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md` Seams row (K8); `DISCOVERY_engine.md` ("a new scoped field adds one `SCOPED` entry"); `realms.js` header; `CHANGELOG.md` (Changed M1, M2; Fixed K8).
+- [x] Contract commit (W2 contract agent, opus); rsh reviewed it. Note: S5 b6e0948; rsh reviewed it by diff stat.
+- [x] Wave dispatched: T5.1 opus, T5.2 sonnet, T5.3 sonnet. Note: rsh dispatch, 2026-11-01 10:50 CT; T5.1 8a9fcb2, T5.2 a7158ee, T5.3 2fe8edc.
+- [x] Owns check by `git diff --stat`. Note: `homes.js`, `interact.js`, `persist.js`, `realms.js`, `tile-entities.js`, `tests/realm-slice.test.js` only (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Integrate: the "Every step" checks pass. Note: S5 tip 15d3904: depcheck pass, 177/177, build ok; fixtures diff empty; live fixture passes `readSave`; sweep baseline unchanged; no user-visible text change (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Unit: M1-1 (with its planted fail proof). Note: 8 `M1-1` tests incl. the planted copy without `looted`; green on `main` edf2906.
+- [x] Ported cases: none deleted. Note: `tests/realm-slice.test.js` is new; +119/-0 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: drop `looted` from `SCOPED` → M1-1 fails, and the guard throws at load. Note: 3 `M1-1` tests fail; the guard throws (`/tmp/deepen-clonecraft/w2-integrate.md` 5).
+- [x] Mutation: `editIndex.load` without `!(v & 8)` → M1-3 shows a timer on a top half. Note: browser QA, doorTimers held `7,37,1` and `7,38,1` (`/tmp/deepen-clonecraft/w2-qa.md` C1).
+- [x] Mutation: `homesSlice.clear` as `homes.length = 0` → M1-3 loses the stashed homes. Note: browser QA, homes lost in 3 places (`/tmp/deepen-clonecraft/w2-qa.md` C2).
+- [x] Mutation: `teSlice.clear` reassigns a new Map → M1-3 leak check fails through the handle. Note: browser QA, ember and crystal keys leak through the handle (`/tmp/deepen-clonecraft/w2-qa.md` C3).
+- [x] Mutation: `realm.data` drops `portals` → M2-2 fails. Note: browser QA, `/portals` and `/portals/crystalBack` missing, 131 against 133 paths (`/tmp/deepen-clonecraft/w2-qa.md` C4).
+- [x] Structure: `realms.js` has no `tileEntities`, `looted`, `torches`, `doorTimers`, or `setHomes` reference; `persist.js` has no `REALMS` or `realm.slice`. Note: grep on `main` edf2906: the only code hit is the `SCOPED` key `looted: lootedSlice` (`realms.js:57`), which the M1 table requires; it names no `looted` set. Comments aside, no other hit.
+- [x] Structure: `git diff main -- src/liquids.js src/leaf-decay.js src/farming.js src/vehicles.js src/main.js` is empty (no renames; handle keys unchanged). Note: `git diff 69da971` (the wave base) on `main` edf2906 is empty.
+- [x] QA: M1-2 realm round trip, save, reload; `persist.data()` deep-equal modulo clock. Note: seeds 792001, 792004; 0 diffs (`/tmp/deepen-clonecraft/w2-qa.md` B).
+- [x] QA: M1-3 leak check, torch and door-timer keys, door closes. Note: no leak; timers on bottom halves only; the door closes after about 7 s (`/tmp/deepen-clonecraft/w2-qa.md` B).
+- [x] QA: M2-1 Note: the saved JSON equals `persist.data()`; `validSave` true (`/tmp/deepen-clonecraft/w2-qa.md` B).
+- [x] QA: M2-2 Note: 133 saved key paths match the wave base; only the intended key order differs (`/tmp/deepen-clonecraft/w2-qa.md` B).
+- [x] QA: 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w2-qa.md` A and the setup line.
+- [x] Docs: `ARCHITECTURE.md` Seams row (K8); `DISCOVERY_engine.md` ("a new scoped field adds one `SCOPED` entry"); `realms.js` header; `CHANGELOG.md` (Changed M1, M2; Fixed K8). Note: 65a2099 (also the save row, D47, and `DISCOVERY_save-format.md`); the `realms.js` header came with T5.1.
 - [ ] **(owner)** Joe reviews the S5 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: 4d32132; worktrees d5, d5a..d5c and their branches removed.
 
 ### S6: world seam, light curve, batched (M6, K1, K9) — `step/deepen-6-world-seam`
-- [ ] Contract commit (W2 contract agent, opus), written against the post-S4 `sky.js`; rsh reviewed it.
-- [ ] Contract amendment: depcheck.test.js:36 plant moves from world.js to mesher.js; the test still expects `upward`.
-- [ ] Wave dispatched: T6.1 opus, T6.2 sonnet, T6.3 sonnet.
-- [ ] Owns check by `git diff --stat`.
-- [ ] Integrate: merged after S5; the "Every step" checks pass.
-- [ ] Unit: M6-1
-- [ ] Unit: M6-2
-- [ ] Unit: M6-3
-- [ ] Unit: M6-4
-- [ ] Unit: M6-5
-- [ ] Unit: M6-6
-- [ ] Unit: M6-7
-- [ ] Unit: M6-8
-- [ ] Unit: M6-9
-- [ ] Unit: M6-10
-- [ ] Unit (`batched`): M6-11
-- [ ] Unit (`batched`): M6-12
-- [ ] Unit (`batched`): M6-13
-- [ ] Unit (`batched`): M6-14
-- [ ] Unit: K1-1
-- [ ] Unit: K1-2
-- [ ] Unit: K1-3
-- [ ] Unit: K1-4
-- [ ] Ported cases: none deleted.
-- [ ] Mutation: drop the neighbor-lit check → M6-2 fails.
-- [ ] Mutation: skip `refreshColumn` at arrival → M6-3 fails.
-- [ ] Mutation: `L - 1 - ATTEN` → `L - 1`, and drop the `LIGHT_STOP` continue → M6-5 fails (each).
-- [ ] Mutation: `onEdit` before the relight → M6-6 fails.
-- [ ] Mutation: drop `extraLight` from the max → M6-7 fails.
-- [ ] Mutation: drop the unload in `reset` → M6-8 fails.
-- [ ] Mutation: `RD + 3` → `RD + 4` → M6-9 fails.
-- [ ] Mutation: drop the `batched` join → M6-12 fails; drop `finally` → M6-13 fails; capture the set at open → M6-14 fails.
-- [ ] Mutation: unrounded curve constants → K1-3 fails; drop the normalization → K1-1 fails.
-- [ ] Structure: `world.js` imports only `config`, `blocks`, `gen-service`; `world` is in `PURE`; `order.js` no longer re-exports `buildChunkMesh` or `heldLight`; 0 literal `pow(0.8` sites in `src/`; the curves come only from `LIGHT_GLSL` and `lightCurve` (this states the same intent as "one `pow(0.8` site": one source; `config.js` builds the GLSL text from `LIGHT_SKY` and `LIGHT_BLK`); no reader of `world.scene`.
-- [ ] QA: an edit remeshes once with no hole; a realm round trip does not grow `renderer.info.memory.geometries`; a held torch brightens mobs.
-- [ ] QA: K1 before/after screenshots (mob, drop, held item; dark cave, night) and the level table are attached here.
-- [ ] **(owner)** Joe looks at the K1 screenshots and the level table, and accepts the darker entities.
-- [ ] QA: 0 game console errors; cleanup done.
-- [ ] Docs: `ARCHITECTURE.md` (Seams row world to mesh adapter; D31 `world.extraLight`; D6 lists `travel` and `victory` (K9); D48 `lightCurve`); `DISCOVERY_engine.md` (World is Node-testable; `batched`); headers of `world.js`, `mesher.js`, `engine.js` (K9); `CHANGELOG.md` (Changed M6; Fixed K1 with the darker-entity note, K9).
+- [x] Contract commit (W2 contract agent, opus), written against the post-S4 `sky.js`; rsh reviewed it. Note: S6 bc14ef1; rsh reviewed it by diff stat and the one test retarget.
+- [x] Contract amendment: depcheck.test.js:36 plant moves from world.js to mesher.js; the test still expects `upward`. Note: rsh approved it; `tests/depcheck.test.js:36` plants into `mesher` and expects `upward`; the only changed line in `git diff 69da971 -- tests`.
+- [x] Wave dispatched: T6.1 opus, T6.2 sonnet, T6.3 sonnet. Note: rsh dispatch, 2026-11-01 10:52 CT; T6.1 774c8da, T6.2 1c2940f, T6.3 ac2e489 and 04a982f.
+- [x] Owns check by `git diff --stat`. Note: all files in S6 Owns plus the amendment (`/tmp/deepen-clonecraft/w2-integrate.md`, S6 2).
+- [x] Integrate: merged after S5; the "Every step" checks pass. Note: S5 merge 4d32132, then S6 merge 9e0639b; S6 tip 16c37dd: depcheck pass, 200/200, build ok; fixtures diff empty; no user-visible text change (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Unit: M6-1 Note: green on `main` edf2906.
+- [x] Unit: M6-2 Note: green on `main` edf2906.
+- [x] Unit: M6-3 Note: green on `main` edf2906.
+- [x] Unit: M6-4 Note: green on `main` edf2906.
+- [x] Unit: M6-5 Note: green on `main` edf2906.
+- [x] Unit: M6-6 Note: green on `main` edf2906.
+- [x] Unit: M6-7 Note: green on `main` edf2906.
+- [x] Unit: M6-8 Note: green on `main` edf2906; the spec line was amended to one `dispose` per loaded chunk (e37a10f).
+- [x] Unit: M6-9 Note: green on `main` edf2906.
+- [x] Unit: M6-10 Note: green on `main` edf2906.
+- [x] Unit (`batched`): M6-11 Note: green on `main` edf2906.
+- [x] Unit (`batched`): M6-12 Note: green on `main` edf2906.
+- [x] Unit (`batched`): M6-13 Note: green on `main` edf2906.
+- [x] Unit (`batched`): M6-14 Note: green on `main` edf2906.
+- [x] Unit: K1-1 Note: green on `main` edf2906.
+- [x] Unit: K1-2 Note: green on `main` edf2906.
+- [x] Unit: K1-3 Note: green on `main` edf2906; each `LIGHT_GLSL` function equals the old `curve` or `curveB` line byte for byte. The assembled fragment shaders differ in 2 known places only: the `curveB` line lost its 2-space indent, and one GLSL comment moved to a JS comment in `config.js`. The vertex shaders are identical, and the compiled behavior is the same (terrain parity 0 px, `/tmp/deepen-clonecraft/w2-qa.md` F; `/tmp/deepen-clonecraft/w2-integrate.md` S6 4).
+- [x] Unit: K1-4 Note: green on `main` edf2906.
+- [x] Ported cases: none deleted. Note: tests diff is additions plus the amended depcheck line (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: drop the neighbor-lit check → M6-2 fails. Note: the whole check and the `.lit` part alone are caught by M6-2 (the zero-budget test, 16c37dd; `/tmp/deepen-clonecraft/w2-integrate.md` follow-up).
+- [x] Mutation: skip `refreshColumn` at arrival → M6-3 fails. Note: caught by M6-3 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: `L - 1 - ATTEN` → `L - 1`, and drop the `LIGHT_STOP` continue → M6-5 fails (each). Note: ATTEN (both sites and one site) caught by "M6-5 a leaf cell takes ATTEN" (16c37dd); `LIGHT_STOP` caught by M6-5 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: `onEdit` before the relight → M6-6 fails. Note: caught by M6-6 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: drop `extraLight` from the max → M6-7 fails. Note: caught by M6-7 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: drop the unload in `reset` → M6-8 fails. Note: caught by M6-8 and M6-14 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: `RD + 3` → `RD + 4` → M6-9 fails. Note: caught by name by M6-9 after the boolean asserts (16c37dd; `/tmp/deepen-clonecraft/w2-integrate.md` follow-up).
+- [x] Mutation: drop the `batched` join → M6-12 fails; drop `finally` → M6-13 fails; capture the set at open → M6-14 fails. Note: each caught by its test (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Mutation: unrounded curve constants → K1-3 fails; drop the normalization → K1-1 fails. Note: caught by K1-3 and K1-5; K1-1, K1-3, K1-5 (`/tmp/deepen-clonecraft/w2-integrate.md`).
+- [x] Structure: `world.js` imports only `config`, `blocks`, `gen-service`; `world` is in `PURE`; `order.js` no longer re-exports `buildChunkMesh` or `heldLight`; 0 literal `pow(0.8` sites in `src/`; the curves come only from `LIGHT_GLSL` and `lightCurve` (this states the same intent as "one `pow(0.8` site": one source; `config.js` builds the GLSL text from `LIGHT_SKY` and `LIGHT_BLK`); no reader of `world.scene`. Note: grep on `main` edf2906: `world.js` imports `config`, `blocks`, `gen-service`; `world` in `PURE`; no `buildChunkMesh` or `heldLight` in `order.js`; 0 `pow(0.8` sites; 0 `world.scene` readers.
+- [x] QA: an edit remeshes once with no hole; a realm round trip does not grow `renderer.info.memory.geometries`; a held torch brightens mobs. Note: all 49 chunk mesh hashes equal the wave base; 1 build per chunk per edit; geometries 481, 465, 449, 449; `brightnessAt` 0.0855 → 0.8356 with a torch (`/tmp/deepen-clonecraft/w2-qa.md` D).
+- [x] QA: K1 before/after screenshots (mob, drop, held item; dark cave, night) and the level table are attached here. Note: `/tmp/deepen-clonecraft/qa-w2/k1-{cave,night,ember}-{before,after}.png`. Level table (brightness before → after): cave block 11, mob and drop 0.6141 → 0.5772, eye 0.2725 → 0.2028; open night 0.1414 → 0.0855 (held item floors at 0.1); Ember ambient 9, 0.3771 → 0.3175 (equals `uAmbient`). Block levels 0: 0.087 → 0.040; 4: 0.167 → 0.088; 8: 0.321 → 0.256; 12: 0.614 → 0.577; 15: 1 → 1. Terrain pixels unchanged (`/tmp/deepen-clonecraft/w2-qa.md` E).
+- [ ] **(owner)** Joe looks at the K1 screenshots and the level table, and accepts the darker entities. Note by rsh: the pairs are `/tmp/deepen-clonecraft/qa-w2/k1-*`; the table is in the QA box above.
+- [x] QA: 0 game console errors; cleanup done. Note: `/tmp/deepen-clonecraft/w2-qa.md` A and the setup line.
+- [x] Docs: `ARCHITECTURE.md` (Seams row world to mesh adapter; D31 `world.extraLight`; D6 lists `travel` and `victory` (K9); D48 `lightCurve`); `DISCOVERY_engine.md` (World is Node-testable; `batched`); headers of `world.js`, `mesher.js`, `engine.js` (K9); `CHANGELOG.md` (Changed M6; Fixed K1 with the darker-entity note, K9). Note: 9764104 (the mesh adapter is the new D57 and the "world to meshes" Seams row; D3 and the block-edits row name `batched`; D4 and the light-queries row name the one curve source); the `engine.js` K9 header came with T6.3 ac2e489.
 - [ ] **(owner)** Joe reviews the S6 diff.
-- [ ] Merged to `main`; worktrees and branches removed.
+- [x] Merged to `main`; worktrees and branches removed. Note: 9e0639b; worktrees d6, d6a..d6c, dw2qa and their branches (and `qa/deepen-w2`) removed.
 
 ### W2 close
-- [ ] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once.
+- [x] `npm run build`, then `npm run check` passes on `main`. `index.html` committed once. Note: edf2906; depcheck pass, 210/210, fresh-build check pass.
 - [ ] **(owner)** Joe approves the W2 merge.
 
 ## Wave 3
